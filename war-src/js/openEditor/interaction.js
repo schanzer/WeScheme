@@ -130,6 +130,10 @@ WeSchemeInteractions = (function () {
         this.interactions = interactions;
         this.div = jQuery("<div><span class='top-aligned-inline-block'>&gt;&nbsp;</span><span class='top-aligned-inline-block' style='width: 90%'/></div>");
         parentDiv.append(this.div);
+                        
+        // LOCAL TRANSLATOR STATE
+        this.__nenv = this.__nenv ? this.__nenv : initDashNenv;
+        this.__venv = this.__venv ? this.__venv : initDashVenv;
 
         var innerDivElt = this.div.find("span").get(1);
         new plt.wescheme.WeSchemeTextContainer(
@@ -651,6 +655,25 @@ WeSchemeInteractions = (function () {
                     that.notifyBus("before-run", that);
 
                     that.disableInput();
+                    try {
+                      var sexp = lex(aSource);
+                      console.log("LEXER OUTPUT:");
+                      console.log(sexpToString(sexp));
+                      var AST = parse(sexp);
+                      console.log("PARSER OUTPUT:");
+                      console.log(AST.join("\n"));
+                      var result = runprogSlashEnvs(AST, that.prompt.__nenv, that.prompt.__venv);
+                      var progres = first(result); // the program-result
+                      that.prompt.__nenv = second(result); // update the environments for future use
+                      that.prompt.__venv = third(result);
+                      var res = [];
+                      for(var i = 0; i < progres.vals.length; i++) {
+                        res[i] = sexpToString(progres.vals[i]);
+                      }
+                      console.log(res);
+                    } catch(e){
+                      console.log("!!!!ERROR!!!\n"+e.message);
+                    }
                     that.evaluator.executeProgram(
                         sourceName,
                         aSource,
