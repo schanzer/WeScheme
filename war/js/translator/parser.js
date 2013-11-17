@@ -1,3 +1,18 @@
+////////////////////////////////////// ERROR MESSAGES ////////////////
+// the location struct
+var Location = function(sCol, sLine, eCol, eLine, i, id){
+  this.sCol = sCol;   // starting index into the line
+  this.sLine= sLine;  // starting line # (1-index)
+  this.eCol = eCol;   // ending line # (1-index)
+  this.eLine= eLine;  // ending index into the line
+  this.i = i;         // index into the whole program
+  this.id = id;       // [OPTIONAL] id of the containing DOM element
+  this.toString = function(){
+    return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
+  };
+}
+
+
 ///////////////////////////////////////// Constructor Wrappers ////////////////////////
 function makeDashDefDashFunc(name, args, body) { return new defDashFunc(name, args, body); };
 function makeDashDefDashVar(name, expr) { return new defDashVar(name, expr); };
@@ -605,7 +620,7 @@ var parseDashExprDashSingleton = (function (sexp) {
   ((symbolEqualSignP(new quote("true"), sexp)) || (symbolEqualSignP(new quote("false"), sexp))) ? makeDashBooleanDashExpr(sexp) :
   sexp :
   imageP(sexp) ? parseDashImage(sexp) :
-  error(new quote("parse-expr-singleton"), stringDashAppend("SExp, ", sexpDashGreaterThanString(sexp), ", does not represent any atomic Scheme expression"));
+  error(new quote("parse-expr-singleton"), stringDashAppend("( ): ", sexpDashGreaterThanString(sexp), "expected a function, but nothing's there"));
 });
 
 var parseDashImage = (function (img) {
