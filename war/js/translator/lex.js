@@ -18,11 +18,11 @@
 /////////////////////
 
 // a collection of common RegExps
-var res = new Object();
+var res = {};
 res.leftListDelims = /[(\u005B\u007B]/;
 res.rightListDelims = /[)\u005D\u007D]/;
 res.quotes = /[\'`,]/;
-
+              
 // the delimiters encountered so far, which need to be matched
 var delims;
 // line/column counters
@@ -33,57 +33,60 @@ var column;
 /* Primary Methods */
 /////////////////////
 
-// readProg : String -> [ListOf SExp]
+// readProg : String -> SExp
 // reads multiple sexps encoded into this string and converts them to a SExp
 // datum
 function readProg(str) {
-  var i = line = column = 0; // initialize all position indices
-  var data = [];
+//               console.log("readProg");
+  var i = sCol = sLine = line = column = 0; // initialize all position indices
+  var sexps = [];
   delims = [];
   while(i < str.length) {
-    var temp = readSExpByIndex(str, i);
-    if(!(temp[0] instanceof Comment)) {
-      data.push(temp[0]);
+    var sexp = readSExpByIndex(str, i);
+    if(!(sexp instanceof Comment)) {
+      sexps.push(sexp);
     }
-    i = chewWhiteSpace(str, temp[1]);
+    i = chewWhiteSpace(str, sexp.location.i);
   }
-  return data;
+  return sexps;
 }
 
-// readSSFile : String -> [ListOf SExp]
+// readSSFile : String -> SExp
 // removes the first three lines of the string that contain DrScheme meta data
 function readSSFile(str) {
-  var i = line = column = 0; // initialize all position indices
+  var i = sCol = sLine = line = column = 0; // initialize all position indices
   var crs = 0;
 
   while(i < str.length && crs < 3) {
     if(str.charAt(i++) == "\n") { crs++; }
   }
 
-  var data = [];
+  var sexps = [];
   delims = [];
   while(i < str.length) {
-    var temp = readSExpByIndex(str, i);
-    if(!(temp[0] instanceof Comment)) {
-      data.push(temp[0]);
+    var sexp = readSExpByIndex(str, i);
+    if(!(sexp instanceof Comment)) {
+      sexps.push(sexp);
     }
-    i = chewWhiteSpace(str, temp[1]);
+    i = chewWhiteSpace(str, sexp.location.i);
   }
-  return data;
+  return sexps;
 }
 
 // readSExp : String -> SExp
 // reads the first sexp encoded in this string and converts it to a SExp datum
 function readSExp(str) {
+//               console.log("readSexp");
   delims = [];
-  var temp = readSExpByIndex(str, 0)[0];
-  return temp instanceof Comment ? null : temp;
+  var sexp = readSExpByIndex(str, 0);
+  return sexp instanceof Comment ? null : sexp;
 }
 
-// readSExpByIndex : String Number -> [SExp, Number]
+// readSExpByIndex : String Number -> SExp
 // reads a sexp encoded as a string starting at the i'th character and converts
 // it to a SExp datum
 function readSExpByIndex(str, i) {
+//               console.log("readSexpByIndex: starting at "+i);
   var sCol = column, sLine = line;
   var p;
   p = str.charAt(i);
@@ -91,21 +94,22 @@ function readSExpByIndex(str, i) {
   i = chewWhiteSpace(str, i);
 
   if(i >= str.length) {
-    throwError("Unexpected EOF while reading a SExp, at "
-               + new Location(sCol, sLine, column, line, i));
+    throwError("Unexpected EOF while reading a SExp, at " +
+               new Location(sCol, sLine, column, line, i));
   }
-
-  return res.leftListDelims.test(p) ? readList(str, i) :
-         p == '"'                   ? readString(str, i) :
-         p == '#'                   ? readPoundSExp(str, i) :
-         p == ';'                   ? readLineComment(str, i) :
-         res.quotes.test(p)         ? readQuote(str, i) :
-         /* else */                   readSymbolOrNumber(str, i);
+  var sexp = res.leftListDelims.test(p) ? readList(str, i) :
+             p == '"'                   ? readString(str, i) :
+             p == '#'                   ? readPoundSExp(str, i) :
+             p == ';'                   ? readLineComment(str, i) :
+             res.quotes.test(p)         ? readQuote(str, i) :
+              /* else */                   readSymbolOrNumber(str, i);
+   return sexp;
 }
 
-// readList : String Number -> [[ListOf SExp], Number]
+// readList : String Number -> SExp
 // reads a list encoded in this string with the left delimiter at index i
 function readList(str, i) {
+//               console.log("readList");
   var sCol = column, sLine = line;
   var openingDelim = str.charAt(i++);
   var p;
@@ -118,32 +122,33 @@ function readList(str, i) {
     // track line/char values while we scan
     if(str.charAt(i) === "\n"){ line++; column = 0;}
     else { column++; }
-    var element = readSExpByIndex(str, i);
-    if(!(element[0] instanceof Comment)) {
-      list.push(element[0]);
+    var sexp = readSExpByIndex(str, i);
+    if(!(sexp instanceof Comment)) {
+      list.push(sexp);
     }
-    i = chewWhiteSpace(str, element[1]);
+    i = chewWhiteSpace(str, sexp.location.i);
   }
 
   if(i >= str.length) {
-    throwError("read: Unexpected EOF when reading a list at "
-               + new Location(sCol, sLine, column, line, i)
-               + list.toString());
+    throwError("read: Unexpected EOF when reading a list at " +
+               new Location(sCol, sLine, column, line, i) +
+               list.toString());
   }
   if(!matchingDelims(openingDelim, str.charAt(i))) {
-    throwError("read: Mismatched delimiters, expected to find "
-	       + otherDelim(openingDelim) + " but instead found "
-	       + str.charAt(i) + " at "
-         + new Location(sCol, sLine, column, line, i));
+    throwError("read: Mismatched delimiters, expected to find " +
+               otherDelim(openingDelim) + " but instead found " +
+               str.charAt(i) + " at " +
+               new Location(sCol, sLine, column, line, i));
   }
-
-  return [list, i+1];
+  list.location = new Location(sCol, sLine, column, line, i+1);
+  return list;
 }
 
-// readString : String Number -> [String, Number]
+// readString : String Number -> SExp
 // reads a string encoded in this string with the leftmost quotation mark
 // at index i
 function readString(str, i) {
+//               console.log("readString");
   var sCol = column, sLine = line;
   i++; // skip over the opening quotation mark and char
   column++;
@@ -159,17 +164,17 @@ function readString(str, i) {
     if(chr == '\\') {
       chr = str.charAt(++i);
       chr = chr == 'a'  ? '\u0007' :
-	    chr == 'b'  ? '\b' :
-	    chr == 't'  ? '\t' :
-	    chr == 'n'  ? '\n' :
-	    chr == 'v'  ? '\v' :
-	    chr == 'f'  ? '\f' :
-	    chr == 'r'  ? '\r' :
-	    chr == 'e'  ? '\u0027' :
-	    chr == '"'  ? '"' :
-	    chr == "'"  ? "'" :
-	    chr == '\\' ? '\\' :
-	    throwError("Escape sequence not supported at "
+      chr == 'b'  ? '\b' :
+      chr == 't'  ? '\t' :
+      chr == 'n'  ? '\n' :
+      chr == 'v'  ? '\v' :
+      chr == 'f'  ? '\f' :
+      chr == 'r'  ? '\r' :
+      chr == 'e'  ? '\u0027' :
+      chr == '"'  ? '"' :
+      chr == "'"  ? "'" :
+      chr == '\\' ? '\\' :
+      throwError("Escape sequence not supported at "
                  + new Location(sCol, sLine, column, line, i)
                  + ", \\" + chr);
     }
@@ -179,14 +184,17 @@ function readString(str, i) {
   if(i >= str.length) {
     throwError("read: expected a closing \'\"\' "
                + new Location(sCol, sLine, column, line, i)
-               + "ended with " + chr);
+               + " ended with " + chr);
   }
-  return [datum, i+1];
+  var atom = types.string(datum);
+  atom.location = new Location(sCol, sLine, column, line, i+1);
+  return atom;
 }
 
-// readPoundSExp : String Number -> [SExp, Number]
+// readPoundSExp : String Number -> SExp
 // reads a sexp begining with a # sign.
 function readPoundSExp(str, i) {
+//               console.log("readPoundSExp");
   var sCol = column, sLine = line;
   i++; // skip over the pound sign
   column++;
@@ -194,25 +202,27 @@ function readPoundSExp(str, i) {
   var datum;
   if(i < str.length) {
     var p = str.charAt(i);
-    datum = p == 't' || p == 'T' ? [true, i+1] :
-            p == 'f' || p == 'F' ? [false, i+1] :
-	    p == '\\' ? readChar(str, i-1) :
-	    p == '|'  ? readMultiLineComment(str, i-1) :
-	    p == ';'  ? readSExpComment(str, i-1) :
-      /* else */  throwError("Unknown pound-prefixed sexp at "
-                             + new Location(sCol, sLine, column, line, i));
+    datum =   p == 't' || p == 'T' ? [true, i+1] :
+              p == 'f' || p == 'F' ? [false, i+1] :
+              p == '\\' ? readChar(str, i-1) :
+              p == '|'  ? readMultiLineComment(str, i-1) :
+              p == ';'  ? readSExpComment(str, i-1) :
+              /* else */  throwError("Unknown pound-prefixed sexp at " +
+                                     new Location(sCol, sLine, column, line, i));
   } else {
     throwError("read: Unexpected EOF when reading a pound-prefixed sexp at"
                + new Location(sCol, sLine, column, line, i)
                + " already read: " + datum);
   }
 
+  datum.location = new Location(sCol, sLine, column, line, i);
   return datum;
 }
 
-// readChar : String Number -> [Character, Number]
+// readChar : String Number -> Atom
 // reads a character encoded in the string and returns a representative datum
 function readChar(str, i) {
+//               console.log("readChar");
   var sCol = column, sLine = line;
   i+=2; // skip over the #\
   column+=2;
@@ -224,22 +234,24 @@ function readChar(str, i) {
     datum += str.charAt(i++);
   }
   datum = datum == 'nul' || datum == 'null' ? new charDashVal('\u0000') :
-          datum == 'backspace' ? new charDashVal('\b') :
-	  datum == 'tab'       ? new charDashVal('\t') :
-	  datum == 'newline'   ? new charDashVal('\n') :
-	  datum == 'vtab'      ? new charDashVal('\u000B') :
-	  datum == 'page'      ? new charDashVal('\u000C') :
-	  datum == 'return'    ? new charDashVal('\r') :
-	  datum == 'space'     ? new charDashVal('\u0020') :
-	  datum == 'rubout'    ? new charDashVal('\u007F') :
-	  datum.length === 1   ? new charDashVal(datum) :
-	  throwError("read: Unsupported character at "
-               + new Location(sCol, sLine, column, line, i)
-               + " #\\" + datum);
-  return [datum, i];
+                      datum == 'backspace' ? new charDashVal('\b') :
+                      datum == 'tab'       ? new charDashVal('\t') :
+                      datum == 'newline'   ? new charDashVal('\n') :
+                      datum == 'vtab'      ? new charDashVal('\u000B') :
+                      datum == 'page'      ? new charDashVal('\u000C') :
+                      datum == 'return'    ? new charDashVal('\r') :
+                      datum == 'space'     ? new charDashVal('\u0020') :
+                      datum == 'rubout'    ? new charDashVal('\u007F') :
+                      datum.length === 1   ? new charDashVal(datum) :
+                        throwError("read: Unsupported character at " +
+                                   new Location(sCol, sLine, column, line, i) +
+                                   " #\\" + datum);
+  var atom = new Char(datum);
+  atom.location = new Location(sCol, sLine, column, line, i);
+  return atom;
 }
 
-// readMultiLineComment : String Number -> [SExp, Number]
+// readMultiLineComment : String Number -> Atom
 // reads a multiline comment
 function readMultiLineComment(str, i) {
   var sCol = column, sLine = line;
@@ -257,18 +269,22 @@ function readMultiLineComment(str, i) {
     throwError("read: Unexpected EOF when reading a multiline comment at "
                + new Location(sCol, sLine, column, line, i));
   }
-  return [new Comment(txt), i+2];
+  var atom = new Comment(txt);
+  atom.location = new Location(sCol, sLine, column, line, i+2);
+  return atom;
 }
 
-// readSExpComment : String Number -> [SExp, Number]
+// readSExpComment : String Number -> Atom
 // reads exactly one SExp and ignores it entirely
 function readSExpComment(str, i) {
   var sCol = column, sLine = line;
-  var comment = readSExpByIndex(str, i);
-  return [new Comment(comment), comment[1]];
+  var ignore = readSExpByIndex(str, i); // we only read this to extract location
+  var atom = new Comment();
+  atom.location = ignore.location;  // use the location for our new, empty sexp
+  return atom;
 }
 
-// readLineComment : String Number -> [SExp, Number]
+// readLineComment : String Number -> Atom
 // reads a single line comment
 function readLineComment(str, i) {
   var sCol = column, sLine = line;
@@ -286,12 +302,15 @@ function readLineComment(str, i) {
     throwError("read: Unexpected EOF when reading a line comment at "
                + new Location(sCol, sLine, column, line, i));
   }
-  return [new Comment(txt), i+1];
+  var atom = new Comment(txt);
+  atom.location = new Location(sCol, sLine, column, line, i+1);
+  return atom;
 }
 
-// readQuote : String Number -> [SExp, Number]
+// readQuote : String Number -> SExp
 // reads a quote, quasiquote, or unquote encoded as a string
 function readQuote(str, i) {
+//               console.log("readQuote");
   var sCol = column, sLine = line;
   var p = str.charAt(i);
   var symbol = p == "'" ? new quote("quote") :
@@ -308,8 +327,10 @@ function readQuote(str, i) {
       symbol = new quote("unquote");
     }
   }
-  var datumAndIndex = readSExpByIndex(str, i+1);
-  return [[symbol, datumAndIndex[0]], datumAndIndex[1]];
+  var sexp = readSExpByIndex(str, i+1);
+  var quotedSexp = [symbol, sexp];
+  quotedSexp.location = sexp.location;
+  return quotedSexp;
 }
 
 // stringDatumToNumber : String -> Number
@@ -318,6 +339,7 @@ function readQuote(str, i) {
 // "3.3" -> 3.3
 // "333" -> 333
 function stringDatumToNumber(str) {
+//               console.log("stringDatumToNumber");
   if(!isNaN(new Number(str))) {
     return new Number(str).valueOf();
   } else {
@@ -331,21 +353,23 @@ function stringDatumToNumber(str) {
   }
 }
 
-// readSymbolOrNumber : String Number String -> [SExp, Number]
+// readSymbolOrNumber : String Number String -> Symbol | Number
 // reads any number or symbol
 function readSymbolOrNumber(str, i) {
+               console.log("readSymbolOrNumber");
   var sCol = column, sLine = line;
   var p = str.charAt(i);
-
-  return /[+-]/.test(p)  ? readNumberStar(str, i+1, p) :
-         p == "."        ? readDigits(str, i+1, p) :
-         /[0-9]/.test(p) ? readRationalOrDecimal(str, i, "") :
-         /* else */        readSymbol(str, i, "");
+  var atom = /[+-]/.test(p)  ? readNumberStar(str, i+1, p) :
+             p == "."        ? readDigits(str, i+1, p) :
+             /[0-9]/.test(p) ? readRationalOrDecimal(str, i, "") :
+             /* else */        readSymbol(str, i, "");
+  return atom;
 }
 
-// readNumberStar : String Number String -> [SExp, Number]
+// readNumberStar : String Number String -> Symbol | Number
 // reads any number (excluding a sign)
 function readNumberStar(str, i, datum) {
+               console.log("readNumberStar");
   var sCol = column, sLine = line;
   if(i >= str.length) {
     throwError("read: Unexpected EOF while reading a number or symbol at "
@@ -359,17 +383,20 @@ function readNumberStar(str, i, datum) {
           /* else */        readSymbol(str, i, datum);
 }
 
-// readDigits : String Number String -> [SExp, Number]
+// readDigits : String Number String -> Number
 // reads the decimal digits from the string until it hits a non decimal digit
 function readDigits(str, i, datum) {
-  var sCol = column, sLine = line;
+               console.log("readDigits. datum="+datum);
+  var sCol = column, sLine = line, num;
   if(i >= str.length) {
     if(isNaN(stringDatumToNumber(datum))) {
       throwError("read: Unexpected EOF while reading a number or symbol at"
                  + new Location(sCol, sLine, column, line, i)
                  + ", read so far: " + datum);
     } else {
-      return [stringDatumToNumber(datum).valueOf(), i];
+      num = jsnums.fromString(datum);
+      num.location = new Location(sCol, sLine, column, line, i);
+      return num;
     }
   }
 
@@ -386,27 +413,37 @@ function readDigits(str, i, datum) {
                  + new Location(sCol, sLine, column, line, i)
                  + ", read so far: " + datum);
     } else {
-      return [stringDatumToNumber(datum).valueOf(), i];
+      num = jsnums.fromString(datum);
+      num.location = new Location(sCol, sLine, column, line, i);
+      return num;
     }
   }
 
   var p = str.charAt(i);
 
-  return isDelim(p) || isWhiteSpace(p) ? [stringDatumToNumber(datum), i] :
-         /* else */                      readSymbol(str, i, datum);
+  if(isDelim(p) || isWhiteSpace(p)){
+      num = jsnums.fromFixnum(datum);
+      num.location = new Location(sCol, sLine, column, line, i);
+      return num;
+   } else {
+      readSymbol(str, i, datum);
+   }
 }
 
-// readRationalOrDecimal : String Number -> [Number, SExp]
+// readRationalOrDecimal : String Number -> Number
 // reads in a ration or decimal number such as 3/5 2.34 0.3141
 function readRationalOrDecimal(str, i, datum) {
-  var sCol = column, sLine = line;
+//               console.log("readRationalOrDecimal: starting at "+i);
+  var sCol = column, sLine = line, num;
   if(i >= str.length) {
     if(isNaN(stringDatumToNumber(datum))) {
       throwError("read: Unexpected EOF while reading a number or symbol at"
                  + new Location(sCol, sLine, column, line, i)
                  + ", read so far: " + datum);
     } else {
-      return [stringDatumToNumber(datum).valueOf(), i];
+      num = jsnums.fromFixnum(datum);
+      num.location = new Location(sCol, sLine, column, line, i);
+      return num;
     }
   }
 
@@ -423,55 +460,68 @@ function readRationalOrDecimal(str, i, datum) {
                  + new Location(sCol, sLine, column, line, i)
                  + ", read so far: " + datum);
     } else {
-      return [stringDatumToNumber(datum).valueOf(), i];
+      num = jsnums.fromFixnum(datum);
+      num.location = new Location(sCol, sLine, column, line, i);
+      return num;
     }
   }
 
   var p = str.charAt(i);
-
-  return p == "."                      ? readDigits(str, i+1, datum+p) :
-         p == "/"                      ? readDigits(str, i+1, datum+p) :
-	 isDelim(p) || isWhiteSpace(p) ? [stringDatumToNumber(datum), i] :
-	 /* else */                      readSymbol(str, i, datum);
+  // if it's a decimal or fraction, keep reading
+  if(p == "." || p== "/") return readDigits(str, i+1, datum+p);
+  // if we've reached the end of the token, return the sexp
+  if(isDelim(p) || isWhiteSpace(p)){
+      num = jsnums.fromFixnum(datum);
+      num.location = new Location(sCol, sLine, column, line, i);
+      return num;
+  }
+  // it's not a number after all! Read it as a symbol
+	readSymbol(str, i, datum);
 }
 
-// readSymbol : String Number String -> [SExp, Number]
+// readSymbol : String Number String -> Symbol
 // reads in a symbol which can be any charcter except for certain delimiters
 // as described in isValidSymbolCharP
 function readSymbol(str, i, datum) {
+//               console.log("readSymbol");
   var sCol = column, sLine = line;
   while(i < str.length && isValidSymbolCharP(str.charAt(i))) {
     // track line/column values while we scan
     if(str.charAt(i) === "\n"){ line++; column = 0;}
     else { column++; }
     if(str.charAt(i) == "|") {
-      var temp = readVerbatimSymbol(str, i, datum);
-      datum = temp[0];
-      i = temp[1];
+      var sym = readVerbatimSymbol(str, i, datum);
+      datum = sym.val;
+      i = sym.location.i;
     } else {
       datum += str.charAt(i++);
     }
   }
 
   if(i >= str.length) {
-    if(datum == "") {
+    if(datum === "") {
       throwError("read: Unexpected EOF while reading a symbol at "
                  + new Location(sCol, sLine, column, line, i)
                  + ".");
     } else {
-      return [new quote(datum), i];
+      sexp = types.symbol(datum);
+      sexp.location = new Location(sCol, sLine, column, line, i);
+      return sexp;
     }
   }
 
   var p = str.charAt(i);
 
-  return [new quote(datum), i];
+  var symbl = types.symbol(datum);
+  symbl.location = new Location(sCol, sLine, column, line, i);
+  return symbl;
 }
 
-// readVerbatimSymbol : String Number String -> [SExp, Number]
+// readVerbatimSymbol : String Number String -> Symbol
 // reads the next couple characters as is without any restraint until it reads
 // a |.  It ignores both the cosing | and the opening |.
 function readVerbatimSymbol(str, i, datum) {
+//               console.log("readVerbatimSymbol");
   var sCol = column, sLine = line;
   i++; // skip over the opening |
   while(i < str.length && str.charAt(i) != "|") {
@@ -488,8 +538,9 @@ function readVerbatimSymbol(str, i, datum) {
   }
 
   i++; // skip over the closing |
-
-  return [datum, i];
+  var symbl = types.symbol(datum);
+  symbl.location = new Location(sCol, sLine, column, line, i);
+  return symbl;
 }
 
 
@@ -499,7 +550,7 @@ function readVerbatimSymbol(str, i, datum) {
                
 // some important string methods
 function isWhiteSpace(str) {
-  return /\s/.test(str);
+  return (/\s/).test(str);
 }
 
 // determines if a character string is in one of the three sets of delimiters
@@ -531,13 +582,13 @@ function matchingDelims(x, y) {
 
 // gets the matching delim given the other delim in a pair
 function otherDelim(x) {
-  return x == '(' ? ')' :
-         x == '[' ? ']' :
-	 x == '{' ? '}' :
-	 x == ')' ? '(' :
-	 x == ']' ? '[' :
-	 x == '}' ? '{' :
-	 /* else */ throwError("otherDelim: Unknown delimiter: " + x);
+  return  x == '(' ? ')' :
+          x == '[' ? ']' :
+          x == '{' ? '}' :
+          x == ')' ? '(' :
+          x == ']' ? '[' :
+          x == '}' ? '{' :
+/* else */ throwError("otherDelim: Unknown delimiter: " + x);
 }
 
 // reads through whitespace
@@ -564,7 +615,7 @@ function sexpToString(sexp) {
   var str = sexp.toString();
   if(sexp instanceof Array) {
     str = foldl(function(x, xs) {
-		  return xs + sexpToString(x) + " ";
+      return xs + sexpToString(x) + " ";
 		},
 		"",
 		sexp);
@@ -577,7 +628,7 @@ function sexpToString(sexp) {
     str += ") ...)";
   } else if (sexp instanceof prim) {
     str = primDashName(sexp);
-  } else if (typeof sexp === "string" || sexp instanceof String) {
+  } else if (typeof sexp === "string" || sexp instanceof String || sexp instanceof types.string) {
     str = '"' + sexp + '"';
   } else if (imageP(sexp)) {
     if(sexp instanceof imgDashVal) {

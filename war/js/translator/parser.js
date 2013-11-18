@@ -1,4 +1,5 @@
 ////////////////////////////////////// ERROR MESSAGES ////////////////
+
 // the location struct
 var Location = function(sCol, sLine, eCol, eLine, i, id){
   this.sCol = sCol;   // starting index into the line
@@ -11,7 +12,6 @@ var Location = function(sCol, sLine, eCol, eLine, i, id){
     return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
   };
 }
-
 
 ///////////////////////////////////////// Constructor Wrappers ////////////////////////
 function makeDashDefDashFunc(name, args, body) { return new defDashFunc(name, args, body); };
