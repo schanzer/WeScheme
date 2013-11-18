@@ -12,6 +12,12 @@ var Location = function(sCol, sLine, eCol, eLine, i, id){
     return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
   };
 }
+// the constant struct
+var Constant = function(val, loc){
+  this.val = val;
+  this.location = loc;
+  this.toString = function(){return this.val.toString();};
+}
 
 ///////////////////////////////////////// Constructor Wrappers ////////////////////////
 function makeDashDefDashFunc(name, args, body) { return new defDashFunc(name, args, body); };

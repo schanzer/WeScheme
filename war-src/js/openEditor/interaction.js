@@ -657,8 +657,9 @@ WeSchemeInteractions = (function () {
                     that.disableInput();
                     try {
                       var sexp = lex(aSource);
-                      console.log("LEXER OUTPUT:");
+                      console.log("LEXER OUTPUT (prettyprinted and raw):");
                       console.log(sexpToString(sexp));
+                      console.log(sexp);
                       var AST = parse(sexp);
                       console.log("PARSER OUTPUT:");
                       console.log(AST.join("\n"));
@@ -697,6 +698,7 @@ WeSchemeInteractions = (function () {
     };
 
     WeSchemeInteractions.prototype.handleError = function(err) {
+                        console.log(err);
         this.addToInteractions(renderErrorAsDomNode(this, err));
         this.addToInteractions("\n");
     };

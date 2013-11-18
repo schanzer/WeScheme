@@ -186,9 +186,8 @@ function readString(str, i) {
                + new Location(sCol, sLine, column, line, i)
                + " ended with " + chr);
   }
-  var atom = types.string(datum);
-  atom.location = new Location(sCol, sLine, column, line, i+1);
-  return atom;
+  var strng = types.string(datum);
+  return new Constant(strng, new Location(sCol, sLine, column, line, i+1));
 }
 
 // readPoundSExp : String Number -> SExp
@@ -219,7 +218,7 @@ function readPoundSExp(str, i) {
   return datum;
 }
 
-// readChar : String Number -> Atom
+// readChar : String Number -> types.char
 // reads a character encoded in the string and returns a representative datum
 function readChar(str, i) {
 //               console.log("readChar");
@@ -246,9 +245,8 @@ function readChar(str, i) {
                         throwError("read: Unsupported character at " +
                                    new Location(sCol, sLine, column, line, i) +
                                    " #\\" + datum);
-  var atom = new Char(datum);
-  atom.location = new Location(sCol, sLine, column, line, i);
-  return atom;
+  var chr = new Char(datum);
+  return new Contant(chr, new Location(sCol, sLine, column, line, i));
 }
 
 // readMultiLineComment : String Number -> Atom
@@ -332,158 +330,40 @@ function readQuote(str, i) {
   quotedSexp.location = sexp.location;
   return quotedSexp;
 }
-
-// stringDatumToNumber : String -> Number
-// converts the string datum to a number
-// "3/3" -> 1
-// "3.3" -> 3.3
-// "333" -> 333
-function stringDatumToNumber(str) {
-               console.log("stringDatumToNumber");
-  if(!isNaN(new Number(str))) {
-    return new Number(str).valueOf();
-  } else {
-    var pivot = str.indexOf("/");
-
-    if(pivot == -1) {
-      return Number.NaN;
-    } else {
-      return Number(str.substring(0,pivot)) /	new Number(str.substring(pivot+1)).valueOf();
-    }
-  }
-}
-
-// readSymbolOrNumber : String Number String -> Symbol | Number
+               
+// readSymbolOrNumber : String Number -> types.Symbol | types.Number
 // reads any number or symbol
 function readSymbolOrNumber(str, i) {
                console.log("readSymbolOrNumber");
   var sCol = column, sLine = line;
-  var p = str.charAt(i);
-  var atom = /[+-]/.test(p)  ? readNumberStar(str, i+1, p) :
-             p == "."        ? readDigits(str, i+1, p) :
-             /[0-9]/.test(p) ? readRationalOrDecimal(str, i, "") :
-             /* else */        readSymbol(str, i, "");
-  return atom;
+  var p = str.charAt(i), datum = "";
+  
+  // if it *could* be the first char in a number, chew until we hit whitespace
+  if(/[+-]/.test(p) || p==="." || /[0-9]/.test(p)){
+    while(i < str.length &&
+          !isWhiteSpace(str.charAt(i)) &&
+          !isDelim(str.charAt(i))) {
+       // track line/column values while we scan
+       if(str.charAt(i) === "\n"){ line++; column = 0;}
+       else { column++; }
+       datum += str.charAt(i++);
+    }
+    var num = jsnums.fromString(datum);
+    // if the string we've seen IS a Number, return it as a Constant. Otherwise bail
+    if(num) return new Constant(num, new Location(sCol, sLine, column, line, i));
+  }
+               
+  // if it was never a number (or turned out not to be), return the Symbol
+  var symbl = readSymbol(str,i,datum);
+  return symbl;
 }
 
-// readNumberStar : String Number String -> Symbol | Number
-// reads any number (excluding a sign)
-function readNumberStar(str, i, datum) {
-               console.log("readNumberStar");
-  var sCol = column, sLine = line;
-  if(i >= str.length) {
-    throwError("read: Unexpected EOF while reading a number or symbol at "
-               + new Location(sCol, sLine, column, line, i)
-               + ", read so far: " + datum);
-  }
-  var p = str.charAt(i);
-
-  return p == "."        ? readDigits(str, i+1, datum+p) :
-         /[0-9]/.test(p) ? readRationalOrDecimal(str, i+1, datum+p) :
-          /* else */        readSymbol(str, i, datum);
-}
-
-// readDigits : String Number String -> Number
-// reads the decimal digits from the string until it hits a non decimal digit
-function readDigits(str, i, datum) {
-              console.log("readDigits. datum="+datum+", str="+str);
-  var sCol = column, sLine = line, num;
-  if(i >= str.length) {
-    if(isNaN(stringDatumToNumber(datum))) {
-      throwError("read: Unexpected EOF while reading a number or symbol at"
-                 + new Location(sCol, sLine, column, line, i)
-                 + ", read so far: " + datum);
-    } else {
-      num = jsnums.fromString(datum);
-      num.location = new Location(sCol, sLine, column, line, i);
-               console.log(1+": datum is "+datum+" and generated num is "+num);
-      return num;
-    }
-  }
-  while(i < str.length && /[0-9]/.test(str.charAt(i))) {
-    // track line/column values while we scan
-    if(str.charAt(i) === "\n"){ line++; column = 0;}
-    else { column++; }
-    datum += str.charAt(i++);
-  }
-  if(i >= str.length) {
-    if(isNaN(stringDatumToNumber(datum))) {
-      throwError("read: Unexpected EOF while reading a number or symbol at"
-                 + new Location(sCol, sLine, column, line, i)
-                 + ", read so far: " + datum);
-    } else {
-      num = jsnums.fromString(datum);
-      num.location = new Location(sCol, sLine, column, line, i);
-      return num;
-    }
-  }
-
-  var p = str.charAt(i);
-
-  if(isDelim(p) || isWhiteSpace(p)){
-      num = jsnums.fromString(datum);
-      num.location = new Location(sCol, sLine, column, line, i);
-      return num;
-   } else {
-      readSymbol(str, i, datum);
-   }
-}
-
-// readRationalOrDecimal : String Number -> Number
-// reads in a ration or decimal number such as 3/5 2.34 0.3141
-function readRationalOrDecimal(str, i, datum) {
-//               console.log("readRationalOrDecimal: starting at "+i);
-  var sCol = column, sLine = line, num;
-  if(i >= str.length) {
-    if(isNaN(stringDatumToNumber(datum))) {
-      throwError("read: Unexpected EOF while reading a number or symbol at"
-                 + new Location(sCol, sLine, column, line, i)
-                 + ", read so far: " + datum);
-    } else {
-      num = jsnums.fromFixnum(datum);
-      num.location = new Location(sCol, sLine, column, line, i);
-      return num;
-    }
-  }
-
-  while(i < str.length && /[0-9]/.test(str.charAt(i))) {
-    // track line/column values while we scan
-    if(str.charAt(i) === "\n"){ line++; column = 0;}
-    else { column++; }
-    datum += str.charAt(i++);
-  }
-
-  if(i >= str.length) {
-    if(isNaN(stringDatumToNumber(datum))) {
-      throwError("read: Unexpected EOF while reading a number or symbol at"
-                 + new Location(sCol, sLine, column, line, i)
-                 + ", read so far: " + datum);
-    } else {
-      num = jsnums.fromFixnum(datum);
-      num.location = new Location(sCol, sLine, column, line, i);
-      return num;
-    }
-  }
-
-  var p = str.charAt(i);
-  // if it's a decimal or fraction, keep reading
-  if(p == "." || p== "/") return readDigits(str, i+1, datum+p);
-  // if we've reached the end of the token, return the sexp
-  if(isDelim(p) || isWhiteSpace(p)){
-      num = jsnums.fromFixnum(datum);
-      num.location = new Location(sCol, sLine, column, line, i);
-      return num;
-  }
-  // it's not a number after all! Read it as a symbol
-	readSymbol(str, i, datum);
-}
-
-// readSymbol : String Number String -> Symbol
+// readSymbol : String Number String -> types.Symbol
 // reads in a symbol which can be any charcter except for certain delimiters
 // as described in isValidSymbolCharP
 function readSymbol(str, i, datum) {
 //               console.log("readSymbol");
-  var sCol = column, sLine = line;
+  var sCol = column, sLine = line, symbl;
   while(i < str.length && isValidSymbolCharP(str.charAt(i))) {
     // track line/column values while we scan
     if(str.charAt(i) === "\n"){ line++; column = 0;}
@@ -503,22 +383,22 @@ function readSymbol(str, i, datum) {
                  + new Location(sCol, sLine, column, line, i)
                  + ".");
     } else {
-      sexp = types.symbol(datum);
-      sexp.location = new Location(sCol, sLine, column, line, i);
-      return sexp;
+      symbl = types.symbol(datum);
+      symbl.location = new Location(sCol, sLine, column, line, i);
+      return symbl;
     }
   }
 
   var p = str.charAt(i);
 
-  var symbl = types.symbol(datum);
+  symbl = types.symbol(datum);
   symbl.location = new Location(sCol, sLine, column, line, i);
   return symbl;
 }
 
-// readVerbatimSymbol : String Number String -> Symbol
+// readVerbatimSymbol : String Number String -> types.Symbol
 // reads the next couple characters as is without any restraint until it reads
-// a |.  It ignores both the cosing | and the opening |.
+// a |.  It ignores both the closing | and the opening |.
 function readVerbatimSymbol(str, i, datum) {
 //              console.log("readVerbatimSymbol");
   var sCol = column, sLine = line;
