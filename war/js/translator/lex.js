@@ -38,7 +38,7 @@ var column;
 // datum
 function readProg(str) {
 //               console.log("readProg");
-  var i = sCol = sLine = line = column = 0; // initialize all position indices
+  var i = sCol = column = 0, sline = line = 1; // initialize all position indices
   var sexps = [];
   delims = [];
   while(i < str.length) {
@@ -54,7 +54,7 @@ function readProg(str) {
 // readSSFile : String -> SExp
 // removes the first three lines of the string that contain DrScheme meta data
 function readSSFile(str) {
-  var i = sCol = sLine = line = column = 0; // initialize all position indices
+  var i = sCol = column = 0, sline = line = 1; // initialize all position indices
   var crs = 0;
 
   while(i < str.length && crs < 3) {
@@ -290,9 +290,8 @@ function readLineComment(str, i) {
   column++;
   var txt = "";
   while(i < str.length && str.charAt(i) != '\n') {
-    // track line/column values while we scan
-    if(str.charAt(i) === "\n"){ line++; column = 0;}
-    else { column++; }
+    // track column values while we scan
+    column++;
     txt+=str.charAt(i);
     i++;
   }
@@ -302,6 +301,8 @@ function readLineComment(str, i) {
   }
   var atom = new Comment(txt);
   atom.location = new Location(sCol, sLine, column, line, i+1);
+  // at the end of the line, reset line/col values
+  line++; column = 0;
   return atom;
 }
 
