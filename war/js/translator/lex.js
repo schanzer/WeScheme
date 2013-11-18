@@ -339,7 +339,7 @@ function readQuote(str, i) {
 // "3.3" -> 3.3
 // "333" -> 333
 function stringDatumToNumber(str) {
-//               console.log("stringDatumToNumber");
+               console.log("stringDatumToNumber");
   if(!isNaN(new Number(str))) {
     return new Number(str).valueOf();
   } else {
@@ -386,7 +386,7 @@ function readNumberStar(str, i, datum) {
 // readDigits : String Number String -> Number
 // reads the decimal digits from the string until it hits a non decimal digit
 function readDigits(str, i, datum) {
-               console.log("readDigits. datum="+datum);
+              console.log("readDigits. datum="+datum+", str="+str);
   var sCol = column, sLine = line, num;
   if(i >= str.length) {
     if(isNaN(stringDatumToNumber(datum))) {
@@ -396,17 +396,16 @@ function readDigits(str, i, datum) {
     } else {
       num = jsnums.fromString(datum);
       num.location = new Location(sCol, sLine, column, line, i);
+               console.log(1+": datum is "+datum+" and generated num is "+num);
       return num;
     }
   }
-
   while(i < str.length && /[0-9]/.test(str.charAt(i))) {
     // track line/column values while we scan
     if(str.charAt(i) === "\n"){ line++; column = 0;}
     else { column++; }
     datum += str.charAt(i++);
   }
-
   if(i >= str.length) {
     if(isNaN(stringDatumToNumber(datum))) {
       throwError("read: Unexpected EOF while reading a number or symbol at"
@@ -422,7 +421,7 @@ function readDigits(str, i, datum) {
   var p = str.charAt(i);
 
   if(isDelim(p) || isWhiteSpace(p)){
-      num = jsnums.fromFixnum(datum);
+      num = jsnums.fromString(datum);
       num.location = new Location(sCol, sLine, column, line, i);
       return num;
    } else {
@@ -521,7 +520,7 @@ function readSymbol(str, i, datum) {
 // reads the next couple characters as is without any restraint until it reads
 // a |.  It ignores both the cosing | and the opening |.
 function readVerbatimSymbol(str, i, datum) {
-//               console.log("readVerbatimSymbol");
+//              console.log("readVerbatimSymbol");
   var sCol = column, sLine = line;
   i++; // skip over the opening |
   while(i < str.length && str.charAt(i) != "|") {
