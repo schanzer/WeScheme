@@ -672,8 +672,10 @@ WeSchemeInteractions = (function () {
                         res[i] = sexpToString(progres.vals[i]);
                       }
                       console.log(res);
+                    // if an error occured, we want to hand it off to WeScheme's built-in error handler
                     } catch(e){
-                      console.log("!!!!ERROR!!!\n"+e.message);
+                      console.log("LOCAL TRANSLATOR EXCEPTION:\n");
+                                  console.log(e);
                     }
                     that.evaluator.executeProgram(
                         sourceName,
