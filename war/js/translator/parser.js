@@ -1,13 +1,12 @@
 ////////////////////////////////////// ERROR MESSAGES ////////////////
 
 // the location struct
-var Location = function(sCol, sLine, eCol, eLine, i, id){
-  this.sCol = sCol;   // starting index into the line
-  this.sLine= sLine;  // starting line # (1-index)
-  this.eCol = eCol;   // ending line # (1-index)
-  this.eLine= eLine;  // ending index into the line
-  this.i = i;         // index into the whole program
-  this.id = id;       // [OPTIONAL] id of the containing DOM element
+var Location = function(sCol, sLine, offset, span, source){
+  this.sCol   = sCol;   // starting index into the line
+  this.sLine  = sLine;  // starting line # (1-index)
+  this.offset = offset; // ch index of lexeme start, from beginning
+  this.span   = span;   // num chrs between lexeme start and end
+  this.source = source; // [OPTIONAL] id of the containing DOM element
   this.toString = function(){
     return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
   };

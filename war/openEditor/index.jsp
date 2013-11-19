@@ -16,7 +16,8 @@
     <!-- Google analytics support -->
     <jsp:include page="/google-analytics.jsp"/>
 
-
+    <!-- Add translator -->
+    <jsp:include page="/js/translator/local.jsp"/>
 
 
     <link rel="stylesheet" type="text/css" href="/css/default.css" id="style" />

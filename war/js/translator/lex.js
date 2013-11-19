@@ -1,15 +1,13 @@
-// JS implementation of the Scheme read function, version 2.
-
 // A SExp is either:
-// - Atom x Location
+// - Constant x Location
+// - Symbol x Location
 // - [ListOf SExp] x Location
 //
-// An Atom is either:
-// - Number
-// - Symbol
-// - String
-// - Character
-// - Boolean
+// A Constant is either:
+// - types.Number
+// - types.Symbol
+// - types.String
+// - types.Character
 
 (function () {
 
@@ -46,7 +44,7 @@ function readProg(str) {
     if(!(sexp instanceof Comment)) {
       sexps.push(sexp);
     }
-    i = chewWhiteSpace(str, sexp.location.i);
+    i = chewWhiteSpace(str, sexp.location.offset+sexp.location.span);
   }
   return sexps;
 }
@@ -68,7 +66,7 @@ function readSSFile(str) {
     if(!(sexp instanceof Comment)) {
       sexps.push(sexp);
     }
-    i = chewWhiteSpace(str, sexp.location.i);
+    i = chewWhiteSpace(str, sexp.location.offset+sexp.location.span);
   }
   return sexps;
 }
@@ -87,7 +85,7 @@ function readSExp(str) {
 // it to a SExp datum
 function readSExpByIndex(str, i) {
 //               console.log("readSexpByIndex: starting at "+i);
-  var sCol = column, sLine = line;
+  var sCol = column, sLine = line, iStart = i;
   var p;
   p = str.charAt(i);
 
@@ -95,7 +93,7 @@ function readSExpByIndex(str, i) {
 
   if(i >= str.length) {
     throwError("Unexpected EOF while reading a SExp, at " +
-               new Location(sCol, sLine, column, line, i));
+               new Location(sCol, sLine, iStart, i-iStart));
   }
   var sexp = res.leftListDelims.test(p) ? readList(str, i) :
              p == '"'                   ? readString(str, i) :
@@ -110,7 +108,7 @@ function readSExpByIndex(str, i) {
 // reads a list encoded in this string with the left delimiter at index i
 function readList(str, i) {
 //               console.log("readList");
-  var sCol = column, sLine = line;
+  var sCol = column, sLine = line, iStart = i;
   var openingDelim = str.charAt(i++);
   var p;
   var list = [];
@@ -126,21 +124,30 @@ function readList(str, i) {
     if(!(sexp instanceof Comment)) {
       list.push(sexp);
     }
-    i = chewWhiteSpace(str, sexp.location.i);
+    i = chewWhiteSpace(str, sexp.location.offset+sexp.location.span);
   }
 
   if(i >= str.length) {
-    throwError("read: Unexpected EOF when reading a list at " +
-               new Location(sCol, sLine, column, line, i) +
-               list.toString());
+//    throwError("read: expected a ) to close ( " +
+//               new Location(sCol, sLine, iStart, i - iStart) + list.toString());
+   var msg = new types.Message(["read: expected a ",
+                      otherDelim(openingDelim),
+                      " to close ",
+                      new types.ColoredPart(openingDelim.toString(),
+                                            new Location(sCol, sLine, iStart, i-iStart))
+                      ]);
+   var err = types.schemeError(types.incompleteExn(types.exnFailContract, msg), []);
+               console.log(err);
+   throw err;
   }
   if(!matchingDelims(openingDelim, str.charAt(i))) {
-    throwError("read: Mismatched delimiters, expected to find " +
-               otherDelim(openingDelim) + " but instead found " +
+    throwError("read: expected a " +
+               otherDelim(openingDelim) + " to close " +
+               "TODO" + " but found a " +
                str.charAt(i) + " at " +
-               new Location(sCol, sLine, column, line, i));
+               new Location(sCol, sLine, iStart, i-iStart));
   }
-  list.location = new Location(sCol, sLine, column, line, i+1);
+  list.location = new Location(sCol, sLine, iStart, i+1-iStart);
   return list;
 }
 
@@ -149,7 +156,7 @@ function readList(str, i) {
 // at index i
 function readString(str, i) {
 //               console.log("readString");
-  var sCol = column, sLine = line;
+  var sCol = column, sLine = line, iStart = i;
   i++; // skip over the opening quotation mark and char
   column++;
                
@@ -175,7 +182,7 @@ function readString(str, i) {
       chr == "'"  ? "'" :
       chr == '\\' ? '\\' :
       throwError("Escape sequence not supported at "
-                 + new Location(sCol, sLine, column, line, i)
+                 + new Location(sCol, sLine, iStart, i-iStart)
                  + ", \\" + chr);
     }
     datum += chr;
@@ -183,18 +190,18 @@ function readString(str, i) {
 
   if(i >= str.length) {
     throwError("read: expected a closing \'\"\' "
-               + new Location(sCol, sLine, column, line, i)
+               + new Location(sCol, sLine, iStart, i-iStart)
                + " ended with " + chr);
   }
   var strng = types.string(datum);
-  return new Constant(strng, new Location(sCol, sLine, column, line, i+1));
+  return new Constant(strng, new Location(sCol, sLine, iStart, i+1-iStart));
 }
 
 // readPoundSExp : String Number -> SExp
 // reads a sexp begining with a # sign.
 function readPoundSExp(str, i) {
 //               console.log("readPoundSExp");
-  var sCol = column, sLine = line;
+  var sCol = column, sLine = line, iStart = i;
   i++; // skip over the pound sign
   column++;
 
@@ -207,14 +214,14 @@ function readPoundSExp(str, i) {
               p == '|'  ? readMultiLineComment(str, i-1) :
               p == ';'  ? readSExpComment(str, i-1) :
               /* else */  throwError("Unknown pound-prefixed sexp at " +
-                                     new Location(sCol, sLine, column, line, i));
+                                     new Location(sCol, sLine, iStart, i-iStart));
   } else {
     throwError("read: Unexpected EOF when reading a pound-prefixed sexp at"
-               + new Location(sCol, sLine, column, line, i)
+               + new Location(sCol, sLine, iStart, i-iStart)
                + " already read: " + datum);
   }
 
-  datum.location = new Location(sCol, sLine, column, line, i);
+  datum.location = new Location(sCol, sLine, iStart, i-iStart);
   return datum;
 }
 
@@ -222,7 +229,7 @@ function readPoundSExp(str, i) {
 // reads a character encoded in the string and returns a representative datum
 function readChar(str, i) {
 //               console.log("readChar");
-  var sCol = column, sLine = line;
+  var sCol = column, sLine = line, iStart;
   i+=2; // skip over the #\
   column+=2;
   var datum = "";
@@ -243,16 +250,16 @@ function readChar(str, i) {
                       datum == 'rubout'    ? new charDashVal('\u007F') :
                       datum.length === 1   ? new charDashVal(datum) :
                         throwError("read: Unsupported character at " +
-                                   new Location(sCol, sLine, column, line, i) +
+                                   new Location(sCol, sLine, iStart, i-iStart) +
                                    " #\\" + datum);
   var chr = new Char(datum);
-  return new Contant(chr, new Location(sCol, sLine, column, line, i));
+  return new Contant(chr, new Location(sCol, sLine, iStart, i-iStart));
 }
 
 // readMultiLineComment : String Number -> Atom
 // reads a multiline comment
 function readMultiLineComment(str, i) {
-  var sCol = column, sLine = line;
+  var sCol = column, sLine = line, iStart = i;
   i+=2; // skip over the #|
   column+=2;
   var txt = "";
@@ -265,10 +272,10 @@ function readMultiLineComment(str, i) {
   }
   if(i+1 >= str.length) {
     throwError("read: Unexpected EOF when reading a multiline comment at "
-               + new Location(sCol, sLine, column, line, i));
+               + new Location(sCol, sLine, iStart, i-iStart));
   }
   var atom = new Comment(txt);
-  atom.location = new Location(sCol, sLine, column, line, i+2);
+  atom.location = new Location(sCol, sLine, iStart, i+2-iStart);
   return atom;
 }
 
@@ -285,7 +292,7 @@ function readSExpComment(str, i) {
 // readLineComment : String Number -> Atom
 // reads a single line comment
 function readLineComment(str, i) {
-  var sCol = column, sLine = line;
+  var sCol = column, sLine = line, iStart = i;
   i++; // skip over the ;
   column++;
   var txt = "";
@@ -297,10 +304,10 @@ function readLineComment(str, i) {
   }
   if(i >= str.length) {
     throwError("read: Unexpected EOF when reading a line comment at "
-               + new Location(sCol, sLine, column, line, i));
+               + new Location(sCol, sLine, iStart, i-iStart));
   }
   var atom = new Comment(txt);
-  atom.location = new Location(sCol, sLine, column, line, i+1);
+  atom.location = new Location(sCol, sLine, iStart, i+1-iStart);
   // at the end of the line, reset line/col values
   line++; column = 0;
   return atom;
@@ -310,7 +317,7 @@ function readLineComment(str, i) {
 // reads a quote, quasiquote, or unquote encoded as a string
 function readQuote(str, i) {
 //               console.log("readQuote");
-  var sCol = column, sLine = line;
+  var sCol = column, sLine = line, iStart = i;
   var p = str.charAt(i);
   var symbol = p == "'" ? new quote("quote") :
                p == "`" ? new quote("quasiquote") :
@@ -318,7 +325,7 @@ function readQuote(str, i) {
   if(p == ',') {
     if(i+1 >= str.length) {
       throwError("read: Unexpected EOF when reading a quoted expression at "
-                 + new Location(sCol, sLine, column, line, i));
+                 + new Location(sCol, sLine, iStart, i-iStart));
     }
     if(str.charAt(i+1) == '#') {
       symbol = new quote("unquote-splicing");
@@ -335,8 +342,8 @@ function readQuote(str, i) {
 // readSymbolOrNumber : String Number -> types.Symbol | types.Number
 // reads any number or symbol
 function readSymbolOrNumber(str, i) {
-               console.log("readSymbolOrNumber");
-  var sCol = column, sLine = line;
+//               console.log("readSymbolOrNumber");
+  var sCol = column, sLine = line, iStart = i;
   var p = str.charAt(i), datum = "";
   
   // if it *could* be the first char in a number, chew until we hit whitespace
@@ -351,7 +358,7 @@ function readSymbolOrNumber(str, i) {
     }
     var num = jsnums.fromString(datum);
     // if the string we've seen IS a Number, return it as a Constant. Otherwise bail
-    if(num) return new Constant(num, new Location(sCol, sLine, column, line, i));
+    if(num) return new Constant(num, new Location(sCol, sLine, iStart, i-iStart));
   }
                
   // if it was never a number (or turned out not to be), return the Symbol
@@ -364,7 +371,7 @@ function readSymbolOrNumber(str, i) {
 // as described in isValidSymbolCharP
 function readSymbol(str, i, datum) {
 //               console.log("readSymbol");
-  var sCol = column, sLine = line, symbl;
+  var sCol = column-datum.length, sLine = line, iStart = i-datum.length, symbl;
   while(i < str.length && isValidSymbolCharP(str.charAt(i))) {
     // track line/column values while we scan
     if(str.charAt(i) === "\n"){ line++; column = 0;}
@@ -381,11 +388,11 @@ function readSymbol(str, i, datum) {
   if(i >= str.length) {
     if(datum === "") {
       throwError("read: Unexpected EOF while reading a symbol at "
-                 + new Location(sCol, sLine, column, line, i)
+                 + new Location(sCol, sLine, iStart, i-iStart)
                  + ".");
     } else {
       symbl = types.symbol(datum);
-      symbl.location = new Location(sCol, sLine, column, line, i);
+      symbl.location = new Location(sCol, sLine, iStart, i-iStart);
       return symbl;
     }
   }
@@ -393,7 +400,7 @@ function readSymbol(str, i, datum) {
   var p = str.charAt(i);
 
   symbl = types.symbol(datum);
-  symbl.location = new Location(sCol, sLine, column, line, i);
+  symbl.location = new Location(sCol, sLine, iStart, i-iStart);
   return symbl;
 }
 
@@ -402,7 +409,7 @@ function readSymbol(str, i, datum) {
 // a |.  It ignores both the closing | and the opening |.
 function readVerbatimSymbol(str, i, datum) {
 //              console.log("readVerbatimSymbol");
-  var sCol = column, sLine = line;
+  var sCol = column-datum.length, sLine = line, iStart = i-datum;
   i++; // skip over the opening |
   while(i < str.length && str.charAt(i) != "|") {
     // track line/column values while we scan
@@ -413,13 +420,13 @@ function readVerbatimSymbol(str, i, datum) {
 
   if(i >= str.length) {
     throwError("Unexpected EOF while reading a verbatim symbol at index "
-               + new Location(sCol, sLine, column, line, i)
+               + new Location(sCol, sLine, iStart, i-iStart)
                + ", read so far: " + datum);
   }
 
   i++; // skip over the closing |
   var symbl = types.symbol(datum);
-  symbl.location = new Location(sCol, sLine, column, line, i);
+  symbl.location = new Location(sCol, sLine, iStart, i-iStart);
   return symbl;
 }
 
