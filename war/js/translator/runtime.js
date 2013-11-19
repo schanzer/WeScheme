@@ -34,7 +34,7 @@ function charDashValP(x) { return x instanceof charDashVal; };
 function charDashValDashStr(x) { return x.str; };
 
 function quote(x)    { this.x = x; }
-function symbolP(q)  { return q instanceof quote; }
+function symbolP(q)  { return q instanceof quote || types.isSymbol(q);}
 function quoteVal(q) { return q.x; }
 quote.prototype.toString = function () {
     return this.x.toString();
@@ -297,7 +297,7 @@ function numberDashGreaterThanString(x) { return x.toString(); };
 
 // numberP : Number -> Boolean
 function numberP(x) {
-  return x instanceof Number || typeof x==="number";
+  return x instanceof Number || typeof x==="number" || types.isNumber(x);
 }
 
 // oddP : Number -> Boolean
@@ -637,7 +637,9 @@ function stringGreaterThanP() {
 }
 
 // stringP : Any -> Boolean
-function stringP(x) { return x instanceof String || typeof x==="string"; }
+function stringP(x) {
+  return x instanceof String || typeof x==="string" || types.isString(x);
+}
 
 // substring : String Number Number -> String
 function substring(str, i1, i0) {
@@ -1617,7 +1619,7 @@ var iDashNd = (function (i) {
 });
 
 var msgDashType = (function (name, val, n, others) {
-  return stringDashAppend("expects type <", symbolDashGreaterThanString(name), "> as ", iDashNd(n), " argument, given: ", valDashGreaterThanString(val), emptyP(others) ? "" :
+  return stringDashAppend("expects a ", symbolDashGreaterThanString(name), " as ", iDashNd(n), " argument, but given: ", valDashGreaterThanString(val), emptyP(others) ? "" :
   stringDashAppend("; other arguments were: ", valsDashAsDashString(others)));
 });
 

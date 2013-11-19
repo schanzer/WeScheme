@@ -63,8 +63,9 @@ function readFromRepl(event) {
     var progres;
     try {
       var sexp = lex(input);
-      console.log("LEXER OUTPUT:");
+      console.log("LEXER OUTPUT (prettyprinted and raw):");
       console.log(sexpToString(sexp));
+      console.log(sexp);
       var AST = parse(sexp);
       console.log("PARSER OUTPUT:");
       console.log(AST.join("\n"));
