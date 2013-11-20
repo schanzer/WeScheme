@@ -63,13 +63,13 @@ function readFromRepl(event) {
     var progres;
     try {
       var sexp = lex(input);
-      console.log("LEXER OUTPUT (prettyprinted and raw):");
-      console.log(sexpToString(sexp));
+      console.log("LEXER OUTPUT (raw and prettyprinted):");
       console.log(sexp);
+      console.log(sexpToString(sexp));
       var AST = parse(sexp);
-      console.log("PARSER OUTPUT (prettyprinted and raw):");
-      console.log(AST.join("\n"));
+      console.log("PARSER OUTPUT (raw and prettyprinted):");
       console.log(AST);
+      console.log(AST.join("\n"));
       var result = runprogSlashEnvs(AST, __nenv, __venv);
       progres = first(result); // the prog-res value
       __nenv = second(result); // update the environments for future use

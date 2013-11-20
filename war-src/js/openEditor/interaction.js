@@ -657,13 +657,13 @@ WeSchemeInteractions = (function () {
                     that.disableInput();
                     try {
                       var sexp = lex(aSource);
-                      console.log("LEXER OUTPUT (prettyprinted and raw):");
-                      console.log(sexpToString(sexp));
+                      console.log("LEXER OUTPUT (raw and prettyprinted):");
                       console.log(sexp);
+                      console.log(sexpToString(sexp));
                       var AST = parse(sexp);
-                      console.log("PARSER OUTPUT (prettyprinted and raw):");
-                      console.log(AST.join("\n"));
+                      console.log("PARSER OUTPUT (raw and prettyprinted):");
                       console.log(AST);
+                      console.log(AST.join("\n"));
                       var result = runprogSlashEnvs(AST, that.prompt.__nenv, that.prompt.__venv);
                       var progres = first(result); // the program-result
                       that.prompt.__nenv = second(result); // update the environments for future use
