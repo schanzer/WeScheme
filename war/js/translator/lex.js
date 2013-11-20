@@ -217,8 +217,8 @@ function readPoundSExp(str, i) {
                  i+= datum.location.span-1; break;
       case '|':  datum = readMultiLineComment(str, i-1);
                  i+= datum.location.span; break;
-      case ';':  datum = readSExpComment(str, i-1);
-                 i+= datum.location.span; break;
+      case ';':  datum = readSExpComment(str, i+1);
+                 i+= datum.location.span+1; break;
       default: throwError("Unknown pound-prefixed sexp at " +
                           new Location(sCol, sLine, iStart, i-iStart));
      }
@@ -289,8 +289,10 @@ function readMultiLineComment(str, i) {
 // readSExpComment : String Number -> Atom
 // reads exactly one SExp and ignores it entirely
 function readSExpComment(str, i) {
+//               console.log('readSExpComment with i at '+i);
   var sCol = column, sLine = line;
   var ignore = readSExpByIndex(str, i); // we only read this to extract location
+  i =+ ignore.location.span;
   var atom = new Comment();
   atom.location = ignore.location;  // use the location for our new, empty sexp
   return atom;
@@ -303,13 +305,13 @@ function readLineComment(str, i) {
   i++; // skip over the ;
   column++;
   var txt = "";
-  while(i < str.length && str.charAt(i) != '\n') {
+  while(i < str.length && str.charAt(i) !== '\n') {
     // track column values while we scan
     column++;
     txt+=str.charAt(i);
     i++;
   }
-  if(i >= str.length) {
+  if(i > str.length) {
     throwError("read: Unexpected EOF when reading a line comment at "
                + new Location(sCol, sLine, iStart, i-iStart));
   }
