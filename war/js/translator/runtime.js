@@ -582,7 +582,7 @@ function stringGreaterThanP() {
 
 // stringP : Any -> Boolean
 function stringP(x) {
-  return x instanceof String || typeof x==="string" || types.isString(x);
+  return (x instanceof Constant && types.isString(x.val));
 }
 
 // substring : String Number Number -> String
