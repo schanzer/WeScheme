@@ -421,9 +421,9 @@ function provideDashStatement(val) {
   };
 };
 
-
-///////////////////////////////// PARSER OBJECT //////////////////////////
-
+//////////////////////////////////////////////////////////////////////////////
+///////////////////////////////// PARSER OBJECT //////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 (function () {
 
 // parse : sexp -> AST?
@@ -744,11 +744,18 @@ var sexpDashIsDashIdP = (function (sexp) {
 });
 
 var symDashTestDashCaseP = (function (sexp) {
-  return ((consP(sexp)) && (symbolP(first(sexp))) && (((symbolEqualSignP(first(sexp), types.symbol("check-expect"))) || (symbolEqualSignP(first(sexp), types.symbol("check-within"))) || (symbolEqualSignP(first(sexp), types.symbol("check-error"))))));
+  return ((consP(sexp)) &&
+          (symbolP(first(sexp))) &&
+          (((symbolEqualSignP(first(sexp), types.symbol("check-expect"))) ||
+            (symbolEqualSignP(first(sexp), types.symbol("check-within"))) ||
+            (symbolEqualSignP(first(sexp), types.symbol("EXAMPLE"))) ||
+            (symbolEqualSignP(first(sexp), types.symbol("check-error")))
+                                                       )));
 });
 
 var symDashCheckDashExpectP = (function (sexp) {
-  return tuple3SlashFirstP(sexp, types.symbol("check-expect"));
+  return tuple3SlashFirstP(sexp, types.symbol("check-expect")) ||
+         tuple3SlashFirstP(sexp, types.symbol("EXAMPLE"));
 });
 
 var checkDashErrorP = (function (sexp) {
@@ -760,8 +767,8 @@ var checkDashWithinP = (function (sexp) {
 });
 
 var parseDashTestDashCase = (function (sexp) {
-//                             console.log("parseDashTestDashCase");
   return consP(sexp) ? symbolEqualSignP(first(sexp), types.symbol("check-expect")) ? parseDashCheckDashExpect(sexp) :
+  symbolEqualSignP(first(sexp), types.symbol("EXAMPLE")) ? parseDashCheckDashExpect(sexp) :
   symbolEqualSignP(first(sexp), types.symbol("check-error")) ? parseDashCheckDashError(sexp) :
   symbolEqualSignP(first(sexp), types.symbol("check-within")) ? parseDashCheckDashWithin(sexp) :
   error(types.symbol("parse-test-case"), stringDashAppend("Expected a test case but instead found: ", sexpDashGreaterThanString(sexp))) :
@@ -769,7 +776,7 @@ var parseDashTestDashCase = (function (sexp) {
 });
 
 var parseDashCheckDashExpect = (function (sexp) {
-//                                console.log("parseDashCheckDashExpect");
+                                console.log("parseDashCheckDashExpect");
   return symDashCheckDashExpectP(sexp) ? makeDashChkDashExpect(parseDashExpr(second(sexp)), parseDashExpr(third(sexp)), sexp) :
   expectedDashError(types.symbol("parse-check-expect"), "check expect sexp", sexp);
 });
