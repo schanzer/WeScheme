@@ -59,14 +59,14 @@ function readFromRepl(event) {
   var key = event.keyCode;
 
   if(key === 13) { // "\n"
-    var input = repl_input.value;
+    var aSource = repl_input.value;
     var progres;
     try {
-      sexp = lex(input);
+      sexp = lex(aSource);
     } catch (e) {
       throw Error("LEXING ERROR\n"+e);
     }
-    console.log("raw:\n");
+    console.log("raw:");
     console.log(sexp);
     console.log("pretty:\n"+sexpToString(sexp));
     try {
@@ -74,9 +74,9 @@ function readFromRepl(event) {
     } catch (e) {
       throw Error("PARSING ERROR\n"+e);
     }
-    console.log("raw:\n");
+    console.log("raw:");
     console.log(AST);
-    console.log("pretty:\n");
+    console.log("pretty:");
     console.log(AST.join("\n"));
     try {
       var result = runprogSlashEnvs(AST, __nenv, __venv);

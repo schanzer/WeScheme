@@ -655,24 +655,24 @@ WeSchemeInteractions = (function () {
                     that.notifyBus("before-run", that);
 
                     that.disableInput();
-                    try { ////////////// LEX ///////////////
-                      sexp = lex(input);
-                    } catch (e) {
+                    var sexp, AST, progres, result;
+                    try { //////////////////// LEX ///////////////////
+                      var sexp = lex(aSource);
+                    } catch(e) {
                       throw Error("LEXING ERROR\n"+e);
                     }
-                    console.log("raw:\n");
+                    console.log("LEXER OUTPUT (raw and prettyprinted):");
                     console.log(sexp);
-                    console.log("pretty:\n"+sexpToString(sexp));
-                    try { ////////////// PARSE ///////////////
+                    console.log(sexpToString(sexp));
+                    try{ //////////////////// PARSE ///////////////////
                       var AST = parse(sexp);
-                    } catch (e) {
+                    } catch(e) {
                       throw Error("PARSING ERROR\n"+e);
                     }
-                    console.log("raw:\n");
+                    console.log("PARSER OUTPUT (raw and prettyprinted):");
                     console.log(AST);
-                    console.log("pretty:\n");
                     console.log(AST.join("\n"));
-                    try { ////////////// RUN ///////////////
+                    try { ////////////////// RUN /////////////////////
                       var result = runprogSlashEnvs(AST, that.prompt.__nenv, that.prompt.__venv);
                       var progres = first(result); // the program-result
                       that.prompt.__nenv = second(result); // update the environments for future use
@@ -684,7 +684,7 @@ WeSchemeInteractions = (function () {
                       console.log(res);
                     // if an error occured, we want to hand it off to WeScheme's built-in error handler
                     } catch(e){
-                      console.log("LOCAL TRANSLATOR EXCEPTION:\n");
+                      console.log("RUN ERROR:\n");
                                   console.log(e);
                     }
                     that.evaluator.executeProgram(
