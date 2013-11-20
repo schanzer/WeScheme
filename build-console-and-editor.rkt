@@ -18,11 +18,11 @@
 
 
 (define appengine-url
-  "http://googleappengine.googlecode.com/files/appengine-java-sdk-1.7.3.zip")
+  "http://googleappengine.googlecode.com/files/appengine-java-sdk-1.7.7.zip")
 (define appengine-zip-path
-  (build-path "externals" "appengine-java-sdk-1.7.3.zip"))
+  (build-path "externals" "appengine-java-sdk-1.7.7.zip"))
 (define appengine-dir
-  (build-path "lib" "appengine-java-sdk-1.7.3"))
+  (build-path "lib" "appengine-java-sdk-1.7.7"))
 
 
 
