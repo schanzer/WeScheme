@@ -16,10 +16,6 @@
     <!-- Google analytics support -->
     <jsp:include page="/google-analytics.jsp"/>
 
-    <!-- Add translator -->
-    <jsp:include page="/js/translator/local.jsp"/>
-
-
     <link rel="stylesheet" type="text/css" href="/css/default.css" id="style" />
     <link rel="stylesheet" type="text/css" href="/css/pretty-printing.css" id="style" />
 
@@ -87,6 +83,9 @@
     <script src="/js/mzscheme-vm/evaluator-min.js" type="text/javascript"></script>
 
     <script src="/js/openEditor/openEditor-calc.js" type="text/javascript"></script>
+
+    <!-- Add translator -->
+    <jsp:include page="/js/translator/local.jsp"/>
 
 
 <!--    <script src="https://apis.google.com/js/client:plusone.js"></script>
