@@ -90,9 +90,9 @@ function readFromRepl(event) {
 
     repl_input.value = ""; // clear the input
     var temp = document.createElement("li"); // make an li element
-    temp.textContent = input; // stick the program's text in there
+    temp.textContent = aSource; // stick the program's text in there
     output_list.insertBefore(temp, repl_input_li);
-    addToHistory(input);
+    addToHistory(aSource);
 
     // if there's an error don't print the output
     if(!progres.err) {
