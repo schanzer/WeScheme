@@ -661,8 +661,9 @@ WeSchemeInteractions = (function () {
                       console.log(sexpToString(sexp));
                       console.log(sexp);
                       var AST = parse(sexp);
-                      console.log("PARSER OUTPUT:");
+                      console.log("PARSER OUTPUT (prettyprinted and raw):");
                       console.log(AST.join("\n"));
+                      console.log(AST);
                       var result = runprogSlashEnvs(AST, that.prompt.__nenv, that.prompt.__venv);
                       var progres = first(result); // the program-result
                       that.prompt.__nenv = second(result); // update the environments for future use

@@ -319,8 +319,8 @@ function readQuote(str, i) {
 //               console.log("readQuote");
   var sCol = column, sLine = line, iStart = i;
   var p = str.charAt(i);
-  var symbol = p == "'" ? new quote("quote") :
-               p == "`" ? new quote("quasiquote") :
+  var symbol = p == "'" ? types.symbol("quote") :
+               p == "`" ? types.symbol("quasiquote") :
                "";
   if(p == ',') {
     if(i+1 >= str.length) {
@@ -328,9 +328,9 @@ function readQuote(str, i) {
                  + new Location(sCol, sLine, iStart, i-iStart));
     }
     if(str.charAt(i+1) == '#') {
-      symbol = new quote("unquote-splicing");
+      symbol = types.symbol("unquote-splicing");
     } else {
-      symbol = new quote("unquote");
+      symbol = types.symbol("unquote");
     }
   }
   var sexp = readSExpByIndex(str, i+1);

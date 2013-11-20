@@ -34,7 +34,7 @@ function charDashValP(x) { return x instanceof charDashVal; };
 function charDashValDashStr(x) { return x.str; };
 
 function quote(x)    { this.x = x; }
-function symbolP(q)  { return q instanceof quote || types.isSymbol(q);}
+var symbolP = types.isSymbol;
 function quoteVal(q) { return q.x; }
 quote.prototype.toString = function () {
     return this.x.toString();
@@ -123,11 +123,7 @@ function hasArgs(argv, min, max) {
 
 // plus : Number ... -> Number
 function plus() {
-  return foldl(function (x,xs) {
-               return xs + x;
-               },
-               0,
-               arguments);
+  return foldl(jsnums.add, 0, arguments);
 }
 
 // minus : Number ... -> Number
@@ -136,32 +132,18 @@ function minus() {
   if(arguments.length === 1)
     return -arguments[0];
   else
-    return foldl(function(x,xs) {
-                 return xs - x;
-                 },
-                 arguments[0],
-                 Array.prototype.slice.call(arguments,1));
+    return foldl(jsnums.subtract, arguments[0], Array.prototype.slice.call(arguments,1));
 }
 
 // times : Number ... -> Number
 function times() {
-  return foldl(function(x,xs) {
-               return xs * x;
-               },
-               1,
-               arguments);
+  return foldl(jsnums.multiply, 1, arguments);
 }
 
 // divide : Number ... -> Number
 function divide() {
   hasArgs(arguments.length, 2, -1);
-  return foldl(function(x,xs) {
-               if(x === 0)
-               throw new Error("/: Division by zero");
-               return xs / x;
-               },
-               arguments[0],
-               Array.prototype.slice.call(arguments,1));
+  return foldl(jsnums.divide, arguments[0], Array.prototype.slice.call(arguments,1));
 }
 
 function __posn(x, y) {
@@ -185,39 +167,36 @@ function posnDashY(posn) {
   return posn.y;
 }
 
-var abs = Math.abs;
-var sin = Math.sin;
-var asin = Math.asin;
-var cos = Math.cos;
-var acos = Math.acos;
-var tan = Math.tan;
-var atan = Math.atan;
-var ceiling = Math.ceiling;
-var exp = Math.expt;
-var expt = Math.pow;
-var floor = Math.floor;
-var log = Math.log;
-var round = Math.round;
-var sqrt = Math.sqrt;
+// * : types.Number -> various
+// all of these assume native WeScheme Number types
+var abs   = jsnums.abs;
+var sin   = jsnums.sin;
+var asin  = jsnums.asin;
+var cos   = jsnums.cos;
+var acos  = jsnums.acos;
+var tan   = jsnums.tan;
+var atan  = jsnums.atan;
+var exp   = jsnums.expt;
+var expt  = jsnums.pow;
+var floor = jsnums.floor;
+var log   = jsnums.log;
+var round = jsnums.round;
+var sqrt  = jsnums.sqrt;
+var sqr   = jsnums.sqr;
+var sinh  = jsnums.sinh;
+var cosh  = jsnums.cosh;
+var modulo= jsnums.modulo
+var ceiling=jsnums.ceiling;
+var integerP=jsnums.isInteger;
+var realP = jsnums.isReal;
+var real  = jsnums.isReal;
+var quotient = jsnums.quotient;
+var remainder = jsnums.remainder;
 
-// The following definitions were taken from Wikipedia's
-// page on hyperbolicn functions
-function sinh(x) {
-  with (Math) {
-    return (exp(x)-exp(-x))/2;
-  }
-}
 
-function cosh(x) {
-  with (Math) {
-    return (exp(x)+exp(-x))/2;
-  }
-}
 
 // add1 : Number -> Number
-function add1(x) {
-  return x + 1;
-}
+function add1(x) { return jsnums.add(x, 1); }
 
 // returns the number of seconds since January 1, 1970, 00:00:00 UTC
 function currentDashSeconds() {
@@ -230,11 +209,7 @@ function evenP(x) { return x%2===0; }
 // determines the greatest common divisor of its arguments
 function gcd(x,y) {
   var rest = Array.prototype.splice.call(arguments,2);
-  while(y!=0) {
-    var t = y;
-    y = x % y;
-    x = t;
-  }
+  var x = jsnums.gcd(x,y);
   return rest.length===0 ? x : gcd.apply(gcd,[x].concat(rest));
 }
 
@@ -246,18 +221,13 @@ function integerDashGreaterThanChar(x) {
 // integerDashSqrt : Number -> Number
 // returns the floor of the number's sqrt
 function integerDashSqrt(x) {
-  return Math.floor(Math.sqrt(x));
-}
-
-// integerP : Number -> Boolean
-function integerP(x) {
-  return x===Math.floor(x);
+  return floor(sqrt(x));
 }
 
 // lcm : Number ... -> Number
 // computes the lowest common multiple of the arguments
 function lcm() {
-  return abs(times.apply(times, arguments))
+  return abs(jsnums.multiply.apply(jsnums.multiply, arguments))
   /    gcd.apply(gcd, arguments);
 }
 
@@ -265,7 +235,7 @@ function lcm() {
 // gets the biggest number of the arguments
 function max() {
   return foldl(function (x,max) {
-               return x>max ? x : max;
+                return jsnums.greaterThan(x,max) ? x : max;
                },
                arguments[0],
                arguments);
@@ -275,67 +245,45 @@ function max() {
 // gets the smallest number of the arguments
 function min() {
   return foldl(function (x,min) {
-               return x<min ? x : min;
+                return jsnums.lessThan(x,min) ? x : min;
                },
                arguments[0],
                arguments);
 }
 
-// modulo : Number Number -> Number
-function modulo(q,n) {
-  var quo = q/n;
-  var flo = floor(quo);
-  var rem = quo-flo;
-  return rem*n;
-}
-
 // negativeP : Number -> Boolean
-function negativeP(x) { return x<0; }
+function negativeP(x) {
+  return jsnums.lessThan(x.val, 0);
+}
 
 // numberDashGreaterThanString : Number -> String
 function numberDashGreaterThanString(x) { return x.toString(); };
 
-// numberP : Number -> Boolean
+// numberP : expr -> Boolean
 function numberP(x) {
-  return x instanceof Number || typeof x==="number" || types.isNumber(x);
+  return (x instanceof Constant && types.isNumber(x.val));
 }
 
 // oddP : Number -> Boolean
-function oddP(x) { return x%2===1; }
+function oddP(x) { return jsnums.remainder(x.val,2)===1; }
 
 // positiveP : Number -> Boolean
-function positiveP(x) { return x>0; }
-
-// quotient : Number Number -> Boolean
-function quotient(x, y) {
-  return x/y;
-}
-
-// remainder : Number Number -> Number
-function remainder(x, y) { return x%y; }
+function positiveP(x) { return jsnums.greaterThan(x.val, 0); }
 
 // random : Number -> Number
-function random(x) { return Math.floor(Math.random()*x); }
-
-// real : Any -> Number
-function realP(x) { return numberP(x); }
+function random(x) { return jsnums.fromFixnum(Math.floor(Math.random()*x)); }
 
 // sgn : Number -> (U 1 0 -1)
 function sgn(x) {
-  return x<0 ? -1 : x>0 ? 1 : 0;
+  return negativeP(x)? -1 : positiveP(x) ? 1 : 0;
 }
 
-// sqr : Number -> Number
-function sqr(x) { return x*x; }
-
 // sub1 : Number -> Number
-function sub1(x) { return x - 1; }
+function sub1(x) { return jsnums.subtract(x, 1); }
 
 // zeroP : Number -> Boolean
 // is this the number zero?
-function zeroP(x) {
-  return x===0;
-}
+function zeroP(x) { return jsnums.equals(x, 0); }
 
 // booleanP : Any -> Boolean
 function booleanP(x) {
@@ -346,14 +294,10 @@ function booleanP(x) {
 // "false"==false -> false
 // new Boolean(false)==false -> true
 // false==false -> true
-function falseP(x) {
-  return x==false;
-}
+function falseP(x) { return x==false; }
 
 // not : Boolean -> Boolean
-function not(x) {
-  return !x;
-}
+function not(x) { return !x; }
 
 // append : [ListOf Any] ... -> [ListOf Any]
 function append() {
@@ -1061,8 +1005,7 @@ function charEqualSignP() {
 // are these all symbols of the same value?
 function symbolEqualSignP() {
   function proc(x,y){
-    return x instanceof quote && y instanceof quote
-    &&   quoteVal(x) === quoteVal(y);
+    return x.val === y.val && types.isSymbol(x) && types.isSymbol(y);
   }
   return consecCmp(proc, arguments);
 }
