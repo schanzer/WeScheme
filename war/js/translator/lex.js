@@ -455,8 +455,9 @@ function throwError(x) { throw new Error(x); }
 
 // determines if the character is valid as a part of a symbol
 function isValidSymbolCharP(x) {
-  return !isDelim(x) &&  !isWhiteSpace(x) && x != '"' && x != ',' && x != "'"
-                                                      && x != '`' && x != ';';
+  return !isDelim(x) && !isWhiteSpace(x)
+        && x != '"' && x != ',' && x != "'"
+                    && x != '`' && x != ';';
 }
 
 // determines if they are matching delimiter pairs

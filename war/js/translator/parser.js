@@ -382,12 +382,10 @@ function chkDashError(actual, error, sexp) {
 // require-url
 function req(uri) {
   this.uri = uri;
+  this.toString = function(){ return "(require "+this.uri+")"; };
 };
 function reqDashUri(x) {
   return x.uri;
-  this.toString = function(){
-    return "(require-url "+this.uri+")";
-  };
 };
 
 var requireDashFileP = (function (x) {
