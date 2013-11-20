@@ -200,27 +200,33 @@ function readString(str, i) {
 // readPoundSExp : String Number -> SExp
 // reads a sexp begining with a # sign.
 function readPoundSExp(str, i) {
-//               console.log("readPoundSExp");
-  var sCol = column, sLine = line, iStart = i;
-  i++; // skip over the pound sign
-  column++;
+//               console.log("readPoundSExp:, i is "+i);
+  var sCol = column, sLine = line, iStart = i, datum;
+  i++; column++; // skip over the pound sign
+  
 
-  var datum;
   if(i < str.length) {
     var p = str.charAt(i);
-    datum =   p == 't' || p == 'T' ? [true, i+1] :
-              p == 'f' || p == 'F' ? [false, i+1] :
-              p == '\\' ? readChar(str, i-1) :
-              p == '|'  ? readMultiLineComment(str, i-1) :
-              p == ';'  ? readSExpComment(str, i-1) :
-              /* else */  throwError("Unknown pound-prefixed sexp at " +
-                                     new Location(sCol, sLine, iStart, i-iStart));
+    switch(p){
+      case 't':  // test for both forms of true
+      case 'T':  datum = types.symbol("true"); i++; break;
+      case 'f':  // test for both forms of false
+      case 'F':  datum = types.symbol("false"); i++; break;
+      // for all others, back up a character and keep reading
+      case '\\': datum = readChar(str, i-1);
+                 i+= datum.location.span-1; break;
+      case '|':  datum = readMultiLineComment(str, i-1);
+                 i+= datum.location.span; break;
+      case ';':  datum = readSExpComment(str, i-1);
+                 i+= datum.location.span; break;
+      default: throwError("Unknown pound-prefixed sexp at " +
+                          new Location(sCol, sLine, iStart, i-iStart));
+     }
   } else {
     throwError("read: Unexpected EOF when reading a pound-prefixed sexp at"
                + new Location(sCol, sLine, iStart, i-iStart)
                + " already read: " + datum);
   }
-
   datum.location = new Location(sCol, sLine, iStart, i-iStart);
   return datum;
 }
@@ -228,10 +234,10 @@ function readPoundSExp(str, i) {
 // readChar : String Number -> types.char
 // reads a character encoded in the string and returns a representative datum
 function readChar(str, i) {
-//               console.log("readChar");
-  var sCol = column, sLine = line, iStart;
-  i+=2; // skip over the #\
-  column+=2;
+//               console.log("readChar: i is "+i);
+  var sCol = column, sLine = line, iStart = i;
+  i+=2;  column+=2; // skip over the #\\
+
   var datum = "";
   while(i < str.length && !isDelim(str.charAt(i)) && !isWhiteSpace(str.charAt(i))) {
     // track line/column values while we scan
@@ -253,7 +259,8 @@ function readChar(str, i) {
                                    new Location(sCol, sLine, iStart, i-iStart) +
                                    " #\\" + datum);
   var chr = new Char(datum);
-  return new Contant(chr, new Location(sCol, sLine, iStart, i-iStart));
+  chr.location = new Location(sCol, sLine, iStart, i-iStart);
+  return chr;
 }
 
 // readMultiLineComment : String Number -> Atom
@@ -500,7 +507,7 @@ function sexpToString(sexp) {
     // if it hasn't yet been defined
     imageP = function (x) { return x instanceof imgDashVal; };
   }
-  var str = sexp.toString();
+  var str;
   if(sexp instanceof Array) {
     str = foldl(function(x, xs) {
       return xs + sexpToString(x) + " ";
@@ -516,14 +523,21 @@ function sexpToString(sexp) {
     str += ") ...)";
   } else if (sexp instanceof prim) {
     str = primDashName(sexp);
-  } else if (typeof sexp === "string" || sexp instanceof String || sexp instanceof types.string) {
+  } else if (sexp instanceof types.symbol) {
+    str = sexp.val;
+  } else if (sexp instanceof types.string) {
     str = '"' + sexp + '"';
+  } else if (sexp instanceof Char) {
+    str = sexp.val;
   } else if (imageP(sexp)) {
+               console.log('prettyprinting Image');
     if(sexp instanceof imgDashVal) {
       str = '#(struct:object:image-snip% ... ...)';
     } else {
       str = '#(struct:object:cache-image-snip% ... ...)';
     }
+  } else {
+     str = sexp.toString();
   }
 
   return str;

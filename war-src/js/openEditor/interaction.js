@@ -655,15 +655,24 @@ WeSchemeInteractions = (function () {
                     that.notifyBus("before-run", that);
 
                     that.disableInput();
-                    try {
-                      var sexp = lex(aSource);
-                      console.log("LEXER OUTPUT (raw and prettyprinted):");
-                      console.log(sexp);
-                      console.log(sexpToString(sexp));
+                    try { ////////////// LEX ///////////////
+                      sexp = lex(input);
+                    } catch (e) {
+                      throw Error("LEXING ERROR\n"+e);
+                    }
+                    console.log("raw:\n");
+                    console.log(sexp);
+                    console.log("pretty:\n"+sexpToString(sexp));
+                    try { ////////////// PARSE ///////////////
                       var AST = parse(sexp);
-                      console.log("PARSER OUTPUT (raw and prettyprinted):");
-                      console.log(AST);
-                      console.log(AST.join("\n"));
+                    } catch (e) {
+                      throw Error("PARSING ERROR\n"+e);
+                    }
+                    console.log("raw:\n");
+                    console.log(AST);
+                    console.log("pretty:\n");
+                    console.log(AST.join("\n"));
+                    try { ////////////// RUN ///////////////
                       var result = runprogSlashEnvs(AST, that.prompt.__nenv, that.prompt.__venv);
                       var progres = first(result); // the program-result
                       that.prompt.__nenv = second(result); // update the environments for future use

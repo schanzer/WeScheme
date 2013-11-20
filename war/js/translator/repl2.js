@@ -62,14 +62,23 @@ function readFromRepl(event) {
     var input = repl_input.value;
     var progres;
     try {
-      var sexp = lex(input);
-      console.log("LEXER OUTPUT (raw and prettyprinted):");
-      console.log(sexp);
-      console.log(sexpToString(sexp));
+      sexp = lex(input);
+    } catch (e) {
+      throw Error("LEXING ERROR\n"+e);
+    }
+    console.log("raw:\n");
+    console.log(sexp);
+    console.log("pretty:\n"+sexpToString(sexp));
+    try {
       var AST = parse(sexp);
-      console.log("PARSER OUTPUT (raw and prettyprinted):");
-      console.log(AST);
-      console.log(AST.join("\n"));
+    } catch (e) {
+      throw Error("PARSING ERROR\n"+e);
+    }
+    console.log("raw:\n");
+    console.log(AST);
+    console.log("pretty:\n");
+    console.log(AST.join("\n"));
+    try {
       var result = runprogSlashEnvs(AST, __nenv, __venv);
       progres = first(result); // the prog-res value
       __nenv = second(result); // update the environments for future use
