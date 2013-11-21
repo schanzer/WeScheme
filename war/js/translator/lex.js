@@ -108,18 +108,18 @@ function readSExpByIndex(str, i) {
 // reads a list encoded in this string with the left delimiter at index i
 function readList(str, i) {
 //               console.log("readList");
-  var sCol = column, sLine = line, iStart = i;
   var openingDelim = str.charAt(i++);
+  column++; // count the openingDelim
   var p;
   var list = [];
   delims.push(openingDelim);
-
+               
   i = chewWhiteSpace(str, i);
+  var sCol = column, sLine = line, iStart = i;
 
   while (i < str.length && !res.rightListDelims.test(str.charAt(i))) {
-    // track line/char values while we scan
+    // check for newlines
     if(str.charAt(i) === "\n"){ line++; column = 0;}
-    else { column++; }
     var sexp = readSExpByIndex(str, i);
     if(!(sexp instanceof Comment)) {
       list.push(sexp);
@@ -240,10 +240,11 @@ function readChar(str, i) {
 
   var datum = "";
   while(i < str.length && !isDelim(str.charAt(i)) && !isWhiteSpace(str.charAt(i))) {
-    // track line/column values while we scan
+    // check for newlines
     if(str.charAt(i) === "\n"){ line++; column = 0;}
     else { column++; }
     datum += str.charAt(i++);
+    column++;
   }
   datum = datum == 'nul' || datum == 'null' ? new charDashVal('\u0000') :
                       datum == 'backspace' ? new charDashVal('\b') :
@@ -271,11 +272,10 @@ function readMultiLineComment(str, i) {
   column+=2;
   var txt = "";
   while(i+1 < str.length && !(str.charAt(i) == '|' && str.charAt(i+1) == '#')) {
-    // track line/column values while we scan
+    // check for newlines
     if(str.charAt(i) === "\n"){ line++; column = 0;}
-    else { column++; }
     txt+=str.charAt(i);
-    i++;
+    i++; column++;
   }
   if(i+1 >= str.length) {
     throwError("read: Unexpected EOF when reading a multiline comment at "
@@ -351,19 +351,19 @@ function readQuote(str, i) {
 // readSymbolOrNumber : String Number -> types.Symbol | types.Number
 // reads any number or symbol
 function readSymbolOrNumber(str, i) {
-//               console.log("readSymbolOrNumber");
+//               console.log("readSymbolOrNumber, starting at "+i);
   var sCol = column, sLine = line, iStart = i;
   var p = str.charAt(i), datum = "";
-  
+
   // if it *could* be the first char in a number, chew until we hit whitespace
   if(/[+-]/.test(p) || p==="." || /[0-9]/.test(p)){
     while(i < str.length &&
           !isWhiteSpace(str.charAt(i)) &&
           !isDelim(str.charAt(i))) {
-       // track line/column values while we scan
+       // check for newlines
        if(str.charAt(i) === "\n"){ line++; column = 0;}
-       else { column++; }
        datum += str.charAt(i++);
+      column++;
     }
     var num = jsnums.fromString(datum);
     // if the string we've seen IS a Number, return it as a Constant. Otherwise bail
@@ -382,15 +382,15 @@ function readSymbol(str, i, datum) {
 //               console.log("readSymbol");
   var sCol = column-datum.length, sLine = line, iStart = i-datum.length, symbl;
   while(i < str.length && isValidSymbolCharP(str.charAt(i))) {
-    // track line/column values while we scan
+    // check for newlines
     if(str.charAt(i) === "\n"){ line++; column = 0;}
-    else { column++; }
     if(str.charAt(i) == "|") {
       var sym = readVerbatimSymbol(str, i, datum);
       datum = sym.val;
       i = sym.location.i;
     } else {
       datum += str.charAt(i++);
+      column++;
     }
   }
 
@@ -421,10 +421,10 @@ function readVerbatimSymbol(str, i, datum) {
   var sCol = column-datum.length, sLine = line, iStart = i-datum;
   i++; // skip over the opening |
   while(i < str.length && str.charAt(i) != "|") {
-    // track line/column values while we scan
+    // check for newlines
     if(str.charAt(i) === "\n"){ line++; column = 0;}
-    else { column++; }
     datum += str.charAt(i++);
+    column++;
   }
 
   if(i >= str.length) {
@@ -532,7 +532,6 @@ function sexpToString(sexp) {
   } else if (sexp instanceof Char) {
     str = sexp.val;
   } else if (imageP(sexp)) {
-               console.log('prettyprinting Image');
     if(sexp instanceof imgDashVal) {
       str = '#(struct:object:image-snip% ... ...)';
     } else {
