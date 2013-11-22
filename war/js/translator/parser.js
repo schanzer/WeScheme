@@ -426,21 +426,18 @@ function provideDashStatement(val) {
 
 // parse : sexp -> AST
 var parse = (function (sexp) {
-//             console.log("parse");
   return emptyP(sexp) ? [] :
   not(consP(sexp)) ? error(types.symbol("parse"), "The sexp is not a list of definitions or expressions: ", sexpDashGreaterThanString(sexp)) :
   parseStar(sexp);
 });
 
-// parse* : sexp list -> AST?
+// parse* : sexp list -> AST
 var parseStar = function (sexp) {
-//                 console.log("parse*");
   return map(parseDashDefDashExprDashTestDashLib, sexp);
 };
 
-// parse-def-expr-test-lib : sexp -> AST?
+// parse-def-expr-test-lib : sexp -> AST
 var parseDashDefDashExprDashTestDashLib = function (sexp) {
-//                                           console.log("parseDashDefDashExprDashTestDashLib");
   return symDashDefinitionP(sexp) ? parseDashDefinition(sexp) :
   symDashExprP(sexp) ? parseDashExpr(sexp) :
   symDashTestDashCaseP(sexp) ? parseDashTestDashCase(sexp) :
@@ -483,9 +480,7 @@ var variableDashDefinitionP = function (sexp) {
 // : parseDashDefinition : SExp -> AST (definition)
 var parseDashDefinition = function (sexp) {
   function parseDashDefDashStruct(sexp) {
-    var parsed = makeDashDefDashStruct(parseDashIdDashExpr(second(sexp)), map(parseDashIdDashExpr, third(sexp)));
-    parsed.location = sexp.location;
-    return parsed;
+    return makeDashDefDashStruct(parseDashIdDashExpr(second(sexp)), map(parseDashIdDashExpr, third(sexp)));
   };
   function parseDashDefDashFunc(sexp) {
     return GreaterThan(length(rest(second(sexp))), 0) ? makeDashDefDashFunc(parseDashIdDashExpr(first(second(sexp))), map(parseDashIdDashExpr, rest(second(sexp))), parseDashExpr(third(sexp))) :
@@ -495,13 +490,16 @@ var parseDashDefinition = function (sexp) {
     return makeDashDefDashVar(parseDashIdDashExpr(second(sexp)), parseDashExpr(third(sexp)));
   };
  
-  return structureDashDefinitionP(sexp) ? parseDashDefDashStruct(sexp) :
-  functionDashDefinitionP(sexp) ? parseDashDefDashFunc(sexp) :
-  variableDashDefinitionP(sexp) ? parseDashDef(sexp) :
-  error(types.symbol("parse-definition"), stringDashAppend("Expected to find a definition, but found: ", sexpDashGreaterThanString(sexp)));
+  var def = structureDashDefinitionP(sexp) ? parseDashDefDashStruct(sexp) :
+            functionDashDefinitionP(sexp) ? parseDashDefDashFunc(sexp) :
+            variableDashDefinitionP(sexp) ? parseDashDef(sexp) :
+            error(types.symbol("parse-definition"), stringDashAppend("Expected to find a definition, but found: ", sexpDashGreaterThanString(sexp)));
+  def.location = sexp.location;
+ return def;
 };
 
 
+//////////////////////////////////////// EXPRESSION PARSING ////////////////////////////////
 var symDashExprP = function (sexp) {
   return ((not(symDashDefinitionP(sexp))) && (not(symDashTestDashCaseP(sexp))) && (not(symDashRequireP(sexp))) && (not(symDashProvideP(sexp))));
 };
@@ -512,7 +510,39 @@ var parseDashExpr = function (sexp) {
 };
 
 // parseDashExprDashList : SExp -> AST
+// predicates and parsers for call, lambda, local, letrec, let, let*, if, and, or, time, quote and quasiquote exprs
 var parseDashExprDashList = function (sexp) {
+  function sexpDashIsDashLambdaP(sexp) {
+    return tuple3SlashFirstP(sexp, types.symbol("lambda"));
+  };
+  function sexpDashIsDashLocalP(sexp) {
+    return tuple3SlashFirstP(sexp, types.symbol("local"));
+  };
+  function sexpDashIsDashLetrecP(sexp) {
+    return tuple3SlashFirstP(sexp, types.symbol("letrec"));
+  };
+  function sexpDashIsDashLetP(sexp) {
+    return tuple3SlashFirstP(sexp, types.symbol("let"));
+  };
+  function sexpDashIsDashLetStarP(sexp) {
+    return tuple3SlashFirstP(sexp, types.symbol("let*"));
+  };
+  function sexpDashIsDashIfDashExprP(sexp) {
+    return tuple4SlashFirstP(sexp, types.symbol("if"));
+  };
+  function sexpDashIsDashAndDashExprP(sexp) {
+    return ((consP(sexp)) && (symbolP(first(sexp))) && (symbolEqualSignP(first(sexp), types.symbol("and"))));
+  };
+  function sexpDashIsDashOrDashExprP(sexp) {
+    return ((consP(sexp)) && (symbolP(first(sexp))) && (symbolEqualSignP(first(sexp), types.symbol("or"))));
+  };
+  function sexpDashIsDashTimeDashExprP(sexp) {
+    return tupleSlashFirstP(sexp, types.symbol("time"), 2);
+  };
+  function parseDashFuncDashCall(sexp) {
+    return consP(sexp)? makeDashCall(parseDashExpr(first(sexp)), map(parseDashExpr, rest(sexp))) :
+                        expectedDashError(types.symbol("parse-func-call"), "function call sexp", sexp);
+  };
   function parseDashLambdaDashExpr(sexp) {
     return sexpDashIsDashLambdaP(sexp) ? GreaterThan(length(second(sexp)), -1) ? makeDashLambdaDashExpr(map(parseDashIdDashExpr, second(sexp)), parseDashExpr(third(sexp))) :
     error(types.symbol("parse-lambda-expr"), stringDashAppend("expected at least one argument name in the ", "sequence after `lambda', but found none")) :
@@ -561,33 +591,25 @@ var parseDashExprDashList = function (sexp) {
     expectedDashError(types.symbol("parse-quoted-expr"), "quoted sexp", sexp);
   };
 
-  return (function () { var peek = first(sexp);
-
-return not(symbolP(peek)) ? parseDashFuncDashCall(sexp) :
-  symbolEqualSignP(types.symbol("lambda"), peek) ? parseDashLambdaDashExpr(sexp) :
-  symbolEqualSignP(types.symbol("local"), peek) ? parseDashLocalDashExpr(sexp) :
-  symbolEqualSignP(types.symbol("letrec"), peek) ? parseDashLetrecDashExpr(sexp) :
-  symbolEqualSignP(types.symbol("let"), peek) ? parseDashLetDashExpr(sexp) :
-  symbolEqualSignP(types.symbol("let*"), peek) ? parseDashLetStarDashExpr(sexp) :
-  symbolEqualSignP(types.symbol("cond"), peek) ? parseDashCondDashExpr(sexp) :
-  symbolEqualSignP(types.symbol("if"), peek) ? parseDashIfDashExpr(sexp) :
-  symbolEqualSignP(types.symbol("and"), peek) ? parseDashAndDashExpr(sexp) :
-  symbolEqualSignP(types.symbol("or"), peek) ? parseDashOrDashExpr(sexp) :
-  symbolEqualSignP(types.symbol("time"), peek) ? parseDashTimeDashExpr(sexp) :
-  symbolEqualSignP(types.symbol("quote"), peek) ? parseDashQuotedDashExpr(second(sexp)) :
-  symbolEqualSignP(types.symbol("quasiquote"), peek) ? parseDashQuasiDashQuotedDashExpr(second(sexp), false) :
-  parseDashFuncDashCall(sexp);
+  return (function () {
+      var peek = first(sexp);
+      var expr = not(symbolP(peek)) ? parseDashFuncDashCall(sexp) :
+                  symbolEqualSignP(types.symbol("lambda"), peek) ? parseDashLambdaDashExpr(sexp) :
+                  symbolEqualSignP(types.symbol("local"), peek) ? parseDashLocalDashExpr(sexp) :
+                  symbolEqualSignP(types.symbol("letrec"), peek) ? parseDashLetrecDashExpr(sexp) :
+                  symbolEqualSignP(types.symbol("let"), peek) ? parseDashLetDashExpr(sexp) :
+                  symbolEqualSignP(types.symbol("let*"), peek) ? parseDashLetStarDashExpr(sexp) :
+                  symbolEqualSignP(types.symbol("cond"), peek) ? parseDashCondDashExpr(sexp) :
+                  symbolEqualSignP(types.symbol("if"), peek) ? parseDashIfDashExpr(sexp) :
+                  symbolEqualSignP(types.symbol("and"), peek) ? parseDashAndDashExpr(sexp) :
+                  symbolEqualSignP(types.symbol("or"), peek) ? parseDashOrDashExpr(sexp) :
+                  symbolEqualSignP(types.symbol("time"), peek) ? parseDashTimeDashExpr(sexp) :
+                  symbolEqualSignP(types.symbol("quote"), peek) ? parseDashQuotedDashExpr(second(sexp)) :
+                  symbolEqualSignP(types.symbol("quasiquote"), peek) ? parseDashQuasiDashQuotedDashExpr(second(sexp), false) :
+                  parseDashFuncDashCall(sexp);
+        expr.location = sexp.location;
+        return expr;
  })();
-};
-
-var parseDashFuncDashCall = function (sexp) {
- if(consP(sexp)){
-    var parsed = makeDashCall(parseDashExpr(first(sexp)), map(parseDashExpr, rest(sexp)));
-    parsed.location = sexp.location;
-    return parsed;
- } else {
-    return expectedDashError(types.symbol("parse-func-call"), "function call sexp", sexp);
- }
 };
 
 var parseDashCondDashExpr = function (sexp) {
@@ -647,7 +669,6 @@ var parseDashExprDashSingleton = function (sexp) {
 
 
 var parseDashIdDashExpr = function (sexp) {
-//                           console.log("parseDashIdDashExpr");
   return sexpDashIsDashIdP(sexp) ? sexp :
   expectedDashError(types.symbol("parse-id-expr"), "ID", sexp);
 };
@@ -664,45 +685,10 @@ var tuple4SlashFirstP = function (sexp, symbol) {
   return tupleSlashFirstP(sexp, symbol, 4);
 };
 
-var sexpDashIsDashLambdaP = function (sexp) {
-  return tuple3SlashFirstP(sexp, types.symbol("lambda"));
-};
-
-var sexpDashIsDashLocalP = function (sexp) {
-  return tuple3SlashFirstP(sexp, types.symbol("local"));
-};
-
 var sexpDashIsDashCoupleP = function (sexp) {
   return ((consP(sexp)) && (EqualSign(length(sexp), 2)));
 };
 
-var sexpDashIsDashLetrecP = function (sexp) {
-  return tuple3SlashFirstP(sexp, types.symbol("letrec"));
-};
-
-var sexpDashIsDashLetP = function (sexp) {
-  return tuple3SlashFirstP(sexp, types.symbol("let"));
-};
-
-var sexpDashIsDashLetStarP = function (sexp) {
-  return tuple3SlashFirstP(sexp, types.symbol("let*"));
-};
-
-var sexpDashIsDashIfDashExprP = function (sexp) {
-  return tuple4SlashFirstP(sexp, types.symbol("if"));
-};
-
-var sexpDashIsDashAndDashExprP = function (sexp) {
-  return ((consP(sexp)) && (symbolP(first(sexp))) && (symbolEqualSignP(first(sexp), types.symbol("and"))));
-};
-
-var sexpDashIsDashOrDashExprP = function (sexp) {
-  return ((consP(sexp)) && (symbolP(first(sexp))) && (symbolEqualSignP(first(sexp), types.symbol("or"))));
-};
-
-var sexpDashIsDashTimeDashExprP = function (sexp) {
-  return tupleSlashFirstP(sexp, types.symbol("time"), 2);
-};
 
 var sexpDashIsDashPrimopP = function (sexp) {
      return primitive.getPrimitive(sexp);
@@ -716,6 +702,7 @@ var sexpDashIsDashIdP = function (sexp) {
   return symbolP(sexp);
 };
 
+//////////////////////////////////////// TEST-CASE PARSING ////////////////////////////////
 var symDashTestDashCaseP = function (sexp) {
   return ((consP(sexp)) &&
           (symbolP(first(sexp))) &&
@@ -739,6 +726,7 @@ var checkDashWithinP = function (sexp) {
   return tuple4SlashFirstP(sexp, types.symbol("check-within"));
 };
 
+// parseDashTestDashCase : SExp -> AST
 var parseDashTestDashCase = function (sexp) {
   function parseDashCheckDashExpect(sexp) {
     return symDashCheckDashExpectP(sexp) ? makeDashChkDashExpect(parseDashExpr(second(sexp)), parseDashExpr(third(sexp)), sexp) :
@@ -753,14 +741,17 @@ var parseDashTestDashCase = function (sexp) {
     expectedDashError(types.symbol("parse-check-within"), "check within sexp", sexp);
   };
 
-  return consP(sexp) ? symbolEqualSignP(first(sexp), types.symbol("check-expect")) ? parseDashCheckDashExpect(sexp) :
-  symbolEqualSignP(first(sexp), types.symbol("EXAMPLE")) ? parseDashCheckDashExpect(sexp) :
-  symbolEqualSignP(first(sexp), types.symbol("check-error")) ? parseDashCheckDashError(sexp) :
-  symbolEqualSignP(first(sexp), types.symbol("check-within")) ? parseDashCheckDashWithin(sexp) :
-  error(types.symbol("parse-test-case"), stringDashAppend("Expected a test case but instead found: ", sexpDashGreaterThanString(sexp))) :
-  expectedDashError(types.symbol("parse-test-case"), "test-case sexp", sexp);
+  var testCase = consP(sexp) ? symbolEqualSignP(first(sexp), types.symbol("check-expect")) ? parseDashCheckDashExpect(sexp) :
+      symbolEqualSignP(first(sexp), types.symbol("EXAMPLE")) ? parseDashCheckDashExpect(sexp) :
+      symbolEqualSignP(first(sexp), types.symbol("check-error")) ? parseDashCheckDashError(sexp) :
+      symbolEqualSignP(first(sexp), types.symbol("check-within")) ? parseDashCheckDashWithin(sexp) :
+      error(types.symbol("parse-test-case"), stringDashAppend("Expected a test case but instead found: ", sexpDashGreaterThanString(sexp))) :
+      expectedDashError(types.symbol("parse-test-case"), "test-case sexp", sexp);
+  testCase.location = sexp.location;
+  return testCase;
 };
 
+//////////////////////////////////////// REQUIRE PARSING ////////////////////////////////
 var symDashRequireP = function (sexp) {
   return ((consP(sexp)) && ((function () { var fst = first(sexp);
 
@@ -770,12 +761,15 @@ return ((symbolP(fst)) && (symbolEqualSignP(fst, types.symbol("require"))));
 
 var parseDashRequire = function (sexp) {
   return (function () { var uri = second(sexp);
-    return ((stringP(uri)) || (symbolP(uri))) ? makeDashReq(uri) :
+    var req = ((stringP(uri)) || (symbolP(uri))) ? makeDashReq(uri) :
       symbolEqualSignP(first(uri), types.symbol("lib")) ? makeDashReq(uri) :
       makeDashReq(cons(types.symbol("planet"), cons(second(uri), [rest(third(uri))])));
+    req.location = sexp.location;
+    return req;
  })();
 };
 
+//////////////////////////////////////// PROVIDE PARSING ////////////////////////////////
 var symDashProvideP = function (sexp) {
   return ((consP(sexp)) && (symbolP(first(sexp))) && (symbolEqualSignP(first(sexp), types.symbol("provide"))));
 };
