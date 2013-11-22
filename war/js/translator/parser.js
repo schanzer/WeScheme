@@ -656,15 +656,17 @@ var parseDashExprDashSingleton = function (sexp) {
   function parseDashImage(img) {
     return makeDashImageDashExpr(encodeDashImage(img), imageDashWidth(img), imageDashHeight(img), pinholeDashX(img), pinholeDashY(img));
   };
-  return stringP(sexp) ? makeDashStringDashExpr(sexp) :
-  charP(sexp) ? makeDashCharDashExpr(string(sexp)) :
-  numberP(sexp) ? makeDashNumberDashExpr(sexp) :
-  symbolP(sexp) ? sexpDashIsDashPrimopP(sexp) ? makeDashPrimop(sexp) :
-  symbolEqualSignP(types.symbol("empty"), sexp) ? makeDashCall(makeDashPrimop(types.symbol("list")), []) :
-  ((symbolEqualSignP(types.symbol("true"), sexp)) || (symbolEqualSignP(types.symbol("false"), sexp))) ? makeDashBooleanDashExpr(sexp) :
-  sexp :
-  imageP(sexp) ? parseDashImage(sexp) :
-  error(types.symbol("parse-expr-singleton"), stringDashAppend("( ): ", sexpDashGreaterThanString(sexp), "expected a function, but nothing's there"));
+  var singleton = stringP(sexp) ? makeDashStringDashExpr(sexp) :
+    charP(sexp) ? makeDashCharDashExpr(string(sexp)) :
+    numberP(sexp) ? makeDashNumberDashExpr(sexp) :
+    symbolP(sexp) ? sexpDashIsDashPrimopP(sexp) ? makeDashPrimop(sexp) :
+    symbolEqualSignP(types.symbol("empty"), sexp) ? makeDashCall(makeDashPrimop(types.symbol("list")), []) :
+    ((symbolEqualSignP(types.symbol("true"), sexp)) || (symbolEqualSignP(types.symbol("false"), sexp))) ? makeDashBooleanDashExpr(sexp) :
+    sexp :
+    imageP(sexp) ? parseDashImage(sexp) :
+    error(types.symbol("parse-expr-singleton"), stringDashAppend("( ): ", sexpDashGreaterThanString(sexp), "expected a function, but nothing's there"));
+ singleton.location = sexp.location;
+ return singleton;
 };
 
 
@@ -775,8 +777,9 @@ var symDashProvideP = function (sexp) {
 };
 
 var parseDashProvide = function (sexp) {
-  return makeDashProvideDashStatement(symbolP(second(sexp)) ? rest(sexp) :
-  types.symbol("all-defined-out"));
+  var provide = makeDashProvideDashStatement(symbolP(second(sexp)) ? rest(sexp) : types.symbol("all-defined-out"));
+  provide.location = sexp.location;
+  return provide;
 };
 
 var sexpDashGreaterThanString = function (sexp) {
