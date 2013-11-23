@@ -108,6 +108,7 @@ function readSExpByIndex(str, i) {
 // reads a list encoded in this string with the left delimiter at index i
 function readList(str, i) {
 //               console.log("readList");
+  var sCol = column, sLine = line, iStart = i;
   var openingDelim = str.charAt(i++);
   column++; // count the openingDelim
   var p;
@@ -115,7 +116,6 @@ function readList(str, i) {
   delims.push(openingDelim);
                
   i = chewWhiteSpace(str, i);
-  var sCol = column, sLine = line, iStart = i;
 
   while (i < str.length && !res.rightListDelims.test(str.charAt(i))) {
     // check for newlines
@@ -147,7 +147,8 @@ function readList(str, i) {
                str.charAt(i) + " at " +
                new Location(sCol, sLine, iStart, i-iStart));
   }
-  list.location = new Location(sCol, sLine, iStart, i+1-iStart);
+  // add 1 to span to count the closing delimeter
+  list.location = new Location(sCol, sLine, iStart, i-iStart+1);
   return list;
 }
 
