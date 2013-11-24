@@ -34,14 +34,14 @@ function charValP(x) { return x instanceof charVal; };
 function charValStr(x) { return x.str; };
 
 function quote(x)    { this.x = x; }
-var symbolP = types.isSymbol;
+var isSymbol = types.isSymbol;
 function quoteVal(q) { return q.x; }
 quote.prototype.toString = function () {
     return this.x.toString();
 };
 
 function chr(x)     { this.x = x; }
-function charP(c)   { return c instanceof chr; }
+function isChar(c)   { return c instanceof chr; }
 function chrVal(c)  { return c.x; }
 chr.prototype.toString =
   function () {
@@ -259,8 +259,8 @@ function negativeP(x) {
 // numberGreaterThanString : Number -> String
 function numberGreaterThanString(x) { return x.toString(); };
 
-// numberP : expr -> Boolean
-function numberP(x) {
+// isNumber : expr -> Boolean
+function isNumber(x) {
   return (x instanceof Constant && types.isNumber(x.val));
 }
 
@@ -580,8 +580,8 @@ function stringGreaterThanP() {
   return compareStrings(arguments, function(x,y) { return x>y; });
 }
 
-// stringP : Any -> Boolean
-function stringP(x) {
+// isString : Any -> Boolean
+function isString(x) {
   return (x instanceof Constant && types.isString(x.val));
 }
 
@@ -1001,9 +1001,9 @@ function charEqualSignP() {
   return consecCmp(proc, arguments);
 }
 
-// symbolEqualSignP : Any ... -> Boolean
+// isSymbolEqualTo : Any ... -> Boolean
 // are these all symbols of the same value?
-function symbolEqualSignP() {
+function isSymbolEqualTo() {
   function proc(x,y){
     return x.val === y.val && types.isSymbol(x) && types.isSymbol(y);
   }
@@ -1018,7 +1018,7 @@ function eqP() {
   function proc(x,y){
     return x === y
     ||   charEqualSignP(x,y)
-    ||   symbolEqualSignP(x,y)
+    ||   isSymbolEqualTo(x,y)
     ||   (x instanceof Array && y instanceof Array &&
           x.length===0 && y.length===0);
   }
@@ -1073,7 +1073,7 @@ function load_teachpack(str) {
 // environment all the provided identifiers from the require file
 function compileReq(req) {
   var uri = reqUri(req);
-  if(stringP(uri)) {
+  if(isString(uri)) {
     var pathToFile = uri;
 
     var xhr = new XMLHttpRequest();
@@ -1198,13 +1198,13 @@ var address = (function (id, nenv) {
 var addressStar = (function (id, nenv, i, k) {
   return (function () { var findUnboxed = (function (f, j, k) {
   return emptyP(f) ? addressStar(id, rest(nenv), add1(i), k) :
-  symbolEqualSignP(id, first(f)) ? k(makeUnboxedAddr(i, j)) :
+  isSymbolEqualTo(id, first(f)) ? k(makeUnboxedAddr(i, j)) :
   findUnboxed(rest(f), add1(j), k);
 });
 
 var findBoxed = (function (f, j, k) {
   return emptyP(f) ? addressStar(id, rest(nenv), add1(i), k) :
-  symbolEqualSignP(id, first(f)) ? k(makeBoxedAddr(i, j)) :
+  isSymbolEqualTo(id, first(f)) ? k(makeBoxedAddr(i, j)) :
   findBoxed(rest(f), add1(j), k);
 });
 
@@ -1299,7 +1299,7 @@ var boundP = (function (id, env) {
 var lookup = (function (id, env) {
   return (function () { var find = (function (f) {
   return emptyP(f) ? lookup(id, rest(env)) :
-  symbolEqualSignP(id, first(first(f))) ? second(first(f)) :
+  isSymbolEqualTo(id, first(first(f))) ? second(first(f)) :
   find(rest(f));
 });
 
@@ -1312,7 +1312,7 @@ return find(emptyP(env) ? error(new quote("lookup"), symbolGreaterThanString(id)
 var lookupSlashCps = (function (id, env, ret) {
   return (function () { var find = (function (f, retStar) {
   return emptyP(f) ? lookupSlashCps(id, rest(env), retStar) :
-  symbolEqualSignP(id, first(first(f))) ? retStar(second(first(f))) :
+  isSymbolEqualTo(id, first(first(f))) ? retStar(second(first(f))) :
   find(rest(f), retStar);
 });
 
@@ -1480,11 +1480,11 @@ var k = makeProc(2, new quote("<opaque>"), []);
 var valGreaterThanString = (function (v) {
   return procP(v) ? procGreaterThanString(v) :
   primP(v) ? primGreaterThanString(v) :
-  numberP(v) ? numberGreaterThanString(v) :
+  isNumber(v) ? numberGreaterThanString(v) :
   booleanP(v) ? v ? "true" :
   "false" :
-  stringP(v) ? stringAppend("\"", v, "\"") :
-  symbolP(v) ? stringAppend("'", symbolGreaterThanString(v)) :
+  isString(v) ? stringAppend("\"", v, "\"") :
+  isSymbol(v) ? stringAppend("'", symbolGreaterThanString(v)) :
   consP(v) ? stringAppend("(list ", interpolateSpace(map(valGreaterThanString, v)), ")") :
   emptyP(v) ? "empty" :
   imgValP(v) ? "#(struct:object:image-snip% ... ...)" :
@@ -1494,10 +1494,10 @@ var valGreaterThanString = (function (v) {
 var typeAsString = (function (v) {
   return procP(v) ? "procedure" :
   primP(v) ? "procedure" :
-  numberP(v) ? "number" :
+  isNumber(v) ? "number" :
   booleanP(v) ? "boolean" :
-  stringP(v) ? "string" :
-  symbolP(v) ? "symbol" :
+  isString(v) ? "string" :
+  isSymbol(v) ? "symbol" :
   consP(v) ? "list" :
   emptyP(v) ? "list" :
   imgValP(v) ? "image" :
@@ -1665,7 +1665,7 @@ var anyType = makeType(new quote("any"), (function (x) {
   return true;
 }));
 
-var numberType = makeType(new quote("number"), numberP);
+var numberType = makeType(new quote("number"), isNumber);
 
 var booleanType = makeType(new quote("boolean"), booleanP);
 
@@ -1677,13 +1677,13 @@ var rationalType = makeType(new quote("rational"), (function (x) {
 
 var realType = makeType(new quote("real"), realP);
 
-var symbolType = makeType(new quote("symbol"), symbolP);
+var symbolType = makeType(new quote("symbol"), isSymbol);
 
 var listType = makeType(new quote("list"), (function (x) {
   return ((emptyP(x)) || (consP(x)));
 }));
 
-var stringType = makeType(new quote("string"), stringP);
+var stringType = makeType(new quote("string"), isString);
 
 var pairType = makeType(new quote("pair"), consP);
 
@@ -1725,8 +1725,8 @@ var indexable = (function (i) {
 var cStarRAble = (function (ads) {
   return (function (x) {
   return emptyP(ads) ? true :
-  ((consP(x)) && (symbolEqualSignP(new quote("a"), first(ads)) ? cStarRAble(rest(ads))(car(x)) :
-  symbolEqualSignP(new quote("d"), first(ads)) ? cStarRAble(rest(ads))(cdr(x)) :
+  ((consP(x)) && (isSymbolEqualTo(new quote("a"), first(ads)) ? cStarRAble(rest(ads))(car(x)) :
+  isSymbolEqualTo(new quote("d"), first(ads)) ? cStarRAble(rest(ads))(cdr(x)) :
   err("cond", "all questions false")));
 });
 });
@@ -1882,7 +1882,7 @@ return loop(d.fields, 0, []);
 var lookupPrim = (function (name) {
   return (function () { var lookupTable = (function (table) {
   return emptyP(table) ? error(new quote("lookup-prim"), symbolGreaterThanString(name)) :
-  symbolEqualSignP(name, primName(first(table))) ? first(table) :
+  isSymbolEqualTo(name, primName(first(table))) ? first(table) :
   lookupTable(rest(table));
 });
 
@@ -1899,7 +1899,7 @@ return varArityP(IN) ? varArityTypes(IN) :
 });
 
 var primNameP = (function (x) {
-  return ((symbolP(x)) && (ormap((function (p) {
+  return ((isSymbol(x)) && (ormap((function (p) {
   return eqP(x, primName(p));
 }), primTable)));
 });
@@ -2191,23 +2191,23 @@ var primColonEqualTildeP = (function (xs, err, ret) {
 })));
 });
 
-var equalRecP = (function (x1, x2, numberProc) {
+var equalRecP = (function (x1, x2, isNumberroc) {
   return (function () { var andmapStar = (function (p, ls1, ls2) {
   return emptyP(ls1) ? true :
   falseP(p(first(ls1), first(ls2))) ? false :
   andmapStar(p, rest(ls1), rest(ls2));
 });
 
-return ((eqP(x1, x2)) || (numberP(x1) ? ((numberP(x2)) && (numberProc(x1, x2))) :
-  stringP(x1) ? ((stringP(x2)) && (stringEqualSignP(x1, x2))) :
+return ((eqP(x1, x2)) || (isNumber(x1) ? ((isNumber(x2)) && (isNumberroc(x1, x2))) :
+  isString(x1) ? ((isString(x2)) && (stringEqualSignP(x1, x2))) :
   booleanP(x1) ? ((booleanP(x2)) && (booleanEqualSignP(x1, x2))) :
   charValP(x1) ? ((charValP(x2)) && (charValEqualSignP(x1, x2))) :
   emptyP(x1) ? emptyP(x2) :
   consP(x1) ? ((consP(x2)) && (EqualSign(length(x1), length(x2))) && (andmapStar((function (x, y) {
-  return equalRecP(x, y, numberProc);
+  return equalRecP(x, y, isNumberroc);
 }), x1, x2))) :
   structValP(x1) ? ((structValP(x2)) && (eqP(structValType(x1), structValType(x2))) && (andmapStar((function (x, y) {
-  return equalRecP(x, y, numberProc);
+  return equalRecP(x, y, isNumberroc);
 }), structValFields(x1), structValFields(x2)))) :
   imgValP(x1) ? ((imgValP(x2)) && (stringEqualSignP(imgValEncoding(x1), imgValEncoding(x2)))) :
   false));
@@ -2376,13 +2376,13 @@ var primTable = [makePrim(new quote("*"), (function (xs, err, ret) {
   return ret(foldl(min, first(xs), rest(xs)));
 }), makeVarArity([realType], realType)), mkPrim2(new quote("modulo"), modulo, [numberType, extendType(numberType, new quote("non-zero integer"), (function (x) {
   return not(zeroP(x));
-}))]), mkPrim1(new quote("negative?"), negativeP, [realType]), mkPrim1(new quote("number->string"), numberGreaterThanString, [numberType]), mkPrim1(new quote("number?"), numberP, [anyType]), makePrim(new quote("numerator"), notImplemented(new quote("numerator")), [rationalType]), mkPrim1(new quote("odd?"), oddP, [numberType]), mkPrim1(new quote("positive?"), positiveP, [realType]), mkPrim2(new quote("quotient"), quotient, [numberType, extendType(numberType, new quote("non-zero integer"), (function (x) {
+}))]), mkPrim1(new quote("negative?"), negativeP, [realType]), mkPrim1(new quote("number->string"), numberGreaterThanString, [numberType]), mkPrim1(new quote("number?"), isNumber, [anyType]), makePrim(new quote("numerator"), notImplemented(new quote("numerator")), [rationalType]), mkPrim1(new quote("odd?"), oddP, [numberType]), mkPrim1(new quote("positive?"), positiveP, [realType]), mkPrim2(new quote("quotient"), quotient, [numberType, extendType(numberType, new quote("non-zero integer"), (function (x) {
   return not(zeroP(x));
 }))]), mkPrim1(new quote("random"), random, [numberType]), makePrim(new quote("rational?"), notImplemented(new quote("rational?")), [anyType]), mkPrim1(new quote("real?"), realP, [anyType]), mkPrim2(new quote("remainder"), remainder, [numberType, extendType(numberType, new quote("non-zero integer"), (function (x) {
   return not(zeroP(x));
 }))]), mkPrim1(new quote("round"), round, [realType]), mkPrim1(new quote("sgn"), sgn, [realType]), mkPrim1(new quote("sin"), sin, [numberType]), mkPrim1(new quote("sinh"), sinh, [numberType]), mkPrim1(new quote("sqr"), sqr, [numberType]), mkPrim1(new quote("sqrt"), sqrt, [extendType(numberType, new quote("positive integer"), (function (x) {
   return GreaterThanEqualSign(x, 0);
-}))]), mkPrim1(new quote("sub1"), sub1, [numberType]), mkPrim1(new quote("tan"), tan, [numberType]), mkPrim1(new quote("zero?"), zeroP, [realType]), mkPrim2(new quote("boolean=?"), booleanEqualSignP, [booleanType, booleanType]), mkPrim1(new quote("boolean?"), booleanP, [anyType]), mkPrim1(new quote("false?"), falseP, [anyType]), mkPrim1(new quote("not"), not, [booleanType]), mkPrim1(new quote("symbol->string"), symbolGreaterThanString, [symbolType]), mkPrim2(new quote("symbol=?"), symbolEqualSignP, [symbolType, symbolType]), mkPrim1(new quote("symbol?"), symbolP, [anyType]), makePrim(new quote("append"), (function (xs, err, ret) {
+}))]), mkPrim1(new quote("sub1"), sub1, [numberType]), mkPrim1(new quote("tan"), tan, [numberType]), mkPrim1(new quote("zero?"), zeroP, [realType]), mkPrim2(new quote("boolean=?"), booleanEqualSignP, [booleanType, booleanType]), mkPrim1(new quote("boolean?"), booleanP, [anyType]), mkPrim1(new quote("false?"), falseP, [anyType]), mkPrim1(new quote("not"), not, [booleanType]), mkPrim1(new quote("symbol->string"), symbolGreaterThanString, [symbolType]), mkPrim2(new quote("symbol=?"), isSymbolEqualTo, [symbolType, symbolType]), mkPrim1(new quote("symbol?"), isSymbol, [anyType]), makePrim(new quote("append"), (function (xs, err, ret) {
   return ret(foldr(append, [], xs));
 }), makeVarArity([listType, listType], listType)), mkPrim2(new quote("assq"), assq, [anyType, listType]), mkPrim1(new quote("car"), car, [pairType]), mkPrim1(new quote("cdr"), cdr, [pairType]), mkPrim1(new quote("caar"), caar, cStarRAbleType([new quote("a"), new quote("a")])), mkPrim1(new quote("cadr"), cadr, cStarRAbleType([new quote("a"), new quote("d")])), mkPrim1(new quote("cdar"), cdar, cStarRAbleType([new quote("d"), new quote("a")])), mkPrim1(new quote("cddr"), cddr, cStarRAbleType([new quote("d"), new quote("d")])), mkPrim1(new quote("caaar"), caaar, cStarRAbleType([new quote("a"), new quote("a"), new quote("a")])), mkPrim1(new quote("caadr"), caadr, cStarRAbleType([new quote("a"), new quote("a"), new quote("d")])), mkPrim1(new quote("cadar"), cadar, cStarRAbleType([new quote("a"), new quote("d"), new quote("a")])), mkPrim1(new quote("caddr"), caddr, cStarRAbleType([new quote("a"), new quote("d"), new quote("d")])), mkPrim1(new quote("cdaar"), cdaar, cStarRAbleType([new quote("d"), new quote("a"), new quote("a")])), mkPrim1(new quote("cdadr"), cdadr, cStarRAbleType([new quote("d"), new quote("a"), new quote("d")])), mkPrim1(new quote("cddar"), cddar, cStarRAbleType([new quote("d"), new quote("d"), new quote("a")])), mkPrim1(new quote("cdddr"), cdddr, cStarRAbleType([new quote("d"), new quote("d"), new quote("d")])), mkPrim2(new quote("cons"), cons, [anyType, listType]), mkPrim1(new quote("cons?"), consP, [anyType]), mkPrim1(new quote("eighth"), eighth, [indexableType(7)]), mkPrim1(new quote("empty?"), emptyP, [anyType]), mkPrim1(new quote("fifth"), fifth, [indexableType(4)]), mkPrim1(new quote("first"), first, [pairType]), mkPrim1(new quote("fourth"), fourth, [indexableType(3)]), mkPrim1(new quote("length"), length, [listType]), makePrim(new quote("list"), (function (xs, err, ret) {
   return ret(xs);

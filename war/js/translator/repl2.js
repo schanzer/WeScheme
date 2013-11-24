@@ -107,7 +107,7 @@ function readFromRepl(event) {
       }
     } else {
       var temp2 = document.createElement("li");
-      temp2.textContent = stringP(progres.err) ?
+      temp2.textContent = isString(progres.err) ?
 	progres.err :
 	progres.err.proc + ": " + progres.err.msg;
       temp2.setAttribute("class", "error");

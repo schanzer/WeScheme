@@ -71,7 +71,7 @@ var selfEvalP = (function (e) {
 
 var evalSelf = (function (e) {
   return numberExprP(e) ? e.val :
-  booleanExprP(e) ? symbolEqualSignP(e.val, new quote("true")) :
+  booleanExprP(e) ? isSymbolEqualTo(e.val, new quote("true")) :
   symbolExprP(e) ? e.val :
   charExprP(e) ? makeCharVal(e.val) :
   stringExprP(e) ? e.val :
@@ -166,14 +166,14 @@ console.log("compiling provide: "+p);
     bytecode = (function () {
                 var ids = first(p).val;
                 var cR = compileStar(rest(p), nenv);
-                return symbolP(ids) ? (function (venv, vs, provides) {
+                return isSymbol(ids) ? (function (venv, vs, provides) {
                                        return (function (_) {
                                                return cR(venv, vs, new quote("all-defined-out"));
                                                });
                                        }) :
                 (function (venv, vs, provides) {
                  return (function (_) {
-                         return symbolP(provides) ? cR(venv, vs, provides) :
+                         return isSymbol(provides) ? cR(venv, vs, provides) :
                          cR(venv, vs, append(ids, provides));
                          });
                  });
@@ -304,7 +304,7 @@ function compileDefVar(def, nenv) {
 function compileExpr(e, nenv) {
 console.log("compiling single Expr: "+e);
   var bytecode = selfEvalP(e) ? compileSelf(e) :
-                symbolP(e) ? compileVar(e, nenv) :
+                isSymbol(e) ? compileVar(e, nenv) :
                 primopP(e) ? compilePrimop(e) :
                 lambdaExprP(e) ? compileLambda(e, nenv) :
                 callP(e) ? compileCall(e, nenv) :
@@ -761,7 +761,7 @@ function compileChkError(test, nenv) {
                  return (function (_) {
                          return (function () { var actual = tramp(cActual(venv, identity));
                                  return cError(venv, (function (errmsg) {
-                                                          return stringP(errmsg) ? errP(actual) ? stringEqualSignP(errmsg, errGreaterThanString(actual)) ? true :
+                                                          return isString(errmsg) ? errP(actual) ? stringEqualSignP(errmsg, errGreaterThanString(actual)) ? true :
                                                           [new quote("error"), test.sexp, errmsg, errGreaterThanString(actual)] :
                                                           err(new quote("check-error"), msgNotError(actual)) :
                                                           err(new quote("check-error"), stringAppend("expected a string to check against", " error message but found: ", valGreaterThanString(errmsg)));

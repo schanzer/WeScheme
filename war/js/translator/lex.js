@@ -247,16 +247,16 @@ function readChar(str, i) {
     datum += str.charAt(i++);
     column++;
   }
-  datum = datum == 'nul' || datum == 'null' ? new charDashVal('\u0000') :
-                      datum == 'backspace' ? new charDashVal('\b') :
-                      datum == 'tab'       ? new charDashVal('\t') :
-                      datum == 'newline'   ? new charDashVal('\n') :
-                      datum == 'vtab'      ? new charDashVal('\u000B') :
-                      datum == 'page'      ? new charDashVal('\u000C') :
-                      datum == 'return'    ? new charDashVal('\r') :
-                      datum == 'space'     ? new charDashVal('\u0020') :
-                      datum == 'rubout'    ? new charDashVal('\u007F') :
-                      datum.length === 1   ? new charDashVal(datum) :
+  datum = datum == 'nul' || datum == 'null' ? new charVal('\u0000') :
+                      datum == 'backspace' ? new charVal('\b') :
+                      datum == 'tab'       ? new charVal('\t') :
+                      datum == 'newline'   ? new charVal('\n') :
+                      datum == 'vtab'      ? new charVal('\u000B') :
+                      datum == 'page'      ? new charVal('\u000C') :
+                      datum == 'return'    ? new charVal('\r') :
+                      datum == 'space'     ? new charVal('\u0020') :
+                      datum == 'rubout'    ? new charVal('\u007F') :
+                      datum.length === 1   ? new charVal(datum) :
                         throwError("read: Unsupported character at " +
                                    new Location(sCol, sLine, iStart, i-iStart) +
                                    " #\\" + datum);
@@ -508,7 +508,7 @@ function chewWhiteSpace(str, i) {
 function sexpToString(sexp) {
   if(!imageP) {
     // if it hasn't yet been defined
-    imageP = function (x) { return x instanceof imgDashVal; };
+    imageP = function (x) { return x instanceof imgVal; };
   }
   var str;
   if(sexp instanceof Array) {
@@ -520,12 +520,12 @@ function sexpToString(sexp) {
     str = "(" + str.substring(0,str.length-1) + ")";
   } else if (sexp instanceof proc) {
     str = "(lambda (";
-    for(var i=1;i<=procDashArity(sexp); i++) {
-      str += "a" + i + (i===procDashArity(sexp) ? "" : " ");
+    for(var i=1;i<=procArity(sexp); i++) {
+      str += "a" + i + (i===procArity(sexp) ? "" : " ");
     }
     str += ") ...)";
   } else if (sexp instanceof prim) {
-    str = primDashName(sexp);
+    str = primName(sexp);
   } else if (sexp instanceof types.symbol) {
     str = sexp.val;
   } else if (sexp instanceof types.string) {
@@ -533,7 +533,7 @@ function sexpToString(sexp) {
   } else if (sexp instanceof Char) {
     str = sexp.val;
   } else if (imageP(sexp)) {
-    if(sexp instanceof imgDashVal) {
+    if(sexp instanceof imgVal) {
       str = '#(struct:object:image-snip% ... ...)';
     } else {
       str = '#(struct:object:cache-image-snip% ... ...)';
