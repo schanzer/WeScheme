@@ -132,8 +132,8 @@ WeSchemeInteractions = (function () {
         parentDiv.append(this.div);
                         
         // LOCAL TRANSLATOR STATE
-        this.__nenv = this.__nenv ? this.__nenv : initDashNenv;
-        this.__venv = this.__venv ? this.__venv : initDashVenv;
+        this.__nenv = this.__nenv ? this.__nenv : initNenv;
+        this.__venv = this.__venv ? this.__venv : initVenv;
 
         var innerDivElt = this.div.find("span").get(1);
         new plt.wescheme.WeSchemeTextContainer(

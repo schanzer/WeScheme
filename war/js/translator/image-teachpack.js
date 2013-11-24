@@ -6,7 +6,7 @@
 // HtDP Image Teachpack run-time (LIMITED) support
 
 function imageP(x) {
-  return x instanceof imgDashVal
+  return x instanceof imgVal
     ||   isRectangle(x) || isCircle(x)
     ||   isEllipse(x)   || isTriangle(x)
     ||   isStar(x)      || isRegularPolygon(x)
@@ -15,21 +15,21 @@ function imageP(x) {
     ||   isPlaceImage(x);
 }
 
-function imgDashVal(encoding, width, height, x, y) {
+function imgVal(encoding, width, height, x, y) {
   this.encoding = encoding;
   this.width = width;
   this.height = height;
   this.pinhole = make_posn(x, y);
 };
-function makeDashImgDashVal(encoding, width, height, x, y) {
-  return new imgDashVal(encoding, width, height, x, y);
+function makeImgVal(encoding, width, height, x, y) {
+  return new imgVal(encoding, width, height, x, y);
 };
-function imgDashValP(x) { return x instanceof imgDashVal; };
-function imgDashValDashEncoding(x) { return x.encoding; };
-function imgDashValDashWidth(x) { return x.width; };
-function imgDashValDashHeight(x) { return x.height; };
-function imgDashValDashX(x) { return x.x; };
-function imgDashValDashY(x) { return x.y; };
+function imgValP(x) { return x instanceof imgVal; };
+function imgValEncoding(x) { return x.encoding; };
+function imgValWidth(x) { return x.width; };
+function imgValHeight(x) { return x.height; };
+function imgValX(x) { return x.x; };
+function imgValY(x) { return x.y; };
 
 function Posn(x, y) {
   this.x = x;
@@ -48,7 +48,7 @@ function modeToString(s) {
 // colorToString : (U Symbol String make-color) -> String
 function colorToString(c) {
   return c instanceof quote ? c.x :
-         c instanceof structDashVal ? 'rgb(' + c.fields[0] + ', '
+         c instanceof structVal ? 'rgb(' + c.fields[0] + ', '
                                              + c.fields[1] + ', '
 					     + c.fields[2] + ')' :
 	 /* else */   c;
@@ -128,7 +128,7 @@ function RegularPolygon(sides, radius, mode, color, angle) {
 }
 function isRegularPolygon(x) { return x instanceof RegularPolygon; }
 
-function regularDashPolygon(sides, radius, mode, color, angle) {
+function regularPolygon(sides, radius, mode, color, angle) {
   return new RegularPolygon(sides, radius, mode, color, angle);
 }
 
@@ -175,12 +175,12 @@ function overlay(first, second) {
 // - ellipse(Number, Number, Mode, Color)
 // - triangle(Number, Mode, Color)
 // - star(Number, Number, Number, Mode, Color)
-// - regularDashPolygon(Number, Number, Mode, Color, Number)
+// - regularPolygon(Number, Number, Mode, Color, Number)
 // - line(Number, Number, Color)
 // - text(String, Number, Color)
 // - overlay(Image, Image)
-// - placeDashImage(Image, Number, Number, Scene)
-// - emptyDashScene(Number, Number)
+// - placeImage(Image, Number, Number, Scene)
+// - emptyScene(Number, Number)
 
 // A Scene is a image with a pinhole of (0,0).
 
@@ -191,8 +191,8 @@ function EmptyScene(width, height) {
 }
 function isEmptyScene(x) { return x instanceof EmptyScene; }
 
-// emptyDashScene : Number Number -> Scene
-function emptyDashScene(width, height) {
+// emptyScene : Number Number -> Scene
+function emptyScene(width, height) {
   return new EmptyScene(width, height);
 }
 
@@ -205,22 +205,22 @@ function PlaceImage(image, x, y, scene) {
   }
 function isPlaceImage(x) { return x instanceof PlaceImage; }
 
-// placeDashImage : Image Number Number Scene -> Scene
-function placeDashImage(image, x, y, scene) {
+// placeImage : Image Number Number Scene -> Scene
+function placeImage(image, x, y, scene) {
   return new PlaceImage(image, x, y, scene);
     }
 
 
 function image_pinhole (image) { return image.pinhole; }
 
-function pinholeDashX (image) {
-  return imgDashValP(image) ? image.x : posn_x(image_pinhole(image));
+function pinholeX (image) {
+  return imgValP(image) ? image.x : posn_x(image_pinhole(image));
 }
-function pinholeDashY (image) {
-  return imgDashValP(image) ? image.y : posn_y(image_pinhole(image));
+function pinholeY (image) {
+  return imgValP(image) ? image.y : posn_y(image_pinhole(image));
 }
-function imageDashWidth (image) {
-  return imgDashValP(image)      ? image.width :
+function imageWidth (image) {
+  return imgValP(image)      ? image.width :
          isRectangle(image)      ? image.width :
 	 isCircle(image)         ? image.radius * 2 :
 	 isEllipse(image)        ? image.width :
@@ -233,12 +233,12 @@ function imageDashWidth (image) {
 	   throwError("Width of text is unimplemented") :
 	 isOverlay(image)        ? widthOfTwoImages(image.first, image.second) :
 	 isEmptyScene(image)     ? image.width :
-	 isPlaceImage(image)     ? imageDashWidth(image.scene) :
+	 isPlaceImage(image)     ? imageWidth(image.scene) :
 	   throwError("Unknown Image: " + image);
 }
 
-function imageDashHeight (image) {
-  return imgDashValP(image)      ? image.height :
+function imageHeight (image) {
+  return imgValP(image)      ? image.height :
          isRectangle(image)      ? image.height :
 	 isCircle(image)         ? image.radius * 2 :
 	 isEllipse(image)        ? image.height :
@@ -252,23 +252,23 @@ function imageDashHeight (image) {
 	 isOverlay(image)        ? heightOfTwoImages(image.first,
 						     image.second) :
 	 isEmptyScene(image)     ? image.height :
-	 isPlaceImage(image)     ? imageDashHeight(image.scene) :
+	 isPlaceImage(image)     ? imageHeight(image.scene) :
 	   throwError("Unknown Image: " + image);
 }
 
 function widthOfTwoImages(i1, i2) {
   var x1 = -i1.pinhole.x;
-  var x2 = x1 + imageDashWidth(i1);
+  var x2 = x1 + imageWidth(i1);
   var x3 = -i2.pinhole.x;
-  var x4 = x3 + imageDashWidth(i2);
+  var x4 = x3 + imageWidth(i2);
   return composedLineLength(x1, x2, x3, x4);
 }
 
 function heightOfTwoImages(i1, i2) {
   var y1 = -i1.pinhole.y;
-  var y2 = y1 + imageDashHeight(i1);
+  var y2 = y1 + imageHeight(i1);
   var y3 = -i2.pinhole.y;
-  var y4 = y3 + imageDashHeight(i2);
+  var y4 = y3 + imageHeight(i2);
   return composedLineLength(y1, y2, y3, y4);
 }
 
@@ -280,7 +280,7 @@ function composedLineLength(x1, x2, x3, x4) {
 }
 
 function clone(obj){
-  return imgDashValP(obj)      ? new imgDashValP(obj.encoding, obj.width,
+  return imgValP(obj)      ? new imgValP(obj.encoding, obj.width,
 						 obj.height, obj.x, obj.y) :
          isRectangle(obj)      ? rectangle(obj.width, obj.height, obj.mode,
 					   obj.color) :
@@ -290,23 +290,23 @@ function clone(obj){
 	 isTriangle(obj)       ? triangle(obj.side, obj.mode, obj.color) :
 	 isStar(obj)           ? star(obj.n, obj.outer, obj.inner, obj.mode,
 				      obj.color) :
-	 isRegularPolygon(obj) ? regularDashPolygon(obj.sides, obj.radius,
+	 isRegularPolygon(obj) ? regularPolygon(obj.sides, obj.radius,
 						    obj.mode, obj.color,
 						    obj.angle) :
 	 isLine(obj)           ? line(obj.x, obj.y, obj.color) :
 	 isText(obj)           ? text(obj.str, obj.size, obj.color) :
 	 isOverlay(obj)        ? overlay(obj.first, obj.second) :
-	 isEmptyScene(obj)     ? emptyDashScene(obj.width, obj.height) :
-	 isPlaceImage(obj)     ? placeDashImage(obj.image, obj.x, obj.y,
+	 isEmptyScene(obj)     ? emptyScene(obj.width, obj.height) :
+	 isPlaceImage(obj)     ? placeImage(obj.image, obj.x, obj.y,
 					        obj.scene) :
 	   throwError("Unknown Image: " + obj);
 }
 
-function moveDashPinhole(img, dx, dy) {
-  return putDashPinhole(img, img.pinhole.x + dx, img.pinhole.y + dy);
+function movePinhole(img, dx, dy) {
+  return putPinhole(img, img.pinhole.x + dx, img.pinhole.y + dy);
 }
 
-function putDashPinhole(img, x, y) {
+function putPinhole(img, x, y) {
   var temp = clone(img);
   temp.pinhole.x = x;
   temp.pinhole.y = y;

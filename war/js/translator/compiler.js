@@ -1,14 +1,14 @@
 /////////////////// CPS PROCEDURES /////////////////////
-var mapDashCps = function (proc, xs, ret) {
-  return foldrDashCps((function (x, ys, k) {
+var mapCps = function (proc, xs, ret) {
+  return foldrCps((function (x, ys, k) {
     return proc(x, (function (y) {
       return k(cons(y, ys));
     }));
   }), [], xs, ret);
 };
 
-var andmapDashCps = function (proc, xs, ret) {
-  return foldlDashCps((function (f, r, k) {
+var andmapCps = function (proc, xs, ret) {
+  return foldlCps((function (f, r, k) {
     return proc(f, (function (b) {
       return k(((b) && (r)));
     }));
@@ -19,7 +19,7 @@ function continuation(value) {
   this.value = value;
 }
 
-var foldrDashCps = function (proc, base, ls, ret) {
+var foldrCps = function (proc, base, ls, ret) {
   for(var index=ls.length; index>0; index--) {
     base = proc(ls[index-1], base,
                 (function (y) {
@@ -35,7 +35,7 @@ var foldrDashCps = function (proc, base, ls, ret) {
   return ret(base);
 };
 
-var foldlDashCps = function (proc, base, ls, ret) {
+var foldlCps = function (proc, base, ls, ret) {
   for(var index=0; index<ls.length; index++){
     base = proc(ls[index], base,
 		 (function (y) {
@@ -51,177 +51,178 @@ var foldlDashCps = function (proc, base, ls, ret) {
   return ret(base);
 };
 
-var filterDashCps = function (proc, ls, k) {
-  return foldlDashCps((function (x, xs, k2) {
+var filterCps = function (proc, ls, k) {
+  return foldlCps((function (x, xs, k2) {
           return proc(x, (function (bool) {
               return k2(falseP(bool) ? xs :
                 cons(x, xs));
               }));
           }), [], ls,
-          (function (newDashLs) {
-             return k(reverse(newDashLs));
+          (function (newLs) {
+             return k(reverse(newLs));
            }));
 };
 
 ////////////////////// EVAL /////////////////////////
 
-var selfDashEvalP = (function (e) {
-  return ((numberDashExprP(e)) || (booleanDashExprP(e)) || (symbolDashExprP(e)) || (charDashExprP(e)) || (mtDashListDashExprP(e)) || (stringDashExprP(e)) || (imageDashExprP(e)));
+var selfEvalP = (function (e) {
+  return ((numberExprP(e)) || (booleanExprP(e)) || (symbolExprP(e)) || (charExprP(e)) || (mtListExprP(e)) || (stringExprP(e)) || (imageExprP(e)));
 });
 
-var evalDashSelf = (function (e) {
-  return numberDashExprP(e) ? e.val :
-  booleanDashExprP(e) ? symbolEqualSignP(e.val, new quote("true")) :
-  symbolDashExprP(e) ? e.val :
-  charDashExprP(e) ? makeDashCharDashVal(e.val) :
-  stringDashExprP(e) ? e.val :
-  mtDashListDashExprP(e) ? [] :
-  imageDashExprP(e) ? makeDashImgDashVal(e.val, e.width, e.height, e.x, e.y) :
+var evalSelf = (function (e) {
+  return numberExprP(e) ? e.val :
+  booleanExprP(e) ? symbolEqualSignP(e.val, new quote("true")) :
+  symbolExprP(e) ? e.val :
+  charExprP(e) ? makeCharVal(e.val) :
+  stringExprP(e) ? e.val :
+  mtListExprP(e) ? [] :
+  imageExprP(e) ? makeImgVal(e.val, e.width, e.height, e.x, e.y) :
   err("cond", "all questions false");
 });
 
-function progDashRes(vals, err, testDashResults, provides) {
+function progRes(vals, err, testResults, provides) {
   this.vals = vals;
   this.err = err;
-  this.testDashResults = testDashResults;
+  this.testResults = testResults;
   this.provides = provides;
 };
-function makeDashProgDashRes(vals, err, testDashResults, provides) { return new progDashRes(vals, err, testDashResults, provides); };
-function progDashResP(x) { return x instanceof progDashRes; };
-function progDashResDashVals(x) { return x.vals; };
-function progDashResDashErr(x) { return x.err; };
-function progDashResDashTestDashResults(x) { return x.testDashResults; };
-function progDashResDashProvides(x) { return x.provides; };
+function makeProgRes(vals, err, testResults, provides) { return new progRes(vals, err, testResults, provides); };
+function progResP(x) { return x instanceof progRes; };
+function progResVals(x) { return x.vals; };
+function progResErr(x) { return x.err; };
+function progResTestResults(x) { return x.testResults; };
+function progResProvides(x) { return x.provides; };
 
 
 
 ////////////////   COMPILER  OBJECT ////////////////////
 (function () {
 
-var compile = (function (p) {
-  return (function () { var c = compileStar(testsDashToDashEnd(p), loadDashNdefs(p, initDashNenv));
-
-return (function (_) {
-  return first(tramp(c(loadDashVdefs(p, initDashVenv), [], [])));
-});
- })();
-});
-
-var compileSlashEnvs = (function (p, nenv, venv) {
-  return (function () { var c = compileStar(testsDashToDashEnd(p), loadDashNdefs(p, nenv));
-
-return (function (_) {
-  return tramp(c(loadDashVdefs(p, venv), [], []));
-});
- })();
-});
-
-var compileStar = (function (p, nenv) {
-  return emptyP(p) ? (function (venv, vs, provides) {
+function compile(p) {
+  var c = compileStar(testsToEnd(p), loadNdefs(p, initNenv));
   return (function (_) {
-  return [makeDashProgDashRes(reverse(vs), false, [], provides), nenv, venv];
-});
-}) :
-  testDashCaseP(first(p)) ? (function () { var cDashT = compileDashTestsStar(p, nenv);
+          return first(tramp(c(loadVdefs(p, initVenv), [], [])));
+          });
+};
 
-return (function (venv, vs, provides) {
+function compileSlashEnvs(p, nenv, venv) {
+  var c = compileStar(testsToEnd(p), loadNdefs(p, nenv));
   return (function (_) {
-  return [makeDashProgDashRes(reverse(vs), false, cDashT(venv), provides), nenv, venv];
-});
-});
- })() :
-  reqP(first(p)) ? (function () { var cDashReq = compileDashReq(first(p));
+          return tramp(c(loadVdefs(p, venv), [], []));
+          });
+};
 
-var cDashR = compileStar(rest(p), append(nenv, first(cDashReq)));
+// compile* : AST nEnv -> bytecode
+function compileStar(p, nenv) {
+   var bytecode;
+   if(emptyP(p)){ // compile empty AST
+console.log("given nothing to compile: "+p);
+     bytecode = (function (venv, vs, provides) {
+      return (function (_) {
+              return [makeProgRes(reverse(vs), false, [], provides), nenv, venv];
+              });
+      })()
+   } else if(testCaseP(first(p))){ // compile test case
+console.log("compiling test case: "+p);
+     var cT = compileTestsStar(p, nenv);
+     bytecode = (function (venv, vs, provides) {
+                 return (function (_) {
+                         return [makeProgRes(reverse(vs), false, cT(venv), provides), nenv, venv];
+                         });
+                 });
+   } else if(reqP(first(p))){ // compile require
+console.log("compiling require: "+p);
+      bytecode = (function () {
+      var cReq = compileReq(first(p));
+      var cR = compileStar(rest(p), append(nenv, first(cReq)));
+      return (function (venv, vs, provides) {
+        return (function (_) {
+        return (function () { var progresSlashEnv = tramp(second(cReq)(venv, identity));
+      var progres = first(progresSlashEnv);
+      var resNenv = second(progresSlashEnv);
+      var resVenv = third(progresSlashEnv);
+      var resErr = progResErr(progres);
+      var resVals = progResVals(progres);
+      var providedIds = progResProvides(progres);
+      var providedVenv = map((function (nenvFrame, venvFrame) {
+        return reverse(foldl2((function (x1, x2, b) {
+        return consP(providedIds) ? ormap((function (id) {
+        return eqP(x1, id);
+      }), providedIds) ? cons(x2, b) :
+        b :
+        cons(x2, b);
+      }), [], recFrameP(nenvFrame) ? recFrameIds(nenvFrame) :
+        nenvFrame, venvFrame));
+      }), resNenv, resVenv);
 
-return (function (venv, vs, provides) {
-  return (function (_) {
-  return (function () { var progresSlashEnv = tramp(second(cDashReq)(venv, identity));
-
-var progres = first(progresSlashEnv);
-
-var resDashNenv = second(progresSlashEnv);
-
-var resDashVenv = third(progresSlashEnv);
-
-var resDashErr = progDashResDashErr(progres);
-
-var resDashVals = progDashResDashVals(progres);
-
-var providedDashIds = progDashResDashProvides(progres);
-
-var providedDashVenv = map((function (nenvDashFrame, venvDashFrame) {
-  return reverse(foldl2((function (x1, x2, b) {
-  return consP(providedDashIds) ? ormap((function (id) {
-  return eqP(x1, id);
-}), providedDashIds) ? cons(x2, b) :
-  b :
-  cons(x2, b);
-}), [], recDashFrameP(nenvDashFrame) ? recDashFrameDashIds(nenvDashFrame) :
-  nenvDashFrame, venvDashFrame));
-}), resDashNenv, resDashVenv);
-
-return errP(resDashErr) ? [makeDashProgDashRes(reverse(vs), resDashErr, false, provides), nenv, venv] :
-  cDashR(append(venv, providedDashVenv), append(resDashVals, vs), provides);
- })();
-});
-});
- })() :
-  provideP(first(p)) ? (function () { var ids = first(p).val;
-
-var cDashR = compileStar(rest(p), nenv);
-
-return symbolP(ids) ? (function (venv, vs, provides) {
-  return (function (_) {
-  return cDashR(venv, vs, new quote("all-defined-out"));
-});
-}) :
-  (function (venv, vs, provides) {
-  return (function (_) {
-  return symbolP(provides) ? cDashR(venv, vs, provides) :
-  cDashR(venv, vs, append(ids, provides));
-});
-});
- })() :
-  exprP(first(p)) ? (function () { var cDashE = compileDashExpr(first(p), nenv);
-
-var cDashR = compileStar(rest(p), nenv);
-
-return (function (venv, vs, provides) {
-  return (function (_) {
-  return (function () { var v = tramp(cDashE(venv, identity));
-
-return errP(v) ? [makeDashProgDashRes(reverse(vs), v, false, provides), nenv, venv] :
-  cDashR(venv, cons(v, vs), provides);
- })();
-});
-});
- })() :
-  defDashStructP(first(p)) ? (function () { var cDashR = compileStar(rest(p), nenv);
-
-return (function (venv, vs, provides) {
-  return (function (_) {
-  return cDashR(venv, vs, provides);
-});
-});
- })() :
-  defDashFuncP(first(p)) ? compileStar(cons(defDashFuncDashToDashDefDashVarDashLambda(first(p)), rest(p)), nenv) :
-  defDashVarP(first(p)) ? (function () { var cDashD = compileDashDefDashVar(first(p), nenv);
-
-var cDashR = compileStar(rest(p), nenv);
-
-return (function (venv, vs, provides) {
-  return (function (_) {
-  return (function () { var venvStar = tramp(cDashD(venv));
-
-return errP(venvStar) ? [makeDashProgDashRes(vs, venvStar, false, provides), nenv, venv] :
-  cDashR(venvStar, vs, provides);
- })();
-});
-});
- })() :
-  err("cond", "all questions false");
-});
+      return errP(resErr) ? [makeProgRes(reverse(vs), resErr, false, provides), nenv, venv] :
+        cR(append(venv, providedVenv), append(resVals, vs), provides);
+       })();
+      });
+      });
+       })()
+   } else if (provideP(first(p))) { // compile provide
+console.log("compiling provide: "+p);
+    bytecode = (function () {
+                var ids = first(p).val;
+                var cR = compileStar(rest(p), nenv);
+                return symbolP(ids) ? (function (venv, vs, provides) {
+                                       return (function (_) {
+                                               return cR(venv, vs, new quote("all-defined-out"));
+                                               });
+                                       }) :
+                (function (venv, vs, provides) {
+                 return (function (_) {
+                         return symbolP(provides) ? cR(venv, vs, provides) :
+                         cR(venv, vs, append(ids, provides));
+                         });
+                 });
+                })()
+     } else if(exprP(first(p))) { // compile expression
+console.log("compiling expr: "+p);
+        bytecode = (function () { var cE = compileExpr(first(p), nenv);
+          var cR = compileStar(rest(p), nenv);
+          return (function (venv, vs, provides) {
+            return (function (_) {
+            return (function () { var v = tramp(cE(venv, identity));
+          return errP(v) ? [makeProgRes(reverse(vs), v, false, provides), nenv, venv] :
+            cR(venv, cons(v, vs), provides);
+           })();
+          });
+          });
+           })()
+     } else if(defStructP(first(p))){ // compile struct definition
+console.log("compiling struct definition: "+p);
+         bytecode = (function () { var cR = compileStar(rest(p), nenv);
+          
+          return (function (venv, vs, provides) {
+                  return (function (_) {
+                          return cR(venv, vs, provides);
+                          });
+                  });
+          })()
+     } else if(defFuncP(first(p))){ // compile func definition
+console.log("compiling function definition: "+p);
+       bytecode = compileStar(cons(defFuncToDefVarLambda(first(p)), rest(p)), nenv)
+     } else if(defVarP(first(p))){ // compile var definition
+console.log("compiling var definition: "+p);
+       bytecode = (function () { var cD = compileDefVar(first(p), nenv);
+                    var cR = compileStar(rest(p), nenv);
+                    return (function (venv, vs, provides) {
+                            return (function (_) {
+                                    return (function () { var venvStar = tramp(cD(venv));
+                                            return errP(venvStar) ? [makeProgRes(vs, venvStar, false, provides), nenv, venv] :
+                                            cR(venvStar, vs, provides);
+                                            })();
+                                    });
+                            });
+                    })()
+     } else {
+       err("cond", "all questions false");
+     }
+ console.log(bytecode);
+     return bytecode;
+}
 
 var foldl2 = (function (proc, base, l1, l2) {
   return (function () { var f = (function (p, b, l1, l2) {
@@ -234,512 +235,542 @@ return EqualSign(length(l1), length(l2)) ? f(proc, base, l1, l2) :
  })();
 });
 
-var compileDashTestsStar = (function (p, nenv) {
-  return emptyP(p) ? (function (venv) {
-  return [];
-}) :
-  (function () { var cDashT = compileDashTest(first(p), nenv);
+// compileTestsStar : AST nEnv -> bytecode
+function compileTestsStar(p, nenv) {
+  var bytecode;
+  if(emptyP(p)){
+    bytecode = (function (venv) { return [];})
+  } else {
+    var cT = compileTest(first(p), nenv);
+    var cR = compileTestsStar(rest(p), nenv);
+    bytecode = (function (venv) {
+                return cons(tramp(cT(venv)), cR(venv));
+                });
+ }
+ return bytecode;
+}
 
-var cDashR = compileDashTestsStar(rest(p), nenv);
-
-return (function (venv) {
-  return cons(tramp(cDashT(venv)), cDashR(venv));
-});
- })();
-});
-
-var loadDashVdefs = (function (prog, venv) {
+var loadVdefs = (function (prog, venv) {
   return foldr((function (x, xs) {
-  return ((defDashVarP(x)) || (defDashFuncP(x))) ? extend([box(undefn)], xs) :
-  defDashStructP(x) ? extend(buildDashStructDashVframe(x), xs) :
+  return ((defVarP(x)) || (defFuncP(x))) ? extend([box(undefn)], xs) :
+  defStructP(x) ? extend(buildStructVframe(x), xs) :
   xs;
 }), venv, prog);
 });
 
-var loadDashNdefs = (function (prog, nenv) {
+var loadNdefs = (function (prog, nenv) {
   return foldr((function (x, xs) {
-  return ((defDashVarP(x)) || (defDashFuncP(x))) ? extend(makeDashRecDashFrame([definitionDashName(x)]), xs) :
-  defDashStructP(x) ? extend(buildDashStructDashNframe(x), xs) :
+  return ((defVarP(x)) || (defFuncP(x))) ? extend(makeRecFrame([definitionName(x)]), xs) :
+  defStructP(x) ? extend(buildStructNframe(x), xs) :
   xs;
 }), nenv, prog);
 });
 
-var defDashFuncDashToDashDefDashVarDashLambda = (function (d) {
-  return makeDashDefDashVar(d.name, makeDashLambdaDashExpr(d.args, d.body));
-});
+// defFuncToDefVarLambda : defFun -> defLambda
+function defFuncToDefVarLambda(d) {
+  return makeDefVar(d.name, makeLambdaExpr(d.args, d.body));
+}
 
-var testsDashToDashEnd = (function (p) {
-  return (function () { var splitDashTestDashCasesStar = (function (p, pStar, ts) {
-  return emptyP(p) ? append(reverse(pStar), reverse(ts)) :
-  testDashCaseP(first(p)) ? splitDashTestDashCasesStar(rest(p), pStar, cons(first(p), ts)) :
-  splitDashTestDashCasesStar(rest(p), cons(first(p), pStar), ts);
-});
+function testsToEnd(p) {
+  var splitTestCasesStar = (function (p, pStar, ts) {
+        return emptyP(p) ? append(reverse(pStar), reverse(ts)) :
+        testCaseP(first(p)) ? splitTestCasesStar(rest(p), pStar, cons(first(p), ts)) :
+        splitTestCasesStar(rest(p), cons(first(p), pStar), ts);
+      });
+  return splitTestCasesStar(p, [], []);
+}
 
-return splitDashTestDashCasesStar(p, [], []);
- })();
-});
+// compileDefVar : defVar nEnv -> bytecode
+function compileDefVar(def, nenv) {
+  console.log("compiling defVar: "+def);
+  var cExpr = compileExpr(def.expr, nenv);
+  var addr = address(def.name, nenv);
+  var bytecode = (function (venv) {
+          return (function (_) {
+                  return cExpr(venv, (function (v) {
+                                          if(errP(v)){ return v; }
+                                          else{
+                                           var undefVal = valueof(boxedAddrI(addr), boxedAddrJ(addr), venv);
+                                           var DO = setBoxB(undefVal, v);
+                                           return venv;
+                                          }
+                                          }));
+                  });
+          });
+ return bytecode;
+}
 
-var compileDashDefDashVar = (function (def, nenv) {
-  return (function () { var cDashExpr = compileDashExpr(def.expr, nenv);
+// compileExpr : Expr nEnv -> bytecode
+function compileExpr(e, nenv) {
+console.log("compiling single Expr: "+e);
+  var bytecode = selfEvalP(e) ? compileSelf(e) :
+                symbolP(e) ? compileVar(e, nenv) :
+                primopP(e) ? compilePrimop(e) :
+                lambdaExprP(e) ? compileLambda(e, nenv) :
+                callP(e) ? compileCall(e, nenv) :
+                letExprP(e) ? compileLet(e, nenv) :
+                letStarExprP(e) ? compileLetStar(e, nenv) :
+                letrecExprP(e) ? compileLetrecStar(e, nenv) :
+                localExprP(e) ? compileLocal(e, nenv) :
+                ifExprP(e) ? compileIf(e, nenv) :
+                condExprP(e) ? compileCond(e, nenv) :
+                andExprP(e) ? compileAnd(e, nenv) :
+                orExprP(e) ? compileOr(e, nenv) :
+                qqListP(e) ? compileQqList(e, nenv) :
+                error(new quote("compile-expr"), format("~a is unsupported at this time.", e));
+}
 
-var addr = address(def.name, nenv);
-
-return (function (venv) {
-  return (function (_) {
-  return cDashExpr(venv, (function (v) {
-  return errP(v) ? v :
-  (function () { var undefDashVal = valueof(boxedDashAddrDashI(addr), boxedDashAddrDashJ(addr), venv);
-
-var DO = setDashBoxB(undefDashVal, v);
-
-return venv;
- })();
-}));
-});
-});
- })();
-});
-
-var compileDashExpr = (function (e, nenv) {
-  return selfDashEvalP(e) ? compileDashSelf(e) :
-  symbolP(e) ? compileDashVar(e, nenv) :
-  primopP(e) ? compileDashPrimop(e) :
-  lambdaDashExprP(e) ? compileDashLambda(e, nenv) :
-  callP(e) ? compileDashCall(e, nenv) :
-  letDashExprP(e) ? compileDashLet(e, nenv) :
-  letStarDashExprP(e) ? compileDashLetStar(e, nenv) :
-  letrecDashExprP(e) ? compileDashLetrecStar(e, nenv) :
-  localDashExprP(e) ? compileDashLocal(e, nenv) :
-  ifDashExprP(e) ? compileDashIf(e, nenv) :
-  condDashExprP(e) ? compileDashCond(e, nenv) :
-  andDashExprP(e) ? compileDashAnd(e, nenv) :
-  orDashExprP(e) ? compileDashOr(e, nenv) :
-  qqDashListP(e) ? compileDashQqDashList(e, nenv) :
-  error(new quote("compile-expr"), format("~a is unsupported at this time.", e));
-});
-
-var compileDashExprs = (function (es, nenv) {
-  return emptyP(es) ? (function (venv, ret) {
-  return ret([]);
-}) :
-  consP(es) ? (function () { var cDashF = compileDashExpr(first(es), nenv);
-
-var cDashR = compileDashExprs(rest(es), nenv);
-
-return (function (venv, ret) {
-  return (function (_) {
-  return cDashF(venv, (function (f) {
-  return cDashR(venv, (function (r) {
-  return ret(cons(f, r));
-}));
-}));
-});
-});
- })() :
+// compileExprs : Exprs nEnv -> bytecode
+function compileExprs(es, nenv) {
+console.log("compiling Exprs: "+e);
+ var bytecode;
+ if(emptyP(es)){
+  bytecode = (function (venv, ret) { return ret([]); });
+ } else if(consP(es)) {
+   var cF = compileExpr(first(es), nenv);
+   var cR = compileExprs(rest(es), nenv);
+   bytecode = (function (venv, ret) {
+                return (function (_) {
+                          return cF(venv, (function (f) {
+                                                return cR(venv, (function (r) {
+                                                                      return ret(cons(f, r));
+                                                                     }));
+                                                }));
+                          });
+                });
+ } else {
   err("cond", "all questions false");
-});
+ }
+ return bytecode;
+}
 
-var compileDashSelf = (function (expr) {
-  return (function () { var v = evalDashSelf(expr);
+// compileSelf : expr -> bytecode
+function compileSelf(expr) {
+ console.log("compiling self: "+expr);
+ var v = evalSelf(expr);
+ return (function (env, ret) {
+                  return (function (_) { return ret(v); });
+                  });
+}
 
-return (function (env, ret) {
-  return (function (_) {
-  return ret(v);
-});
-});
- })();
-});
+// compileVar : var nEnv -> bytecode
+function compileVar(expr, nenv) {
+console.log("compiling var reference: "+expr);
+ var bytecode = (function () {
+     var addr = address(expr, nenv);
+     if(boxedAddrP(addr)){
+       var i = boxedAddrI(addr);
+       var j = boxedAddrJ(addr);
+       return (function (venv, ret) {
+               return (function (_) {
+                       var v = unbox(valueof(i, j, venv));
+                       return undefinedP(v) ? err(new quote("local-variable"), msgUndefn(expr)) : ret(v);
+                       });
+               });
+       } else if(unboxedAddrP(addr)){
+         var i = unboxedAddrI(addr);
+         var j = unboxedAddrJ(addr);
+         return (function (venv, ret) {
+                  return (function (_) {
+                          return ret(valueof(i, j, venv));
+                          });
+                    });
+       } else {
+          return (function (venv, ret) {
+                  return (function (_) { return addr; });
+                  });
+                 }
+       })();
+}
+ 
+// compilePrimop : expr -> bytecode
+function compilePrimop(expr) {
+console.log("compiling primop "+expr);
+  var primop = lookupPrim(expr.val);
+  var bytecode = (function (venv, ret) {
+                  return (function (_) { return ret(primop);});
+                  });
+ return bytecode;
+}
 
-var compileDashVar = (function (expr, nenv) {
-  return (function () { var addr = address(expr, nenv);
+// compileLambda : lambda nEnv -> bytecode
+function compileLambda(expr, nenv) {
+console.log("compiling lambda "+expr);
+ var bytecode = (function () {
+                 var cBody = compileExpr(expr.body, cons(expr.args, nenv));
+                 var arity = length(expr.args);
+                 return (function (venv, ret) {
+                         return (function (_) {
+                                 return ret(makeProc(arity, cBody, venv));
+                                 });
+                         });
+                 })();
+ return bytecode;
+}
 
-return boxedDashAddrP(addr) ? (function () { var i = boxedDashAddrDashI(addr);
+// compileCall : call nEnv -> bytecode
+function compileCall(expr, nenv) {
+console.log("compiling call: "+expr);
+  var bytecode = (function () {
+          var cF = compileExpr(expr.func, nenv);
+          var csVs = compileExprs(expr.args, nenv);
+          return (function (venv, ret) {
+                  return (function (_) {
+                          return cF(venv, (function (f) {
+                                               return csVs(venv, (function (vs) {
+                                                                      return applyProcedure(f, vs, err, ret);
+                                                                      }));
+                                               }));
+                          });
+                  });
+          })();
+   return bytecode;
+}
+ 
+// compileLet : let nEnv -> bytecode
+function compileLet(expr, nenv) {
+console.log("compiling let: "+expr);
+  return (function () {
+          var ids = map(coupleFirst, expr.bindings);
+          var cVals = compileExprs(map(coupleSecond, expr.bindings), nenv);
+          var cBody = compileExpr(expr.body, cons(ids, nenv));
+          return (function (venv, ret) {
+                  return (function (_) {
+                          return cVals(venv, (function (vals) {
+                                                  return cBody(cons(vals, venv), ret);
+                                                  }));
+                          });
+                  });
+          })();
+}
 
-var j = boxedDashAddrDashJ(addr);
+// compileLetStar : expr nEnv -> bytecode
+function compileLetStar(expr, nenv) {
+  return compileLetStarBindings(expr.bindings, expr.body, nenv);
+}
 
-return (function (venv, ret) {
-  return (function (_) {
-  return (function () { var v = unbox(valueof(i, j, venv));
+//compileLetStarBindings : bindings body nEnv -> bytecode
+function compileLetStarBindings(bs, body, nenv) {
+console.log("compiling let* bindings: "+bs);
+  var bytecode;
+  if(emptyP(bs)){
+    bytecode = compileExpr(body, nenv);
+  } else {
+    bytecode = (function () {
+                var cF = compileExpr(coupleSecond(first(bs)), nenv);
+                var cR = compileLetStarBindings(rest(bs), body, cons([coupleFirst(first(bs))], nenv));
+                return (function (venv, ret) {
+                        return (function (_) {
+                                return cF(venv, (function (v1) {
+                                                     return cR(cons([v1], venv), ret);
+                                                     }));
+                                });
+                        });
+                })();
+ }
+ return bytecode;
+}
 
-return undefinedP(v) ? err(new quote("local-variable"), msgDashUndefn(expr)) :
-  ret(v);
- })();
-});
-});
- })() :
-  unboxedDashAddrP(addr) ? (function () { var i = unboxedDashAddrDashI(addr);
+// compileLetrecStar : letrec nEnv -> bytecode
+function compileLetrecStar(expr, nenv) {
+console.log("compiling letrec bindings: "+expr);
+ var bytecode = (function () {
+    var ids = map(coupleFirst, expr.bindings);
+    var cBody = compileExpr(expr.body, cons(ids, nenv));
+    var cBindings = compileLetrecStarRhss(map(coupleSecond, expr.bindings),
+                                                      cons(makeRecFrame(ids), nenv));
+    return (function (venv, ret) {
+            return (function (_) {
+                    return (function () { var venvStar = cons(buildList(length(ids), (function (x) {
+                                                                                          return box(undefn);
+                                                                                          })), venv);
+                            return cBindings(0, venvStar, (function (vs) {
+                                                               return cBody(cons(map(unbox, first(venvStar)), rest(venvStar)), ret);
+                                                               }));
+                            })();
+                    });
+            });
+    })();
+}
 
-var j = unboxedDashAddrDashJ(addr);
-
-return (function (venv, ret) {
-  return (function (_) {
-  return ret(valueof(i, j, venv));
-});
-});
- })() :
-  (function (venv, ret) {
-  return (function (_) {
-  return addr;
-});
-});
- })();
-});
-
-var compileDashPrimop = (function (expr) {
-  return (function () { var primop = lookupDashPrim(expr.val);
-
-return (function (venv, ret) {
-  return (function (_) {
-  return ret(primop);
-});
-});
- })();
-});
-
-var compileDashLambda = (function (expr, nenv) {
-  return (function () { var cDashBody = compileDashExpr(expr.body, cons(expr.args, nenv));
-
-var arity = length(expr.args);
-
-return (function (venv, ret) {
-  return (function (_) {
-  return ret(makeDashProc(arity, cDashBody, venv));
-});
-});
- })();
-});
-
-var compileDashCall = (function (expr, nenv) {
-  return (function () { var cDashF = compileDashExpr(expr.func, nenv);
-
-var csDashVs = compileDashExprs(expr.args, nenv);
-
-return (function (venv, ret) {
-  return (function (_) {
-  return cDashF(venv, (function (f) {
-  return csDashVs(venv, (function (vs) {
-  return applyDashProcedure(f, vs, err, ret);
-}));
-}));
-});
-});
- })();
-});
-
-var compileDashLet = (function (expr, nenv) {
-  return (function () { var ids = map(coupleDashFirst, expr.bindings);
-
-var cDashVals = compileDashExprs(map(coupleDashSecond, expr.bindings), nenv);
-
-var cDashBody = compileDashExpr(expr.body, cons(ids, nenv));
-
-return (function (venv, ret) {
-  return (function (_) {
-  return cDashVals(venv, (function (vals) {
-  return cDashBody(cons(vals, venv), ret);
-}));
-});
-});
- })();
-});
-
-var compileDashLetStar = (function (expr, nenv) {
-  return compileDashLetStarDashBindings(expr.bindings, expr.body, nenv);
-});
-
-var compileDashLetStarDashBindings = (function (bs, body, nenv) {
-  return emptyP(bs) ? compileDashExpr(body, nenv) :
-  (function () { var cDashF = compileDashExpr(coupleDashSecond(first(bs)), nenv);
-
-var cDashR = compileDashLetStarDashBindings(rest(bs), body, cons([coupleDashFirst(first(bs))], nenv));
-
-return (function (venv, ret) {
-  return (function (_) {
-  return cDashF(venv, (function (v1) {
-  return cDashR(cons([v1], venv), ret);
-}));
-});
-});
- })();
-});
-
-var compileDashLetrecStar = (function (expr, nenv) {
-  return (function () { var ids = map(coupleDashFirst, expr.bindings);
-
-var cDashBody = compileDashExpr(expr.body, cons(ids, nenv));
-
-var cDashBindings = compileDashLetrecStarDashRhss(map(coupleDashSecond, expr.bindings), cons(makeDashRecDashFrame(ids), nenv));
-
-return (function (venv, ret) {
-  return (function (_) {
-  return (function () { var venvStar = cons(buildDashList(length(ids), (function (x) {
-  return box(undefn);
-})), venv);
-
-return cDashBindings(0, venvStar, (function (vs) {
-  return cDashBody(cons(map(unbox, first(venvStar)), rest(venvStar)), ret);
-}));
- })();
-});
-});
- })();
-});
-
-var compileDashLetrecStarDashRhss = (function (es, nenv) {
-  return emptyP(es) ? (function (i, venv, ret) {
-  return ret([]);
-}) :
-  consP(es) ? (function () { var cDashF = compileDashExpr(first(es), nenv);
-
-var cDashR = compileDashLetrecStarDashRhss(rest(es), nenv);
-
-return (function (i, venv, ret) {
-  return (function (_) {
-  return cDashF(venv, (function (f) {
-  return (function () { var DO = setDashBoxB(listDashRef(first(venv), i), f);
-
-return cDashR(add1(i), venv, (function (r) {
-  return ret(cons(f, r));
-}));
- })();
-}));
-});
-});
- })() :
+// compileLetrecStarRhss : exprs nEnv -> bytecode
+function compileLetrecStarRhss(es, nenv) {
+console.log("compiling letrec RHS: "+expr);
+ var bytecode;
+ if(emptyP(es)){
+  bytecode = (function (i, venv, ret) { return ret([]);});
+ } else if(consP(es)) {
+  bytecode = (function () {
+              var cF = compileExpr(first(es), nenv);
+              var cR = compileLetrecStarRhss(rest(es), nenv);
+              return (function (i, venv, ret) {
+                      return (function (_) {
+                              return cF(venv, (function (f) {
+                                                   return (function () { var DO = setBoxB(listRef(first(venv), i), f);
+                                                           return cR(add1(i), venv, (function (r) { return ret(cons(f, r));}));
+                                                           })();
+                                                   }));
+                              });
+                      });
+              })();
+ } else {
   err("cond", "all questions false");
-});
+ }
+ return bytecode;
+}
 
-var compileDashLocal = (function (e, nenv) {
-  return (function () { var defs = e.defs;
+// compileLocal : local nEnv -> bytecode
+function compileLocal(e, nenv) {
+  console.log("compiling local: "+e);
+  return (function () {
+          var defs = e.defs;
+          var cLocal = compileLocalDefs(defs, e.body, loadNdefs(defs, nenv));
+          return (function (venv, ret) {
+                  return (function (_) {
+                          return cLocal(loadVdefs(defs, venv), ret);
+                          });
+                  });
+          })();
+}
 
-var cDashLocal = compileDashLocalDashDefs(defs, e.body, loadDashNdefs(defs, nenv));
+// compileLocalDefs : defintions body nEnv -> bytecode
+function compileLocalDefs(ds, b, nenv) {
+  console.log("compiling local defs: "+ds);
+  var bytecode;
+  if(emptyP(ds)){
+    bytecode = compileExpr(b, nenv);
+ } else if(defStructP(first(ds))) {
+    bytecode = (function () {
+     var cR = compileLocalDefs(rest(ds), b, nenv);
+     return (function (venv, ret) {
+             return (function (_) { return cR(venv, ret); });
+             });
+     })()
+ } else if(defFuncP(first(ds))){
+     bytecode = compileLocalDefs(cons(defFuncToDefVarLambda(first(ds)), rest(ds)), b, nenv);
+ } else if(defVarP(first(ds))){
+     bytecode = (function () {
+                  var cD = compileDefVar(first(ds), nenv);
+                 var cR = compileLocalDefs(rest(ds), b, nenv);
+                 return (function (venv, ret) {
+                         return (function (_) {
+                                 return (function () { var venvStar = tramp(cD(venv));
+                                         return errP(venvStar) ? venvStar :
+                                         cR(venvStar, ret);
+                                         })();
+                                 });
+                         });
+                 })()
+  } else {
+    err("cond", "all questions false");
+  }
+  return bytecode;
+}
 
-return (function (venv, ret) {
-  return (function (_) {
-  return cDashLocal(loadDashVdefs(defs, venv), ret);
-});
-});
- })();
-});
+// compileIf : expr nEnv -> bytecode
+function compileIffunction (expr, nenv) {
+ console.log("compiling if function: "+expr);
+ bytecode = (function () {
+         var cPred = compileExpr(expr.predicate, nenv);
+         var cThen = compileExpr(expr.then, nenv);
+         var cElse = compileExpr(expr.els, nenv);
+         return (function (venv, ret) {
+                 return (function (_) {
+                         return cPred(venv, (function (v) {
+                                                 return booleanP(v) ? v ? cThen(venv, ret) :
+                                                 cElse(venv, ret) :
+                                                 err(new quote("if"), msgNotBool(v));
+                                                 }));
+                         });
+                 });
+         })();
+ return bytecode;
+}
 
-var compileDashLocalDashDefs = (function (ds, b, nenv) {
-  return emptyP(ds) ? compileDashExpr(b, nenv) :
-  defDashStructP(first(ds)) ? (function () { var cDashR = compileDashLocalDashDefs(rest(ds), b, nenv);
-
-return (function (venv, ret) {
-  return (function (_) {
-  return cDashR(venv, ret);
-});
-});
- })() :
-  defDashFuncP(first(ds)) ? compileDashLocalDashDefs(cons(defDashFuncDashToDashDefDashVarDashLambda(first(ds)), rest(ds)), b, nenv) :
-  defDashVarP(first(ds)) ? (function () { var cDashD = compileDashDefDashVar(first(ds), nenv);
-
-var cDashR = compileDashLocalDashDefs(rest(ds), b, nenv);
-
-return (function (venv, ret) {
-  return (function (_) {
-  return (function () { var venvStar = tramp(cDashD(venv));
-
-return errP(venvStar) ? venvStar :
-  cDashR(venvStar, ret);
- })();
-});
-});
- })() :
-  err("cond", "all questions false");
-});
-
-var compileDashIf = (function (expr, nenv) {
-  return (function () { var cDashPred = compileDashExpr(expr.predicate, nenv);
-
-var cDashThen = compileDashExpr(expr.then, nenv);
-
-var cDashElse = compileDashExpr(expr.els, nenv);
-
-return (function (venv, ret) {
-  return (function (_) {
-  return cDashPred(venv, (function (v) {
-  return booleanP(v) ? v ? cDashThen(venv, ret) :
-  cDashElse(venv, ret) :
-  err(new quote("if"), msgDashNotDashBool(v));
-}));
-});
-});
- })();
-});
-
-var compileDashCond = (function (expr, nenv) {
-  return (function () { var compileDashClauses = (function (cs) {
+// compileCond : expr nEnv -> bytecode
+function compileCond(expr, nenv) {
+ console.log("compiling cond expr: "+expr);
+  return (function () { var compileClauses = (function (cs) {
   return emptyP(cs) ? (function (venv, ret) {
   return (function (_) {
-  return err(new quote("cond"), msgDashCondDashAllDashFalse);
+  return err(new quote("cond"), msgCondAllFalse);
 });
 }) :
-  eqP(new quote("else"), coupleDashFirst(first(cs))) ? compileDashExpr(coupleDashSecond(first(cs)), nenv) :
-  (function () { var cDashQ = compileDashExpr(coupleDashFirst(first(cs)), nenv);
+  eqP(new quote("else"), coupleFirst(first(cs))) ? compileExpr(coupleSecond(first(cs)), nenv) :
+  (function () { var cQ = compileExpr(coupleFirst(first(cs)), nenv);
 
-var cDashA = compileDashExpr(coupleDashSecond(first(cs)), nenv);
+var cA = compileExpr(coupleSecond(first(cs)), nenv);
 
-var cDashR = compileDashClauses(rest(cs));
+var cR = compileClauses(rest(cs));
 
 return (function (venv, ret) {
   return (function (_) {
-  return cDashQ(venv, (function (vDashQ) {
-  return booleanP(vDashQ) ? vDashQ ? cDashA(venv, ret) :
-  cDashR(venv, ret) :
-  err(new quote("cond"), msgDashNotDashBool(vDashQ));
+  return cQ(venv, (function (vQ) {
+  return booleanP(vQ) ? vQ ? cA(venv, ret) :
+  cR(venv, ret) :
+  err(new quote("cond"), msgNotBool(vQ));
 }));
 });
 });
  })();
 });
 
-return compileDashClauses(expr.clauses);
+return compileClauses(expr.clauses);
  })();
-});
+}
 
-var andDashLoop = (function (ls) {
+
+function andLoop(ls) {
   return emptyP(ls) ? (function (venv, ret) {
   return ret(true);
 }) :
-  (function () { var fstDashC = first(ls);
+  (function () { var fstC = first(ls);
 
-var rstDashC = andDashLoop(rest(ls));
+var rstC = andLoop(rest(ls));
 
 return (function (venv, ret) {
   return (function (_) {
-  return fstDashC(venv, (function (fstDashV) {
-  return booleanP(fstDashV) ? fstDashV ? rstDashC(venv, ret) :
+  return fstC(venv, (function (fstV) {
+  return booleanP(fstV) ? fstV ? rstC(venv, ret) :
   ret(false) :
-  err(new quote("and"), msgDashNotDashBool(fstDashV));
+  err(new quote("and"), msgNotBool(fstV));
 }));
 });
 });
  })();
-});
+}
 
-var compileDashAnd = (function (expr, nenv) {
-  return andDashLoop(map((function (e) {
-  return compileDashExpr(e, nenv);
-}), expr.exprs));
-});
+// compileAnd : expr nEnv -> bytecode
+function compileAnd(expr, nenv) {
+ console.log("compiling and: "+expr);
+ var bytecode = andLoop(map((function (e) {
+                          return compileExpr(e, nenv);
+                          }), expr.exprs));
+ return bytecode;
+}
 
-var orDashLoop = (function (ls) {
+var orLoop = (function (ls) {
   return emptyP(ls) ? (function (venv, ret) {
   return ret(false);
 }) :
-  (function () { var fstDashC = first(ls);
+  (function () { var fstC = first(ls);
 
-var rstDashC = orDashLoop(rest(ls));
+var rstC = orLoop(rest(ls));
 
 return (function (venv, ret) {
   return (function (_) {
-  return fstDashC(venv, (function (fstDashV) {
-  return booleanP(fstDashV) ? fstDashV ? ret(true) :
-  rstDashC(venv, ret) :
-  err(new quote("or"), msgDashNotDashBool(fstDashV));
+  return fstC(venv, (function (fstV) {
+  return booleanP(fstV) ? fstV ? ret(true) :
+  rstC(venv, ret) :
+  err(new quote("or"), msgNotBool(fstV));
 }));
 });
 });
  })();
 });
 
-var compileDashOr = (function (expr, nenv) {
-  return orDashLoop(map((function (e) {
-  return compileDashExpr(e, nenv);
-}), expr.exprs));
-});
+// compileAnd : expr nEnv -> bytecode
+function compileOr(expr, nenv) {
+ console.log("compiling or: "+expr);
+ var bytecode = orLoop(map((function (e) {
+                                 return compileExpr(e, nenv);
+                                 }), expr.exprs));
+ return bytecode;
+}
 
-var compileDashQqDashList = (function (expr, nenv) {
-  return (function () { var cDashEs = map((function (expr) {
-  return qqDashSpliceP(expr) ? makeDashQqDashSplice(compileDashExpr(expr.val, nenv)) :
-  compileDashExpr(expr, nenv);
+// compileQqList : expr nEnv -> bytecode
+function compileQqList(expr, nenv) {
+ console.log("compiling compileQqList: " + expr);
+  return (function () { var cEs = map((function (expr) {
+  return qqSpliceP(expr) ? makeQqSplice(compileExpr(expr.val, nenv)) :
+  compileExpr(expr, nenv);
 }), expr.val);
 
 return (function (venv, ret) {
   return (function (_) {
-  return foldrDashCps((function (x, xs, retStar) {
-  return qqDashSpliceP(x) ? x.val(venv, (function (vals) {
+  return foldrCps((function (x, xs, retStar) {
+  return qqSpliceP(x) ? x.val(venv, (function (vals) {
   return retStar(foldr(cons, xs, vals));
 })) :
   x(venv, (function (val) {
   return retStar(cons(val, xs));
 }));
-}), [], cDashEs, ret);
+}), [], cEs, ret);
 });
 });
  })();
-});
+}
 
-var compileDashTest = (function (test, nenv) {
-  return chkDashExpectP(test) ? compileDashChkDashExpect(test, nenv) :
-  chkDashWithinP(test) ? compileDashChkDashWithin(test, nenv) :
-  chkDashErrorP(test) ? compileDashChkDashError(test, nenv) :
-  err("cond", "all questions false");
-});
+// compileTest : test nEnv -> bytecode
+function compileTest(test, nenv) {
+ console.log("compiling test: "+test);
+ if(chkExpectP(test)) return compileChkExpect(test, nenv);
+ if(chkWithinP(test)) return compileChkWithin(test, nenv);
+ if(chkErrorP(test))  return compileChkError(test, nenv);
+ else err("cond", "all questions false");
+}
 
-var compileDashChkDashExpect = (function (test, nenv) {
-  return (function () { var cDashActual = compileDashExpr(test.actual, nenv);
+// compileTest : test nEnv -> bytecode
+function compileChkExpect(test, nenv) {
+ console.log("compiling check-expect: "+test);
+  return (function () {
+          var cActual = compileExpr(test.actual, nenv);
+          var cExpect = compileExpr(test.expected, nenv);
+          return (function (venv) {
+                  return (function (_) {
+                          return cActual(venv, (function (a) {
+                                                    return cExpect(venv, (function (e) {
+                                                                              return primColonEqualP([a, e], err, identity) ? true :
+                                                                              [new quote("expect"), test.sexp, a, e];
+                                                                              }));
+                                                    }));
+                          });
+                  });
+          })();
+}
 
-var cDashExpect = compileDashExpr(test.expected, nenv);
+// compileChkWithin : test nEnv -> bytecode
+function compileChkWithin(test, nenv) {
+  console.log("compiling check-within: "+test);
+  return (function () {
+          var cActual = compileExpr(test.actual, nenv);
+          var cExpect = compileExpr(test.expected, nenv);
+          var cRange = compileExpr(test.range, nenv);
+          return (function (venv) {
+                  return (function (_) {
+                          return cActual(venv, (function (v1) {
+                                                    return cExpect(venv, (function (v2) {
+                                                                              return cRange(venv, (function (dx) {
+                                                                                                       return primColonEqualTildeP([v1, v2, dx], err, identity) ? true :
+                                                                                                       [new quote("within"), test.sexp, v1, v2, dx];
+                                                                                                       }));
+                                                                              }));
+                                                    }));
+                          });
+                  });
+          })();
+}
 
-return (function (venv) {
-  return (function (_) {
-  return cDashActual(venv, (function (a) {
-  return cDashExpect(venv, (function (e) {
-  return primColonEqualP([a, e], err, identity) ? true :
-  [new quote("expect"), test.sexp, a, e];
-}));
-}));
-});
-});
- })();
-});
-
-var compileDashChkDashWithin = (function (test, nenv) {
-  return (function () { var cDashActual = compileDashExpr(test.actual, nenv);
-
-var cDashExpect = compileDashExpr(test.expected, nenv);
-
-var cDashRange = compileDashExpr(test.range, nenv);
-
-return (function (venv) {
-  return (function (_) {
-  return cDashActual(venv, (function (v1) {
-  return cDashExpect(venv, (function (v2) {
-  return cDashRange(venv, (function (dx) {
-  return primColonEqualTildeP([v1, v2, dx], err, identity) ? true :
-  [new quote("within"), test.sexp, v1, v2, dx];
-}));
-}));
-}));
-});
-});
- })();
-});
-
-var compileDashChkDashError = (function (test, nenv) {
-  return (function () { var cDashActual = compileDashExpr(test.actual, nenv);
-
-var cDashError = compileDashExpr(test.error, nenv);
-
-return (function (venv) {
-  return (function (_) {
-  return (function () { var actual = tramp(cDashActual(venv, identity));
-
-return cDashError(venv, (function (errmsg) {
-  return stringP(errmsg) ? errP(actual) ? stringEqualSignP(errmsg, errDashGreaterThanString(actual)) ? true :
-  [new quote("error"), test.sexp, errmsg, errDashGreaterThanString(actual)] :
-  err(new quote("check-error"), msgDashNotDashError(actual)) :
-  err(new quote("check-error"), stringDashAppend("expected a string to check against", " error message but found: ", valDashGreaterThanString(errmsg)));
-}));
- })();
-});
-});
- })();
- 
-});
+// compileChkError : test nEnv -> bytecode
+function compileChkError(test, nenv) {
+ console.log("compiling check-error: "+test);
+ return (function () {
+         var cActual = compileExpr(test.actual, nenv);
+         var cError = compileExpr(test.error, nenv);
+         return (function (venv) {
+                 return (function (_) {
+                         return (function () { var actual = tramp(cActual(venv, identity));
+                                 return cError(venv, (function (errmsg) {
+                                                          return stringP(errmsg) ? errP(actual) ? stringEqualSignP(errmsg, errGreaterThanString(actual)) ? true :
+                                                          [new quote("error"), test.sexp, errmsg, errGreaterThanString(actual)] :
+                                                          err(new quote("check-error"), msgNotError(actual)) :
+                                                          err(new quote("check-error"), stringAppend("expected a string to check against", " error message but found: ", valGreaterThanString(errmsg)));
+                                                          }));
+                                 })();
+                         });
+                 });
+         })();
+}
 
  
 /////////////////////
@@ -748,6 +779,6 @@ return cDashError(venv, (function (errmsg) {
  
 window.compile = compile;
 window.compileSlashEnvs = compileSlashEnvs;
-window.compileDashExpr = compileDashExpr;
+window.compileExpr = compileExpr;
 
 })();

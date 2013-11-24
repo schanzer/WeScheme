@@ -7,7 +7,7 @@ var __history_front;
 var __history_back;
 
 
-charDashVal.prototype.toString = function () {
+charVal.prototype.toString = function () {
   return "#\\" + this.str;
 };
 
@@ -24,8 +24,8 @@ function repl2_setup(__nenv, __venv) {
   repl_input = document.getElementById("repl-input");
   repl_input_li = document.getElementById("repl-input-li");
   output_list = document.getElementById("output-list");
-  window.__nenv = __nenv ? __nenv : initDashNenv;
-  window.__venv = __venv ? __venv : initDashVenv;
+  window.__nenv = __nenv ? __nenv : initNenv;
+  window.__venv = __venv ? __venv : initVenv;
   __history_front = [];
   __history_back = [];
 }
@@ -84,7 +84,7 @@ function readFromRepl(event) {
       __nenv = second(result); // update the environments for future use
       __venv = third(result);
     } catch (e) {
-      progres = new progDashRes();
+      progres = new progRes();
       progres.err = e.message;
     }
 

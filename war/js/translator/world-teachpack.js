@@ -62,7 +62,7 @@ function wrap_ticker (ticker) {
   };
 }
 
-function bigDashBang (width, height, seconds, world) {
+function bigBang (width, height, seconds, world) {
   __world = world;
   __width = width;
   __height = height;
@@ -85,22 +85,22 @@ function bigDashBang (width, height, seconds, world) {
 }
 
 // on-tick-event : (World -> World) -> true
-function onDashTickDashEvent (ticker) { __ticker = ticker; return true; }
+function onTickEvent (ticker) { __ticker = ticker; return true; }
 
 // on-key-event : ((World, KeyEvent) -> World) -> true
-function onDashKeyDashEvent (handler) { __key_handler = handler; return true; }
+function onKeyEvent (handler) { __key_handler = handler; return true; }
 
 // on-mouse-event : ((World, MouseEvent) -> World) -> true
-function onDashMouseDashEvent (handler) {
+function onMouseEvent (handler) {
   __mouse_handler = handler;
   return true;
 }
 
 // on-redraw : (World -> Scene) -> true
-function onDashRedraw (drawer) { __drawer = drawer ; return true; }
+function onRedraw (drawer) { __drawer = drawer ; return true; }
 
 // end-of-time : String -> World
-function endDashOfDashTime (message) {
+function endOfTime (message) {
   // Clear the timeout
   // Disable the handler
   clearInterval(__interval_id);
@@ -111,7 +111,7 @@ function endDashOfDashTime (message) {
 // Convert a JavaScript event into a HtDP KeyEvent.
 // A KeyEvent is either
 // - a Symbol (new quote(String)), or
-// - a Character (new charDashVal(String));
+// - a Character (new charVal(String));
 // key_event_to_string : JSEvent -> KeyEvent
 function key_event_to_string (event) {
   var w = event.which;
@@ -120,7 +120,7 @@ function key_event_to_string (event) {
          w == 38 ? new quote('up')    :
          w == 39 ? new quote('right') :
          w == 40 ? new quote('down')  :
-         new charDashVal(String.fromCharCode(event.charCode ?
+         new charVal(String.fromCharCode(event.charCode ?
 					     event.charCode :
 					     event.keyCode) .toLowerCase());
 }
@@ -150,11 +150,11 @@ function mouse_event_to_string (event) {
 
 function keyEqualSignP(key1, key2) {
   return symbolP(key1) && symbolP(key2) && symbolEqualSignP(key1, key2)
-    ||   charDashValP(key1) && charDashValP(key2)
-         && charDashValEqualSignP(key1, key2);
+    ||   charValP(key1) && charValP(key2)
+         && charValEqualSignP(key1, key2);
 }
 
-function keyDashEventP(x) { symbolP(x) || charDashValP(x); }
+function keyEventP(x) { symbolP(x) || charValP(x); }
 
 /*
 // A Simple example of the world.
@@ -191,7 +191,7 @@ function draw_image_acc (image, dx, dy) {
          isOverlay(image)        ? draw_overlay(image, dx, dy)   :
          isPlaceImage(image)     ? draw_place_image(image, dx, dy) :
          isEmptyScene(image)     ? draw_empty_scene(image, dx, dy) :
-	 imgDashValP(image)      ? draw_img_val(image, dx, dy) :
+	 imgValP(image)      ? draw_img_val(image, dx, dy) :
          true;
 }
 
