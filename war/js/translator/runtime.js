@@ -41,7 +41,7 @@ quote.prototype.toString = function () {
 };
 
 function chr(x)     { this.x = x; }
-function isChar(c)   { return c instanceof chr; }
+var isChar = types.isChar;
 function chrVal(c)  { return c.x; }
 chr.prototype.toString =
   function () {

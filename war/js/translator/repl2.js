@@ -6,11 +6,6 @@ var __venv;
 var __history_front;
 var __history_back;
 
-
-charVal.prototype.toString = function () {
-  return "#\\" + this.str;
-};
-
 function formatOutput(x) {
   var res = [];
 
@@ -24,8 +19,6 @@ function repl2_setup(__nenv, __venv) {
   repl_input = document.getElementById("repl-input");
   repl_input_li = document.getElementById("repl-input-li");
   output_list = document.getElementById("output-list");
-  window.__nenv = __nenv ? __nenv : initNenv;
-  window.__venv = __venv ? __venv : initVenv;
   __history_front = [];
   __history_back = [];
 }
@@ -63,29 +56,28 @@ function readFromRepl(event) {
     var progres;
     try {
       sexp = lex(aSource);
+      console.log("LEXING:\nraw:");
+      console.log(sexp);
+      console.log("pretty:\n"+sexpToString(sexp));
     } catch (e) {
       throw Error("LEXING ERROR\n"+e);
     }
-    console.log("raw:");
-    console.log(sexp);
-    console.log("pretty:\n"+sexpToString(sexp));
     try {
       var AST = parse(sexp);
+      console.log("PARSING:\nraw:");
+      console.log(AST);
+      console.log("pretty:");
+      console.log(AST.join("\n"));
     } catch (e) {
       throw Error("PARSING ERROR\n"+e);
     }
-    console.log("raw:");
-    console.log(AST);
-    console.log("pretty:");
-    console.log(AST.join("\n"));
     try {
-      var result = runprogSlashEnvs(AST, __nenv, __venv);
-      progres = first(result); // the prog-res value
-      __nenv = second(result); // update the environments for future use
-      __venv = third(result);
+      var program = compile(AST);
+//      progres = first(result); // the prog-res value
+//      __nenv = second(result); // update the environments for future use
+//      __venv = third(result);
     } catch (e) {
-      progres = new progRes();
-      progres.err = e.message;
+      console.log("COMPILE ERROR:\n");
     }
 
     repl_input.value = ""; // clear the input

@@ -36,7 +36,7 @@ function makeTimeExpr(val) { return new timeExpr(val); };
 function makeSymbolExpr(val) { return new symbolExpr(val); };
 function makeNumberExpr(val) { return new numberExpr(val); };
 function makeStringExpr(val) { return new stringExpr(val); };
-function makeCharExpr(val) { return new charExpr(val); };
+function makeCharExpr(char) { return new charExpr(char.val); };
 function makeListExpr(val) { return new listExpr(val); };
 function makeMtListExpr() { return new mtListExpr(); };
 function makeBooleanExpr(val) { return new booleanExpr(val); };
@@ -256,7 +256,7 @@ function stringExpr(val) {
 // char expression
 function charExpr(val) {
   this.val = val;
-  this.toString = function(){ return "#\\"+this.val.toString(); };
+  this.toString = function(){ return "#\\"+this.val.str.toString(); };
 };
 
 // list expression TODO
@@ -586,7 +586,7 @@ var parseExprList = function (sexp) {
     isCons(sexp) ? makeCall(makePrimop(types.symbol("list")), map(parseQuotedExpr, sexp)) :
     isNumber(sexp) ? makeNumberExpr(sexp) :
     isString(sexp) ? makeStringExpr(sexp) :
-    isChar(sexp) ? makeCharExpr(string(sexp)) :
+    isChar(sexp) ? makeCharExpr(string(sexp.val.str)) :
     isSymbol(sexp) ? makeSymbolExpr(sexp) :
     expectedError(types.symbol("parse-quoted-expr"), "quoted sexp", sexp);
   };
@@ -635,7 +635,7 @@ var parseQuasiQuotedExpr = function (sexp, inlist) {
   isCons(sexp) ? parseQqList(sexp, inlist) :
   isNumber(sexp) ? makeNumberExpr(sexp) :
   isString(sexp) ? makeStringExpr(sexp) :
-  isChar(sexp) ? makeCharExpr(string(sexp)) :
+  isChar(sexp) ? makeCharExpr(sexp) :
   isSymbol(sexp) ? makeSymbolExpr(sexp) :
   expectedError(types.symbol("parse-quoted-expr"), "quoted sexp", sexp);
 };
@@ -656,8 +656,9 @@ var parseExprSingleton = function (sexp) {
   function parseImage(img) {
     return makeImageExpr(encodeImage(img), imageWidth(img), imageHeight(img), pinholeX(img), pinholeY(img));
   };
+ console.log(makeCharExpr(sexp));
   var singleton = isString(sexp) ? makeStringExpr(sexp) :
-    isChar(sexp) ? makeCharExpr(string(sexp)) :
+    isChar(sexp) ? makeCharExpr(sexp) :
     isNumber(sexp) ? makeNumberExpr(sexp) :
     isSymbol(sexp) ? sexpIsisPrimop(sexp) ? makePrimop(sexp) :
     isSymbolEqualTo(types.symbol("empty"), sexp) ? makeCall(makePrimop(types.symbol("list")), []) :

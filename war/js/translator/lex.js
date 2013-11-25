@@ -260,7 +260,7 @@ function readChar(str, i) {
                         throwError("read: Unsupported character at " +
                                    new Location(sCol, sLine, iStart, i-iStart) +
                                    " #\\" + datum);
-  var chr = new Char(datum);
+  var chr = new types.char(datum);
   chr.location = new Location(sCol, sLine, iStart, i-iStart);
   return chr;
 }
@@ -531,7 +531,7 @@ function sexpToString(sexp) {
   } else if (sexp instanceof types.string) {
     str = '"' + sexp + '"';
   } else if (sexp instanceof Char) {
-    str = sexp.val;
+    str = sexp.val.str;
   } else if (imageP(sexp)) {
     if(sexp instanceof imgVal) {
       str = '#(struct:object:image-snip% ... ...)';
