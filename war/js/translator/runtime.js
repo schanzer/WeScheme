@@ -689,9 +689,9 @@ function cons(x, y) {
   return [x].concat(y);
 }
 
-// consP : Any -> Boolean
+// isCons : Any -> Boolean
 // is this a list and can I take the first and rest of it?
-function consP(x) {
+function isCons(x) {
   return x instanceof Array && x.length>=1;
 }
 
@@ -1094,7 +1094,7 @@ function compileReq(req) {
                 };
               }];
     }
-  } else if(consP(uri)) {
+  } else if(isCons(uri)) {
     // these two teachpacks are baked into the runtime
     if(second(uri) == 'world.ss' || second(uri) == 'image.ss') {
       //load_teachpack(second(uri).substring(0, second(uri).length-3)
@@ -1264,7 +1264,7 @@ var bindReplaceB = (function (id, val, env) {
   return emptyP(env) ? error(new quote("bind-replace!"), format("did not find undefined name (~a) to replace. Val was: ~a", id, val)) :
   boxP(first(env)) ? (function () { var frame = unbox(first(env));
 
-return consP(memf((function (x) {
+return isCons(memf((function (x) {
   return ((eqP(id, first(x))) && (undefinedP(second(x))));
 }), frame)) ? (function () { var DO = setBoxB(first(env), map((function (x) {
   return ((eqP(id, first(x))) && (undefinedP(second(x)))) ? [id, val] :
@@ -1292,7 +1292,7 @@ return TRY(0);
 });
 
 var boundP = (function (id, env) {
-  return ((not(emptyP(env))) && (((consP(assq(id, boxP(first(env)) ? unbox(first(env)) :
+  return ((not(emptyP(env))) && (((isCons(assq(id, boxP(first(env)) ? unbox(first(env)) :
   first(env)))) || (boundP(id, rest(env))))));
 });
 
@@ -1485,7 +1485,7 @@ var valGreaterThanString = (function (v) {
   "false" :
   isString(v) ? stringAppend("\"", v, "\"") :
   isSymbol(v) ? stringAppend("'", symbolGreaterThanString(v)) :
-  consP(v) ? stringAppend("(list ", interpolateSpace(map(valGreaterThanString, v)), ")") :
+  isCons(v) ? stringAppend("(list ", interpolateSpace(map(valGreaterThanString, v)), ")") :
   emptyP(v) ? "empty" :
   imgValP(v) ? "#(struct:object:image-snip% ... ...)" :
   format("[Val->String] Unknown Val ~a", v);
@@ -1498,7 +1498,7 @@ var typeAsString = (function (v) {
   booleanP(v) ? "boolean" :
   isString(v) ? "string" :
   isSymbol(v) ? "symbol" :
-  consP(v) ? "list" :
+  isCons(v) ? "list" :
   emptyP(v) ? "list" :
   imgValP(v) ? "image" :
   format("[type-as-string] Unknown type for val: ~a", v);
@@ -1680,12 +1680,12 @@ var realType = makeType(new quote("real"), realP);
 var symbolType = makeType(new quote("symbol"), isSymbol);
 
 var listType = makeType(new quote("list"), (function (x) {
-  return ((emptyP(x)) || (consP(x)));
+  return ((emptyP(x)) || (isCons(x)));
 }));
 
 var stringType = makeType(new quote("string"), isString);
 
-var pairType = makeType(new quote("pair"), consP);
+var pairType = makeType(new quote("pair"), isCons);
 
 var charType = makeType(new quote("char"), charValP);
 
@@ -1712,20 +1712,20 @@ var nonNegativeRealType = makeType(new quote("non-negative-real"), (function (x)
 }));
 
 var listCharType = makeType(new quote("list-of-character"), (function (x) {
-  return ((emptyP(x)) || (((consP(x)) && (andmap(charValP, x)))));
+  return ((emptyP(x)) || (((isCons(x)) && (andmap(charValP, x)))));
 }));
 
 var indexable = (function (i) {
   return (function (x) {
   return emptyP(x) ? false :
-  ((consP(x)) && (((zeroP(i)) || (indexable(sub1(i))(rest(x))))));
+  ((isCons(x)) && (((zeroP(i)) || (indexable(sub1(i))(rest(x))))));
 });
 });
 
 var cStarRAble = (function (ads) {
   return (function (x) {
   return emptyP(ads) ? true :
-  ((consP(x)) && (isSymbolEqualTo(new quote("a"), first(ads)) ? cStarRAble(rest(ads))(car(x)) :
+  ((isCons(x)) && (isSymbolEqualTo(new quote("a"), first(ads)) ? cStarRAble(rest(ads))(car(x)) :
   isSymbolEqualTo(new quote("d"), first(ads)) ? cStarRAble(rest(ads))(cdr(x)) :
   err("cond", "all questions false")));
 });
@@ -1793,7 +1793,7 @@ return checkReqd(primReqdTypes(prim), vals, 1, []);
  })();
 });
 
-var defStructPred = (function (d) {
+var isDefStructred = (function (d) {
   return symbolAppend([d.name, new quote("?")]);
 });
 
@@ -1805,7 +1805,7 @@ var defStructAcc = (function (d, fld) {
   return symbolAppend([d.name, new quote("-"), fld]);
 });
 
-var makeConsPrim = (function (id, d) {
+var makeisConsrim = (function (id, d) {
   return makePrim(defStructCons(d), (function (xs, err, ret) {
   return ret(makeStructVal(id, xs));
 }), map((function (x) {
@@ -1814,7 +1814,7 @@ var makeConsPrim = (function (id, d) {
 });
 
 var makePredPrim = (function (id, d) {
-  return makePrim(defStructPred(d), (function (xs, err, ret) {
+  return makePrim(isDefStructred(d), (function (xs, err, ret) {
   return ret(((structValP(first(xs))) && (eqP(structValType(first(xs)), id))));
 }), [anyType]);
 });
@@ -1830,7 +1830,7 @@ var makeAccPrim = (function (id, d, i) {
 var buildStructVframe = (function (d) {
   return (function () { var id = [d.name];
 
-return append([makeConsPrim(id, d), makePredPrim(id, d)], buildAccVbindings(id, d, makeAccPrim));
+return append([makeisConsrim(id, d), makePredPrim(id, d)], buildAccVbindings(id, d, makeAccPrim));
  })();
 });
 
@@ -1847,7 +1847,7 @@ return reverse(loop(d.fields, 0, []));
 var buildStructNframe = (function (d) {
   return (function () { var id = [d.name];
 
-return append([defStructCons(d), defStructPred(d)], map((function (f) {
+return append([defStructCons(d), isDefStructred(d)], map((function (f) {
   return symbolAppend([d.name, new quote("-"), f]);
 }), d.fields));
  })();
@@ -1856,9 +1856,9 @@ return append([defStructCons(d), defStructPred(d)], map((function (f) {
 var bindStructB = (function (def, env) {
   return (function () { var id = [def.name];
 
-return (function () { var DO = bindReplaceB(defStructCons(def), makeConsPrim(id, def), env);
+return (function () { var DO = bindReplaceB(defStructCons(def), makeisConsrim(id, def), env);
 
-var do2 = bindReplaceB(defStructPred(def), makePredPrim(id, def), env);
+var do2 = bindReplaceB(isDefStructred(def), makePredPrim(id, def), env);
 
 var do3 = map((function (pair) {
   return bindReplaceB(first(pair), second(pair), env);
@@ -1908,7 +1908,7 @@ var joinArgs = (function (f, xs, err, ret) {
   return (function () { var loop = (function (xs, ls, i, k) {
   return emptyP(rest(xs)) ? (function () { var t = first(xs);
 
-return ((emptyP(t)) || (consP(t))) ? applyProcedure(f, append(reverse(ls), t), err, k) :
+return ((emptyP(t)) || (isCons(t))) ? applyProcedure(f, append(reverse(ls), t), err, k) :
   err(new quote("apply"), msgType(new quote("proper-list"), t, i, cons(f, reverse(ls))));
  })() :
   loop(rest(xs), cons(first(xs), ls), add1(i), k);
@@ -2061,7 +2061,7 @@ var myArgmaxStar = (function (p, ls, acc, k) {
 }));
 });
 
-return consP(second(xs)) ? myArgmax(first(xs), second(xs), ret) :
+return isCons(second(xs)) ? myArgmax(first(xs), second(xs), ret) :
   err(new quote("argmax"), format("expected argument of type <non-empty list>; given ~a", second(xs)));
  })();
 });
@@ -2085,7 +2085,7 @@ var myArgminStar = (function (p, ls, acc, k) {
 }));
 });
 
-return consP(second(xs)) ? myArgmin(first(xs), second(xs), ret) :
+return isCons(second(xs)) ? myArgmin(first(xs), second(xs), ret) :
   err(new quote("argmin"), format("expected argument of type <non-empty list>; given ~a", second(xs)));
  })();
 });
@@ -2203,7 +2203,7 @@ return ((eqP(x1, x2)) || (isNumber(x1) ? ((isNumber(x2)) && (isNumberroc(x1, x2)
   booleanP(x1) ? ((booleanP(x2)) && (booleanEqualSignP(x1, x2))) :
   charValP(x1) ? ((charValP(x2)) && (charValEqualSignP(x1, x2))) :
   emptyP(x1) ? emptyP(x2) :
-  consP(x1) ? ((consP(x2)) && (EqualSign(length(x1), length(x2))) && (andmapStar((function (x, y) {
+  isCons(x1) ? ((isCons(x2)) && (EqualSign(length(x1), length(x2))) && (andmapStar((function (x, y) {
   return equalRecP(x, y, isNumberroc);
 }), x1, x2))) :
   structValP(x1) ? ((structValP(x2)) && (eqP(structValType(x1), structValType(x2))) && (andmapStar((function (x, y) {
@@ -2264,7 +2264,7 @@ var tail = first(revXs);
 
 var args = reverse(rest(revXs));
 
-return ((consP(tail)) || (emptyP(tail))) ? ret(foldr(cons, tail, args)) :
+return ((isCons(tail)) || (emptyP(tail))) ? ret(foldr(cons, tail, args)) :
   err(new quote("list*"), msgType(new quote("list"), tail, length(args), args));
  })();
 });
@@ -2384,9 +2384,9 @@ var primTable = [makePrim(new quote("*"), (function (xs, err, ret) {
   return GreaterThanEqualSign(x, 0);
 }))]), mkPrim1(new quote("sub1"), sub1, [numberType]), mkPrim1(new quote("tan"), tan, [numberType]), mkPrim1(new quote("zero?"), zeroP, [realType]), mkPrim2(new quote("boolean=?"), booleanEqualSignP, [booleanType, booleanType]), mkPrim1(new quote("boolean?"), booleanP, [anyType]), mkPrim1(new quote("false?"), falseP, [anyType]), mkPrim1(new quote("not"), not, [booleanType]), mkPrim1(new quote("symbol->string"), symbolGreaterThanString, [symbolType]), mkPrim2(new quote("symbol=?"), isSymbolEqualTo, [symbolType, symbolType]), mkPrim1(new quote("symbol?"), isSymbol, [anyType]), makePrim(new quote("append"), (function (xs, err, ret) {
   return ret(foldr(append, [], xs));
-}), makeVarArity([listType, listType], listType)), mkPrim2(new quote("assq"), assq, [anyType, listType]), mkPrim1(new quote("car"), car, [pairType]), mkPrim1(new quote("cdr"), cdr, [pairType]), mkPrim1(new quote("caar"), caar, cStarRAbleType([new quote("a"), new quote("a")])), mkPrim1(new quote("cadr"), cadr, cStarRAbleType([new quote("a"), new quote("d")])), mkPrim1(new quote("cdar"), cdar, cStarRAbleType([new quote("d"), new quote("a")])), mkPrim1(new quote("cddr"), cddr, cStarRAbleType([new quote("d"), new quote("d")])), mkPrim1(new quote("caaar"), caaar, cStarRAbleType([new quote("a"), new quote("a"), new quote("a")])), mkPrim1(new quote("caadr"), caadr, cStarRAbleType([new quote("a"), new quote("a"), new quote("d")])), mkPrim1(new quote("cadar"), cadar, cStarRAbleType([new quote("a"), new quote("d"), new quote("a")])), mkPrim1(new quote("caddr"), caddr, cStarRAbleType([new quote("a"), new quote("d"), new quote("d")])), mkPrim1(new quote("cdaar"), cdaar, cStarRAbleType([new quote("d"), new quote("a"), new quote("a")])), mkPrim1(new quote("cdadr"), cdadr, cStarRAbleType([new quote("d"), new quote("a"), new quote("d")])), mkPrim1(new quote("cddar"), cddar, cStarRAbleType([new quote("d"), new quote("d"), new quote("a")])), mkPrim1(new quote("cdddr"), cdddr, cStarRAbleType([new quote("d"), new quote("d"), new quote("d")])), mkPrim2(new quote("cons"), cons, [anyType, listType]), mkPrim1(new quote("cons?"), consP, [anyType]), mkPrim1(new quote("eighth"), eighth, [indexableType(7)]), mkPrim1(new quote("empty?"), emptyP, [anyType]), mkPrim1(new quote("fifth"), fifth, [indexableType(4)]), mkPrim1(new quote("first"), first, [pairType]), mkPrim1(new quote("fourth"), fourth, [indexableType(3)]), mkPrim1(new quote("length"), length, [listType]), makePrim(new quote("list"), (function (xs, err, ret) {
+}), makeVarArity([listType, listType], listType)), mkPrim2(new quote("assq"), assq, [anyType, listType]), mkPrim1(new quote("car"), car, [pairType]), mkPrim1(new quote("cdr"), cdr, [pairType]), mkPrim1(new quote("caar"), caar, cStarRAbleType([new quote("a"), new quote("a")])), mkPrim1(new quote("cadr"), cadr, cStarRAbleType([new quote("a"), new quote("d")])), mkPrim1(new quote("cdar"), cdar, cStarRAbleType([new quote("d"), new quote("a")])), mkPrim1(new quote("cddr"), cddr, cStarRAbleType([new quote("d"), new quote("d")])), mkPrim1(new quote("caaar"), caaar, cStarRAbleType([new quote("a"), new quote("a"), new quote("a")])), mkPrim1(new quote("caadr"), caadr, cStarRAbleType([new quote("a"), new quote("a"), new quote("d")])), mkPrim1(new quote("cadar"), cadar, cStarRAbleType([new quote("a"), new quote("d"), new quote("a")])), mkPrim1(new quote("caddr"), caddr, cStarRAbleType([new quote("a"), new quote("d"), new quote("d")])), mkPrim1(new quote("cdaar"), cdaar, cStarRAbleType([new quote("d"), new quote("a"), new quote("a")])), mkPrim1(new quote("cdadr"), cdadr, cStarRAbleType([new quote("d"), new quote("a"), new quote("d")])), mkPrim1(new quote("cddar"), cddar, cStarRAbleType([new quote("d"), new quote("d"), new quote("a")])), mkPrim1(new quote("cdddr"), cdddr, cStarRAbleType([new quote("d"), new quote("d"), new quote("d")])), mkPrim2(new quote("cons"), cons, [anyType, listType]), mkPrim1(new quote("cons?"), isCons, [anyType]), mkPrim1(new quote("eighth"), eighth, [indexableType(7)]), mkPrim1(new quote("empty?"), emptyP, [anyType]), mkPrim1(new quote("fifth"), fifth, [indexableType(4)]), mkPrim1(new quote("first"), first, [pairType]), mkPrim1(new quote("fourth"), fourth, [indexableType(3)]), mkPrim1(new quote("length"), length, [listType]), makePrim(new quote("list"), (function (xs, err, ret) {
   return ret(xs);
-}), makeVarArity([], anyType)), mkPrim(new quote("list*"), primColonListStar, makeVarArity([], anyType)), makePrim(new quote("list-ref"), primColonListRef, [listType, natType]), mkPrim2(new quote("member"), member, [anyType, listType]), mkPrim2(new quote("memq"), memq, [anyType, listType]), mkPrim2(new quote("memv"), memv, [anyType, listType]), mkPrim1(new quote("null?"), nullP, [anyType]), mkPrim1(new quote("rest"), rest, [pairType]), mkPrim1(new quote("reverse"), reverse, [listType]), mkPrim1(new quote("second"), second, [indexableType(1)]), mkPrim1(new quote("seventh"), seventh, [indexableType(6)]), mkPrim1(new quote("sixth"), sixth, [indexableType(5)]), mkPrim1(new quote("third"), third, [indexableType(2)]), makeConsPrim(idColonPosn, structColonPosn), makePredPrim(idColonPosn, structColonPosn), makeAccPrim(idColonPosn, structColonPosn, 0), makeAccPrim(idColonPosn, structColonPosn, 1), mkPrim1(new quote("char->integer"), charValGreaterThanInteger, [charType]), mkPrim1(new quote("char-alphabetic?"), charValAlphabeticP, [charType]), makePrim(new quote("char-ci<=?"), liftOrder(charValCiLessThanEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char-ci<?"), liftOrder(charValCiLessThanP), makeVarArity([charType, charType], charType)), makePrim(new quote("char-ci=?"), liftOrder(charValCiEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char-ci>=?"), liftOrder(charValCiGreaterThanEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char-ci>?"), liftOrder(charValCiGreaterThanP), makeVarArity([charType, charType], charType)), mkPrim1(new quote("char-downcase"), charValDowncase, [charType]), mkPrim1(new quote("char-lower-case?"), charValLowerCaseP, [charType]), mkPrim1(new quote("char-numeric?"), charValNumericP, [charType]), mkPrim1(new quote("char-upcase"), charValUpcase, [charType]), mkPrim1(new quote("char-upper-case?"), charValUpperCaseP, [charType]), mkPrim1(new quote("char-whitespace?"), charValWhitespaceP, [charType]), makePrim(new quote("char<=?"), liftOrder(charValLessThanEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char<?"), liftOrder(charValLessThanP), makeVarArity([charType, charType], charType)), makePrim(new quote("char=?"), liftOrder(charValEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char>=?"), liftOrder(charValGreaterThanEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char>?"), liftOrder(charValGreaterThanP), makeVarArity([charType, charType], charType)), mkPrim1(new quote("char?"), charValP, [anyType]), mkPrim(new quote("format"), format, makeVarArity([stringType], anyType)), mkPrim1(new quote("list->string"), listCharValGreaterThanString, [listCharType]), mkPrim2(new quote("make-string"), makeStringCharVal, [natType, charType]), makePrim(new quote("string"), (function (xs, err, ret) {
+}), makeVarArity([], anyType)), mkPrim(new quote("list*"), primColonListStar, makeVarArity([], anyType)), makePrim(new quote("list-ref"), primColonListRef, [listType, natType]), mkPrim2(new quote("member"), member, [anyType, listType]), mkPrim2(new quote("memq"), memq, [anyType, listType]), mkPrim2(new quote("memv"), memv, [anyType, listType]), mkPrim1(new quote("null?"), nullP, [anyType]), mkPrim1(new quote("rest"), rest, [pairType]), mkPrim1(new quote("reverse"), reverse, [listType]), mkPrim1(new quote("second"), second, [indexableType(1)]), mkPrim1(new quote("seventh"), seventh, [indexableType(6)]), mkPrim1(new quote("sixth"), sixth, [indexableType(5)]), mkPrim1(new quote("third"), third, [indexableType(2)]), makeisConsrim(idColonPosn, structColonPosn), makePredPrim(idColonPosn, structColonPosn), makeAccPrim(idColonPosn, structColonPosn, 0), makeAccPrim(idColonPosn, structColonPosn, 1), mkPrim1(new quote("char->integer"), charValGreaterThanInteger, [charType]), mkPrim1(new quote("char-alphabetic?"), charValAlphabeticP, [charType]), makePrim(new quote("char-ci<=?"), liftOrder(charValCiLessThanEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char-ci<?"), liftOrder(charValCiLessThanP), makeVarArity([charType, charType], charType)), makePrim(new quote("char-ci=?"), liftOrder(charValCiEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char-ci>=?"), liftOrder(charValCiGreaterThanEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char-ci>?"), liftOrder(charValCiGreaterThanP), makeVarArity([charType, charType], charType)), mkPrim1(new quote("char-downcase"), charValDowncase, [charType]), mkPrim1(new quote("char-lower-case?"), charValLowerCaseP, [charType]), mkPrim1(new quote("char-numeric?"), charValNumericP, [charType]), mkPrim1(new quote("char-upcase"), charValUpcase, [charType]), mkPrim1(new quote("char-upper-case?"), charValUpperCaseP, [charType]), mkPrim1(new quote("char-whitespace?"), charValWhitespaceP, [charType]), makePrim(new quote("char<=?"), liftOrder(charValLessThanEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char<?"), liftOrder(charValLessThanP), makeVarArity([charType, charType], charType)), makePrim(new quote("char=?"), liftOrder(charValEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char>=?"), liftOrder(charValGreaterThanEqualSignP), makeVarArity([charType, charType], charType)), makePrim(new quote("char>?"), liftOrder(charValGreaterThanP), makeVarArity([charType, charType], charType)), mkPrim1(new quote("char?"), charValP, [anyType]), mkPrim(new quote("format"), format, makeVarArity([stringType], anyType)), mkPrim1(new quote("list->string"), listCharValGreaterThanString, [listCharType]), mkPrim2(new quote("make-string"), makeStringCharVal, [natType, charType]), makePrim(new quote("string"), (function (xs, err, ret) {
   return ret(listCharValGreaterThanString(xs));
 }), makeVarArity([], charType)), mkPrim1(new quote("string->list"), stringGreaterThanCharValList, [stringType]), mkPrim1(new quote("string->number"), stringGreaterThanNumber, [stringType]), mkPrim1(new quote("string->symbol"), stringGreaterThanSymbol, [stringType]), makePrim(new quote("string-append"), (function (xs, err, ret) {
   return ret(foldr(stringAppend, "", xs));
@@ -2396,7 +2396,7 @@ var primTable = [makePrim(new quote("*"), (function (xs, err, ret) {
   return err(first(xs), second(xs));
 }), [symbolType, stringType]), makePrim(new quote("exit"), notImplemented(new quote("exit")), []), mkPrim1(new quote("identity"), identity, [anyType]), makePrim(new quote("apply"), primColonApply, makeVarArity([procType, anyType], anyType)), makePrim(new quote("andmap"), primColonAndmap, [procType, listType]), makePrim(new quote("foldl"), primColonFoldl, [procType, anyType, listType]), makePrim(new quote("foldr"), primColonFoldr, [procType, anyType, listType]), makePrim(new quote("map"), primColonMap, makeVarArity([procType], listType)), makePrim(new quote("ormap"), primColonOrmap, [procType, listType]), makePrim(new quote("filter"), primColonFilter, [procType, listType]), makePrim(new quote("build-list"), primColonBuildList, [natType, procType]), makePrim(new quote("argmax"), primColonArgmax, [procType, listType]), makePrim(new quote("argmin"), primColonArgmin, [procType, listType]), makePrim(new quote("build-string"), primColonBuildString, [natType, procType]), makePrim(new quote("compose"), primColonCompose, makeVarArity([], procType)), makePrim(new quote("for-each"), primColonForEach, [procType, listType]), makePrim(new quote("memf"), primColonMemf, [procType, listType]), makePrim(new quote("quicksort"), primColonQuicksort, [listType, procType]), makePrim(new quote("sort"), primColonQuicksort, [listType, procType]), mkPrim1(new quote("procedure?"), (function (x) {
   return ((procP(x)) || (primP(x)));
-}), [anyType]), makeConsPrim(idColonColor, structColonColor), makePredPrim(idColonColor, structColonColor), makeAccPrim(idColonColor, structColonColor, 0), makeAccPrim(idColonColor, structColonColor, 1), makeAccPrim(idColonColor, structColonColor, 2), makePrim(new quote("image-color?"), (function (xs, err, ret) {
+}), [anyType]), makeisConsrim(idColonColor, structColonColor), makePredPrim(idColonColor, structColonColor), makeAccPrim(idColonColor, structColonColor, 0), makeAccPrim(idColonColor, structColonColor, 1), makeAccPrim(idColonColor, structColonColor, 2), makePrim(new quote("image-color?"), (function (xs, err, ret) {
   return ret(((structValP(first(xs))) && (eqP(structValType(first(xs)), idColonColor))));
 }), [anyType]), mkPrim1(new quote("image-width"), imageWidth, [imageType]), mkPrim1(new quote("image-height"), imageHeight, [imageType]), mkPrim1(new quote("pinhole-x"), pinholeX, [imageType]), mkPrim1(new quote("pinhole-y"), pinholeY, [imageType]), mkPrim3(new quote("put-pinhole"), putPinhole, [imageType, numberType, numberType]), mkPrim3(new quote("move-pinhole"), movePinhole, [imageType, numberType, numberType]), mkPrim4(new quote("rectangle"), rectangle, [numberType, numberType, symbolSlashStringType, symbolSlashStringType]), mkPrim3(new quote("circle"), circle, [numberType, symbolSlashStringType, symbolSlashStringType]), mkPrim4(new quote("ellipse"), ellipse, [numberType, numberType, symbolSlashStringType, symbolSlashStringType]), mkPrim3(new quote("triangle"), triangle, [numberType, symbolSlashStringType, symbolSlashStringType]), mkPrim5(new quote("star"), star, (function () { var numGreaterThanEqualSign1 = extendType(numberType, new quote("number greater than or equal to 1"), (function (x) {
   return GreaterThanEqualSign(x, 1);
@@ -2470,7 +2470,7 @@ return errP(res) ? errGreaterThanError(res) :
   return primColonOverlaySlashXy(putPinhole(i, 0, 0), x, y, putPinhole(line(z, u, c), 0, 0));
 }), [imageType, numberType, numberType, numberType, numberType, symbolSlashStringType])];
 
-var imageTpSlashPrimTable = [makeConsPrim(idColonColor, structColonColor), makePredPrim(idColonColor, structColonColor), makeAccPrim(idColonColor, structColonColor, 0), makeAccPrim(idColonColor, structColonColor, 1), makeAccPrim(idColonColor, structColonColor, 2), makePrim(new quote("image-color?"), (function (xs, err, ret) {
+var imageTpSlashPrimTable = [makeisConsrim(idColonColor, structColonColor), makePredPrim(idColonColor, structColonColor), makeAccPrim(idColonColor, structColonColor, 0), makeAccPrim(idColonColor, structColonColor, 1), makeAccPrim(idColonColor, structColonColor, 2), makePrim(new quote("image-color?"), (function (xs, err, ret) {
   return ret(((structValP(first(xs))) && (eqP(structValType(first(xs)), new quote("image")))));
 }), [anyType]), mkPrim1(new quote("image-width"), imgValWidth, [imageType]), mkPrim1(new quote("image-height"), imgValHeight, [imageType]), mkPrim1(new quote("pinhole-x"), imgValX, [imageType]), mkPrim1(new quote("pinhole-y"), imgValY, [imageType]), mkPrim3(new quote("put-pinhole"), putPinhole, [imageType, numberType, numberType]), mkPrim3(new quote("move-pinhole"), movePinhole, [imageType, numberType, numberType]), mkPrim4(new quote("rectangle"), rectangle, [numberType, numberType, symbolSlashStringType, symbolSlashStringType]), mkPrim3(new quote("circle"), circle, [numberType, symbolSlashStringType, symbolSlashStringType]), mkPrim4(new quote("ellipse"), ellipse, [numberType, numberType, symbolSlashStringType, symbolSlashStringType]), mkPrim3(new quote("triangle"), triangle, [numberType, symbolSlashStringType, symbolSlashStringType]), mkPrim5(new quote("star"), star, (function () { var numGreaterThanEqualSign1 = extendType(numberType, new quote("number greater than or equal to 1"), (function (x) {
   return GreaterThanEqualSign(x, 1);

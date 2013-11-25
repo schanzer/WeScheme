@@ -55,53 +55,53 @@ function makeReq(uri) { return new req(uri); };
 function makeProvideStatement(val) { return new provideStatement(val); };
 
 //////////////////////////////////// INSTANCE CHECKING WRAPPERS //////////////////////////////
-function defFuncP(x) { return x instanceof defFunc; };
-function defVarP(x) { return x instanceof defVar; };
-function defStructP(x) { return x instanceof defStruct; };
-function lambdaExprP(x) { return x instanceof lambdaExpr; };
-function localExprP(x) { return x instanceof localExpr; };
-function letrecExprP(x) { return x instanceof letrecExpr; };
-function letExprP(x) { return x instanceof letExpr; };
-function letStarExprP(x) { return x instanceof letStarExpr; };
-function callP(x) { return x instanceof call; };
-function condExprP(x) { return x instanceof condExpr; };
-function ifExprP(x) { return x instanceof ifExpr; };
-function andExprP(x) { return x instanceof andExpr; };
-function orExprP(x) { return x instanceof orExpr; };
-function timeExprP(x) { return x instanceof timeExpr; };
-function symbolExprP(x) { return x instanceof symbolExpr; };
-function numberExprP(x) { return x instanceof numberExpr; };
-function stringExprP(x) { return x instanceof stringExpr; };
-function charExprP(x) { return x instanceof charExpr; };
-function listExprP(x) { return x instanceof listExpr; };
-function mtListExprP(x) { return x instanceof mtListExpr; };
-function booleanExprP(x) { return x instanceof booleanExpr; };
-function quotedExprP(x) { return x instanceof quotedExpr; };
-function quasiquotedExprP(x) { return x instanceof quasiquotedExpr; };
-function imageExprP(x) { return x instanceof imageExpr; };
-function qqListP(x) { return x instanceof qqList; };
-function qqSpliceP(x) { return x instanceof qqSplice; };
-function coupleP(x) { return x instanceof couple; };
-function primopP(x) { return x instanceof primop; };
-function chkExpectP(x) { return x instanceof chkExpect; };
-function chkWithinP(x) { return x instanceof chkWithin; };
-function chkErrorP(x) { return x instanceof chkError; };
-function reqP(x) { return x instanceof req; };
-function provideStatementP(x) { return x instanceof provideStatement; };
-var requireP = reqP
-var provideP = provideStatementP;
+function isDefFunc(x) { return x instanceof defFunc; };
+function isDefVar(x) { return x instanceof defVar; };
+function isDefStruct(x) { return x instanceof defStruct; };
+function isLambdaExpr(x) { return x instanceof lambdaExpr; };
+function isLocalExpr(x) { return x instanceof localExpr; };
+function isLetrecExpr(x) { return x instanceof letrecExpr; };
+function isLetExpr(x) { return x instanceof letExpr; };
+function isLetStarExpr(x) { return x instanceof letStarExpr; };
+function isCall(x) { return x instanceof call; };
+function isCondExpr(x) { return x instanceof condExpr; };
+function isIfExpr(x) { return x instanceof ifExpr; };
+function isAndExpr(x) { return x instanceof andExpr; };
+function isOrExpr(x) { return x instanceof orExpr; };
+function isTimeExpr(x) { return x instanceof timeExpr; };
+function isSymbolExpr(x) { return x instanceof symbolExpr; };
+function isNumberExpr(x) { return x instanceof numberExpr; };
+function isStringExpr(x) { return x instanceof stringExpr; };
+function isCharExpr(x) { return x instanceof charExpr; };
+function isListExpr(x) { return x instanceof listExpr; };
+function isMTListExpr(x) { return x instanceof mtListExpr; };
+function isBooleanExpr(x) { return x instanceof booleanExpr; };
+function isQuotedExpr(x) { return x instanceof quotedExpr; };
+function quasiisQuotedExpr(x) { return x instanceof quasiquotedExpr; };
+function isImageExpr(x) { return x instanceof imageExpr; };
+function isQQList(x) { return x instanceof qqList; };
+function isQQSplice(x) { return x instanceof qqSplice; };
+function isCouple(x) { return x instanceof couple; };
+function isPrimop(x) { return x instanceof primop; };
+function isChkExpect(x) { return x instanceof chkExpect; };
+function isChkWithin(x) { return x instanceof chkWithin; };
+function isChkError(x) { return x instanceof chkError; };
+function isReq(x) { return x instanceof req; };
+function isProvideStatement(x) { return x instanceof provideStatement; };
+var isRequire = isReq
+var isProvide = isProvideStatement;
 // a definition is a function, variable or struct
-var definitionP = function (x) {
-                   return ((defFuncP(x)) || (defVarP(x)) || (defStructP(x)));
+var isDefinition = function (x) {
+                   return ((isDefFunc(x)) || (isDefVar(x)) || (isDefStruct(x)));
                    };
 // an expression is a lambda, local, letrec, let, let*, call, cond, if, and, or, time, symbol, primop,
 // number, string, char, list, boolean, image, quote or quasiquote
-var exprP = function (x) {
-             return ((lambdaExprP(x)) || (localExprP(x)) || (letrecExprP(x)) || (letExprP(x)) || (letStarExprP(x)) || (callP(x)) || (condExprP(x)) || (ifExprP(x)) || (andExprP(x)) || (orExprP(x)) || (timeExprP(x)) || (isSymbol(x)) || (primopP(x)) || (symbolExprP(x)) || (numberExprP(x)) || (stringExprP(x)) || (charExprP(x)) || (listExprP(x)) || (mtListExprP(x)) || (booleanExprP(x)) || (quotedExprP(x)) || (quasiquotedExprP(x)) || (imageExprP(x)));
+var isExpr = function (x) {
+             return ((isLambdaExpr(x)) || (isLocalExpr(x)) || (isLetrecExpr(x)) || (isLetExpr(x)) || (isLetStarExpr(x)) || (isCall(x)) || (isCondExpr(x)) || (isIfExpr(x)) || (isAndExpr(x)) || (isOrExpr(x)) || (isTimeExpr(x)) || (isSymbol(x)) || (isPrimop(x)) || (isSymbolExpr(x)) || (isNumberExpr(x)) || (isStringExpr(x)) || (isCharExpr(x)) || (isListExpr(x)) || (isMTListExpr(x)) || (isBooleanExpr(x)) || (isQuotedExpr(x)) || (quasiisQuotedExpr(x)) || (isImageExpr(x)));
              };
 // a test case is a check-expect, check-within or check-error
-var testCaseP = function (x) {
-                     return ((chkExpectP(x)) || (chkWithinP(x)) || (chkErrorP(x)));
+var isTestCase = function (x) {
+                     return ((isChkExpect(x)) || (isChkWithin(x)) || (isChkError(x)));
                      };
 
 
@@ -137,9 +137,9 @@ function defStruct(name, fields) {
 };
 
 var definitionName = (function (def) {
-                          return defFuncP(def) ? def.name :
-                          defVarP(def) ? def.name :
-                          defStructP(def) ? def.name :
+                          return isDefFunc(def) ? def.name :
+                          isDefVar(def) ? def.name :
+                          isDefStruct(def) ? def.name :
                           err("cond", "all questions false");
                           });
 
@@ -316,16 +316,16 @@ function qqSplice(val) {
 };
 
 var letSlashStarSlashRecBindings = (function (x) {
-                                        return letrecExprP(x) ? letrecExprBindings(x) :
-                                        letExprP(x) ? x.bindings:
-                                        letStarExprP(x) ? x.bindings :
+                                        return isLetrecExpr(x) ? letrecExprBindings(x) :
+                                        isLetExpr(x) ? x.bindings:
+                                        isLetStarExpr(x) ? x.bindings :
                                         err("cond", "all questions false");
                                         });
 
 var letSlashStarSlashRecBody = (function (x) {
-                                    return letrecExprP(x) ? x.body :
-                                    letExprP(x) ? x.body :
-                                    letStarExprP(x) ? x.body :
+                                    return isLetrecExpr(x) ? x.body :
+                                    isLetExpr(x) ? x.body :
+                                    isLetStarExpr(x) ? x.body :
                                     err("cond", "all questions false");
                                     });
 // couples...used for cond branches??
@@ -390,7 +390,7 @@ function reqUri(x) {
 };
 
 var requireFileP = (function (x) {
-                        return ((reqP(x)) && (isString(reqUri(x))));
+                        return ((isReq(x)) && (isString(reqUri(x))));
                         });
 
 var isisSymbolred = (function (x) {
@@ -400,7 +400,7 @@ var isisSymbolred = (function (x) {
                             });
 
 var requireTypeP = (function (x, type) {
-                        return ((reqP(x)) && (consP(reqUri(x))) && (isisSymbolred(type)(first(reqUri(x)))));
+                        return ((isReq(x)) && (isCons(reqUri(x))) && (isisSymbolred(type)(first(reqUri(x)))));
                         });
 
 // lib TODO
@@ -408,7 +408,7 @@ var requireLibP = (function (x) {
                        return requireTypeP(x, types.symbol("lib"));
                        });
 // planet TODO
-var requirePlanetP = (function (x) {
+var isRequirelanetP = (function (x) {
                           return requireTypeP(x, types.symbol("planet"));
                           });
 
@@ -428,7 +428,7 @@ function provideStatement(val) {
 // parse : sexp -> AST
 var parse = (function (sexp) {
   return emptyP(sexp) ? [] :
-  not(consP(sexp)) ? error(types.symbol("parse"), "The sexp is not a list of definitions or expressions: ", sexpGreaterThanString(sexp)) :
+  not(isCons(sexp)) ? error(types.symbol("parse"), "The sexp is not a list of definitions or expressions: ", sexpGreaterThanString(sexp)) :
   parseStar(sexp);
 });
 
@@ -453,7 +453,7 @@ var isDefinition = function (sexp) {
 
 // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define-struct'
 var isStructDefinition = function (sexp) {
-  return ((consP(sexp))
+  return ((isCons(sexp))
           && (EqualSign(length(sexp), 3))
           && (isSymbol(first(sexp)))
           && (isSymbolEqualTo(types.symbol("define-struct"), first(sexp))));
@@ -461,20 +461,20 @@ var isStructDefinition = function (sexp) {
 
 // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define' and rest is a Cons
 var isFunctionDefinition = function (sexp) {
-  return ((consP(sexp))
+  return ((isCons(sexp))
           && (EqualSign(length(sexp), 3))
           && (isSymbol(first(sexp)))
           && (isSymbolEqualTo(types.symbol("define"), first(sexp)))
-          && (consP(second(sexp))));
+          && (isCons(second(sexp))));
 };
 
 // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define' and rest is NOT a Cons
 var isVariableDefinition = function (sexp) {
-  return ((consP(sexp))
+  return ((isCons(sexp))
           && (EqualSign(length(sexp), 3))
           && (isSymbol(first(sexp)))
           && (isSymbolEqualTo(types.symbol("define"), first(sexp)))
-          && (not(consP(second(sexp)))));
+          && (not(isCons(second(sexp)))));
 };
 
 // : parseDefinition : SExp -> AST (definition)
@@ -505,7 +505,7 @@ var isExpr = function (sexp) {
 };
 
 var parseExpr = function (sexp) {
-  return consP(sexp) ? parseExprList(sexp) :
+  return isCons(sexp) ? parseExprList(sexp) :
   parseExprSingleton(sexp);
 };
 
@@ -531,16 +531,16 @@ var parseExprList = function (sexp) {
     return isQuadWithFirstEqualTo(sexp, types.symbol("if"));
   };
   function isAnd(sexp) {
-    return ((consP(sexp)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("and"))));
+    return ((isCons(sexp)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("and"))));
   };
   function isOr(sexp) {
-    return ((consP(sexp)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("or"))));
+    return ((isCons(sexp)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("or"))));
   };
   function isTime(sexp) {
     return isTupleStartingWithOfLength(sexp, types.symbol("time"), 2);
   };
   function parseFuncCall(sexp) {
-    return consP(sexp)? makeCall(parseExpr(first(sexp)), map(parseExpr, rest(sexp))) :
+    return isCons(sexp)? makeCall(parseExpr(first(sexp)), map(parseExpr, rest(sexp))) :
                         expectedError(types.symbol("parse-func-call"), "function call sexp", sexp);
   };
   function parseLambdaExpr(sexp) {
@@ -583,7 +583,7 @@ var parseExprList = function (sexp) {
   };
   function parseQuotedExpr(sexp) {
     return emptyP(sexp) ? makeCall(makePrimop(types.symbol("list")), []) :
-    consP(sexp) ? makeCall(makePrimop(types.symbol("list")), map(parseQuotedExpr, sexp)) :
+    isCons(sexp) ? makeCall(makePrimop(types.symbol("list")), map(parseQuotedExpr, sexp)) :
     isNumber(sexp) ? makeNumberExpr(sexp) :
     isString(sexp) ? makeStringExpr(sexp) :
     isChar(sexp) ? makeCharExpr(string(sexp)) :
@@ -621,18 +621,18 @@ var parseCondExpr = function (sexp) {
 };
 
 var parseCondCouple = function (sexp) {
-  return sexpIsCoupleP(sexp) ? makeCouple(parseExpr(first(sexp)), parseExpr(second(sexp))) :
+  return sexpIsisCouple(sexp) ? makeCouple(parseExpr(first(sexp)), parseExpr(second(sexp))) :
   expectedError(types.symbol("parse-cond-couple"), "couple of expressions sexp", sexp);
 };
 
 var parseLetCouple = function (sexp) {
-  return sexpIsCoupleP(sexp) ? makeCouple(parseIdExpr(first(sexp)), parseExpr(second(sexp))) :
+  return sexpIsisCouple(sexp) ? makeCouple(parseIdExpr(first(sexp)), parseExpr(second(sexp))) :
   expectedError(types.symbol("parse-let-couple"), "couple of an id and an expression sexp", sexp);
 };
 
 var parseQuasiQuotedExpr = function (sexp, inlist) {
   return emptyP(sexp) ? makeQqList([]) :
-  consP(sexp) ? parseQqList(sexp, inlist) :
+  isCons(sexp) ? parseQqList(sexp, inlist) :
   isNumber(sexp) ? makeNumberExpr(sexp) :
   isString(sexp) ? makeStringExpr(sexp) :
   isChar(sexp) ? makeCharExpr(string(sexp)) :
@@ -659,7 +659,7 @@ var parseExprSingleton = function (sexp) {
   var singleton = isString(sexp) ? makeStringExpr(sexp) :
     isChar(sexp) ? makeCharExpr(string(sexp)) :
     isNumber(sexp) ? makeNumberExpr(sexp) :
-    isSymbol(sexp) ? sexpIsPrimopP(sexp) ? makePrimop(sexp) :
+    isSymbol(sexp) ? sexpIsisPrimop(sexp) ? makePrimop(sexp) :
     isSymbolEqualTo(types.symbol("empty"), sexp) ? makeCall(makePrimop(types.symbol("list")), []) :
     ((isSymbolEqualTo(types.symbol("true"), sexp)) || (isSymbolEqualTo(types.symbol("false"), sexp))) ? makeBooleanExpr(sexp) :
     sexp :
@@ -676,7 +676,7 @@ var parseIdExpr = function (sexp) {
 };
 
 var isTupleStartingWithOfLength = function (sexp, symbol, n) {
-  return ((consP(sexp)) && (EqualSign(length(sexp), n)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), symbol)));
+  return ((isCons(sexp)) && (EqualSign(length(sexp), n)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), symbol)));
 };
 
 var isTripleWithFirstEqualTo = function (sexp, symbol) {
@@ -687,17 +687,17 @@ var isQuadWithFirstEqualTo = function (sexp, symbol) {
   return isTupleStartingWithOfLength(sexp, symbol, 4);
 };
 
-var sexpIsCoupleP = function (sexp) {
-  return ((consP(sexp)) && (EqualSign(length(sexp), 2)));
+var sexpIsisCouple = function (sexp) {
+  return ((isCons(sexp)) && (EqualSign(length(sexp), 2)));
 };
 
 
-var sexpIsPrimopP = function (sexp) {
+var sexpIsisPrimop = function (sexp) {
      return primitive.getPrimitive(sexp);
 };
 
 var sexpIsCondListP = function (sexp) {
-  return ((consP(sexp)) && (GreaterThanEqualSign(length(sexp), 2)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("cond"))));
+  return ((isCons(sexp)) && (GreaterThanEqualSign(length(sexp), 2)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("cond"))));
 };
 
 var isId = function (sexp) {
@@ -706,7 +706,7 @@ var isId = function (sexp) {
 
 //////////////////////////////////////// TEST-CASE PARSING ////////////////////////////////
 var isTestCase = function (sexp) {
-  return ((consP(sexp)) &&
+  return ((isCons(sexp)) &&
           (isSymbol(first(sexp))) &&
           (((isSymbolEqualTo(first(sexp), types.symbol("check-expect"))) ||
             (isSymbolEqualTo(first(sexp), types.symbol("check-within"))) ||
@@ -743,7 +743,7 @@ var parseTestCase = function (sexp) {
     expectedError(types.symbol("parse-check-within"), "check within sexp", sexp);
   };
 
-  var testCase = consP(sexp) ? isSymbolEqualTo(first(sexp), types.symbol("check-expect")) ? parseCheckExpect(sexp) :
+  var testCase = isCons(sexp) ? isSymbolEqualTo(first(sexp), types.symbol("check-expect")) ? parseCheckExpect(sexp) :
       isSymbolEqualTo(first(sexp), types.symbol("EXAMPLE")) ? parseCheckExpect(sexp) :
       isSymbolEqualTo(first(sexp), types.symbol("check-error")) ? parseCheckError(sexp) :
       isSymbolEqualTo(first(sexp), types.symbol("check-within")) ? parseCheckWithin(sexp) :
@@ -755,7 +755,7 @@ var parseTestCase = function (sexp) {
 
 //////////////////////////////////////// REQUIRE PARSING ////////////////////////////////
 var isRequire = function (sexp) {
-  return ((consP(sexp)) && ((function () { var fst = first(sexp);
+  return ((isCons(sexp)) && ((function () { var fst = first(sexp);
 
 return ((isSymbol(fst)) && (isSymbolEqualTo(fst, types.symbol("require"))));
  })()));
@@ -773,7 +773,7 @@ var parseRequire = function (sexp) {
 
 //////////////////////////////////////// PROVIDE PARSING ////////////////////////////////
 var isProvide = function (sexp) {
-  return ((consP(sexp)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("provide"))));
+  return ((isCons(sexp)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("provide"))));
 };
 
 var parseProvide = function (sexp) {

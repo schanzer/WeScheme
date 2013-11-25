@@ -66,17 +66,17 @@ var filterCps = function (proc, ls, k) {
 ////////////////////// EVAL /////////////////////////
 
 var selfEvalP = (function (e) {
-  return ((numberExprP(e)) || (booleanExprP(e)) || (symbolExprP(e)) || (charExprP(e)) || (mtListExprP(e)) || (stringExprP(e)) || (imageExprP(e)));
+  return ((isNumberExpr(e)) || (isBooleanExpr(e)) || (isSymbolExpr(e)) || (isCharExpr(e)) || (isMTListExpr(e)) || (isStringExpr(e)) || (isImageExpr(e)));
 });
 
 var evalSelf = (function (e) {
-  return numberExprP(e) ? e.val :
-  booleanExprP(e) ? isSymbolEqualTo(e.val, new quote("true")) :
-  symbolExprP(e) ? e.val :
-  charExprP(e) ? makeCharVal(e.val) :
-  stringExprP(e) ? e.val :
-  mtListExprP(e) ? [] :
-  imageExprP(e) ? makeImgVal(e.val, e.width, e.height, e.x, e.y) :
+  return isNumberExpr(e) ? e.val :
+  isBooleanExpr(e) ? isSymbolEqualTo(e.val, new quote("true")) :
+  isSymbolExpr(e) ? e.val :
+  isCharExpr(e) ? makeCharVal(e.val) :
+  isStringExpr(e) ? e.val :
+  isMTListExpr(e) ? [] :
+  isImageExpr(e) ? makeImgVal(e.val, e.width, e.height, e.x, e.y) :
   err("cond", "all questions false");
 });
 
@@ -122,7 +122,7 @@ console.log("given nothing to compile: "+p);
               return [makeProgRes(reverse(vs), false, [], provides), nenv, venv];
               });
       })()
-   } else if(testCaseP(first(p))){ // compile test case
+   } else if(isTestCase(first(p))){ // compile test case
 console.log("compiling test case: "+p);
      var cT = compileTestsStar(p, nenv);
      bytecode = (function (venv, vs, provides) {
@@ -130,7 +130,7 @@ console.log("compiling test case: "+p);
                          return [makeProgRes(reverse(vs), false, cT(venv), provides), nenv, venv];
                          });
                  });
-   } else if(reqP(first(p))){ // compile require
+   } else if(isReq(first(p))){ // compile require
 console.log("compiling require: "+p);
       bytecode = (function () {
       var cReq = compileReq(first(p));
@@ -146,7 +146,7 @@ console.log("compiling require: "+p);
       var providedIds = progResProvides(progres);
       var providedVenv = map((function (nenvFrame, venvFrame) {
         return reverse(foldl2((function (x1, x2, b) {
-        return consP(providedIds) ? ormap((function (id) {
+        return isCons(providedIds) ? ormap((function (id) {
         return eqP(x1, id);
       }), providedIds) ? cons(x2, b) :
         b :
@@ -161,7 +161,7 @@ console.log("compiling require: "+p);
       });
       });
        })()
-   } else if (provideP(first(p))) { // compile provide
+   } else if (isProvide(first(p))) { // compile provide
 console.log("compiling provide: "+p);
     bytecode = (function () {
                 var ids = first(p).val;
@@ -178,7 +178,7 @@ console.log("compiling provide: "+p);
                          });
                  });
                 })()
-     } else if(exprP(first(p))) { // compile expression
+     } else if(isExpr(first(p))) { // compile expression
 console.log("compiling expr: "+p);
         bytecode = (function () { var cE = compileExpr(first(p), nenv);
           var cR = compileStar(rest(p), nenv);
@@ -191,7 +191,7 @@ console.log("compiling expr: "+p);
           });
           });
            })()
-     } else if(defStructP(first(p))){ // compile struct definition
+     } else if(isDefStruct(first(p))){ // compile struct definition
 console.log("compiling struct definition: "+p);
          bytecode = (function () { var cR = compileStar(rest(p), nenv);
           
@@ -201,10 +201,10 @@ console.log("compiling struct definition: "+p);
                           });
                   });
           })()
-     } else if(defFuncP(first(p))){ // compile func definition
+     } else if(isDefFunc(first(p))){ // compile func definition
 console.log("compiling function definition: "+p);
        bytecode = compileStar(cons(defFuncToDefVarLambda(first(p)), rest(p)), nenv)
-     } else if(defVarP(first(p))){ // compile var definition
+     } else if(isDefVar(first(p))){ // compile var definition
 console.log("compiling var definition: "+p);
        bytecode = (function () { var cD = compileDefVar(first(p), nenv);
                     var cR = compileStar(rest(p), nenv);
@@ -252,16 +252,16 @@ function compileTestsStar(p, nenv) {
 
 var loadVdefs = (function (prog, venv) {
   return foldr((function (x, xs) {
-  return ((defVarP(x)) || (defFuncP(x))) ? extend([box(undefn)], xs) :
-  defStructP(x) ? extend(buildStructVframe(x), xs) :
+  return ((isDefVar(x)) || (isDefFunc(x))) ? extend([box(undefn)], xs) :
+  isDefStruct(x) ? extend(buildStructVframe(x), xs) :
   xs;
 }), venv, prog);
 });
 
 var loadNdefs = (function (prog, nenv) {
   return foldr((function (x, xs) {
-  return ((defVarP(x)) || (defFuncP(x))) ? extend(makeRecFrame([definitionName(x)]), xs) :
-  defStructP(x) ? extend(buildStructNframe(x), xs) :
+  return ((isDefVar(x)) || (isDefFunc(x))) ? extend(makeRecFrame([definitionName(x)]), xs) :
+  isDefStruct(x) ? extend(buildStructNframe(x), xs) :
   xs;
 }), nenv, prog);
 });
@@ -274,7 +274,7 @@ function defFuncToDefVarLambda(d) {
 function testsToEnd(p) {
   var splitTestCasesStar = (function (p, pStar, ts) {
         return emptyP(p) ? append(reverse(pStar), reverse(ts)) :
-        testCaseP(first(p)) ? splitTestCasesStar(rest(p), pStar, cons(first(p), ts)) :
+        isTestCase(first(p)) ? splitTestCasesStar(rest(p), pStar, cons(first(p), ts)) :
         splitTestCasesStar(rest(p), cons(first(p), pStar), ts);
       });
   return splitTestCasesStar(p, [], []);
@@ -305,18 +305,18 @@ function compileExpr(e, nenv) {
 console.log("compiling single Expr: "+e);
   var bytecode = selfEvalP(e) ? compileSelf(e) :
                 isSymbol(e) ? compileVar(e, nenv) :
-                primopP(e) ? compilePrimop(e) :
-                lambdaExprP(e) ? compileLambda(e, nenv) :
-                callP(e) ? compileCall(e, nenv) :
-                letExprP(e) ? compileLet(e, nenv) :
-                letStarExprP(e) ? compileLetStar(e, nenv) :
-                letrecExprP(e) ? compileLetrecStar(e, nenv) :
-                localExprP(e) ? compileLocal(e, nenv) :
-                ifExprP(e) ? compileIf(e, nenv) :
-                condExprP(e) ? compileCond(e, nenv) :
-                andExprP(e) ? compileAnd(e, nenv) :
-                orExprP(e) ? compileOr(e, nenv) :
-                qqListP(e) ? compileQqList(e, nenv) :
+                isPrimop(e) ? compilePrimop(e) :
+                isLambdaExpr(e) ? compileLambda(e, nenv) :
+                isCall(e) ? compileCall(e, nenv) :
+                isLetExpr(e) ? compileLet(e, nenv) :
+                isLetStarExpr(e) ? compileLetStar(e, nenv) :
+                isLetrecExpr(e) ? compileLetrecStar(e, nenv) :
+                isLocalExpr(e) ? compileLocal(e, nenv) :
+                isIfExpr(e) ? compileIf(e, nenv) :
+                isCondExpr(e) ? compileCond(e, nenv) :
+                isAndExpr(e) ? compileAnd(e, nenv) :
+                isOrExpr(e) ? compileOr(e, nenv) :
+                isQQList(e) ? compileQqList(e, nenv) :
                 error(new quote("compile-expr"), format("~a is unsupported at this time.", e));
 }
 
@@ -326,7 +326,7 @@ console.log("compiling Exprs: "+e);
  var bytecode;
  if(emptyP(es)){
   bytecode = (function (venv, ret) { return ret([]); });
- } else if(consP(es)) {
+ } else if(isCons(es)) {
    var cF = compileExpr(first(es), nenv);
    var cR = compileExprs(rest(es), nenv);
    bytecode = (function (venv, ret) {
@@ -499,7 +499,7 @@ console.log("compiling letrec RHS: "+expr);
  var bytecode;
  if(emptyP(es)){
   bytecode = (function (i, venv, ret) { return ret([]);});
- } else if(consP(es)) {
+ } else if(isCons(es)) {
   bytecode = (function () {
               var cF = compileExpr(first(es), nenv);
               var cR = compileLetrecStarRhss(rest(es), nenv);
@@ -539,16 +539,16 @@ function compileLocalDefs(ds, b, nenv) {
   var bytecode;
   if(emptyP(ds)){
     bytecode = compileExpr(b, nenv);
- } else if(defStructP(first(ds))) {
+ } else if(isDefStruct(first(ds))) {
     bytecode = (function () {
      var cR = compileLocalDefs(rest(ds), b, nenv);
      return (function (venv, ret) {
              return (function (_) { return cR(venv, ret); });
              });
      })()
- } else if(defFuncP(first(ds))){
+ } else if(isDefFunc(first(ds))){
      bytecode = compileLocalDefs(cons(defFuncToDefVarLambda(first(ds)), rest(ds)), b, nenv);
- } else if(defVarP(first(ds))){
+ } else if(isDefVar(first(ds))){
      bytecode = (function () {
                   var cD = compileDefVar(first(ds), nenv);
                  var cR = compileLocalDefs(rest(ds), b, nenv);
@@ -682,14 +682,14 @@ function compileOr(expr, nenv) {
 function compileQqList(expr, nenv) {
  console.log("compiling compileQqList: " + expr);
   return (function () { var cEs = map((function (expr) {
-  return qqSpliceP(expr) ? makeQqSplice(compileExpr(expr.val, nenv)) :
+  return isQQSplice(expr) ? makeQqSplice(compileExpr(expr.val, nenv)) :
   compileExpr(expr, nenv);
 }), expr.val);
 
 return (function (venv, ret) {
   return (function (_) {
   return foldrCps((function (x, xs, retStar) {
-  return qqSpliceP(x) ? x.val(venv, (function (vals) {
+  return isQQSplice(x) ? x.val(venv, (function (vals) {
   return retStar(foldr(cons, xs, vals));
 })) :
   x(venv, (function (val) {
@@ -704,9 +704,9 @@ return (function (venv, ret) {
 // compileTest : test nEnv -> bytecode
 function compileTest(test, nenv) {
  console.log("compiling test: "+test);
- if(chkExpectP(test)) return compileChkExpect(test, nenv);
- if(chkWithinP(test)) return compileChkWithin(test, nenv);
- if(chkErrorP(test))  return compileChkError(test, nenv);
+ if(isChkExpect(test)) return compileChkExpect(test, nenv);
+ if(isChkWithin(test)) return compileChkWithin(test, nenv);
+ if(isChkError(test))  return compileChkError(test, nenv);
  else err("cond", "all questions false");
 }
 
