@@ -1,5 +1,9 @@
 /* TODO
  - JSLint
+ - use OO-conventions where appropriate (desugaring?)
+ - can one use switch on instanceof in JS?
+ - desugaring of structs and local
+ - add error messages to desugaring phase
  */
 
 ////////////////////////////////////// ERROR MESSAGES ////////////////
@@ -838,9 +842,11 @@ function desugarProgram(program){
     } else if(p instanceof lambdaExpr){
       return makeLambdaExpr(p.args, desugar(p.body));
     } else if(p instanceof localExpr){
+      console.log("WARNING: we don't yet desugar local")
       return p;
     } else if(p instanceof letrecExpr){
-      return p;
+      function bindingToDefn(b){return makeDefVar(b.first, desugar(b.second));};
+      return makeLocalExpr(p.bindings.map(bindingToDefn), desugar(p.body))
     } else if(p instanceof letExpr){
       var ids   = p.bindings.map(coupleFirst),
           exprs = p.bindings.map(coupleSecond).map(desugar);
