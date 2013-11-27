@@ -174,7 +174,7 @@ function lambdaExpr(args, body) {
   this.args = args;
   this.body = body;
   this.toString = function(){
-    return "(lambda ("+this.args.toString()+") ("+this.body.toString()+"))";
+    return "(lambda ("+this.args.join(" ")+") ("+this.body.toString()+"))";
   };
 };
 
@@ -822,9 +822,65 @@ var sexpGreaterThanString = function (sexp) {
 var expectedError = function (id, expected, actual) {
   return error(id, stringAppend("Expected a ", expected, " but found: ", sexpGreaterThanString(actual)));
 };
+ 
+///////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// DESUGARING /////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////
+// desugarProgram : (listof program) -> (listof program)
+function desugarProgram(program){
+ function desugar(p){
+    if(p instanceof defFunc){
+      return makeDefFunc(p.name, p.args, desugar(p.body));
+    } else if(p instanceof defVar) {
+      return makeDefVar(p.name, desugar(p.expr));
+    } else if(p instanceof defStruct){
+      return p;
+    } else if(p instanceof lambdaExpr){
+      return makeLambdaExpr(p.args, desugar(p.body));
+    } else if(p instanceof localExpr){
+      return p;
+    } else if(p instanceof letrecExpr){
+      return p;
+    } else if(p instanceof letExpr){
+      var ids   = p.bindings.map(coupleFirst),
+          exprs = p.bindings.map(coupleSecond).map(desugar);
+      return makeCall(makeLambdaExpr(ids, desugar(p.body)), exprs);
+    } else if(p instanceof letStarExpr){
+      var ids   = p.bindings.map(coupleFirst),
+          exprs = p.bindings.map(coupleSecond).map(desugar),
+          desugared = desugar(p.body);
+      for(i=p.bindings.length-1; i>-1; i--){
+        desugared = makeLetExpr([makeCouple(ids[i], exprs[i])], desugared);
+      }
+      return desugared;
+     } else if(p instanceof call){
+      return makeCall(desugar(p.func), p.args.map(desugar));
+     } else if(p instanceof condExpr){
+      var desugared = second(p.clauses[p.clauses.length-1]);
+      for(i=p.clauses.length-1; i>-1; i--){
+        desugared = makeIfExpr(p.clauses[i].first, p.clauses[i].second, desugared);
+      }
+      return desugared;
+    } else if(p instanceof ifExpr){
+      return makeIfExpr(desugar(p.predicate)
+                      , desugar(p.consequence)
+                      , desugar(p.alternate));
+    } else if(p instanceof beginExpr){
+      return makeBeginExpr(p.exprs.map(desugar));
+    } else if(p instanceof andExpr){
+      return makeAndExpr(p.exprs.map(desugar));
+    } else if(p instanceof orExpr){
+      return makeOrExpr(p.exprs.map(desugar));
+    } else {
+       return p;
+    }
+  }
+ return program.map(desugar);
+}
 
 /////////////////////
 /* Export Bindings */
 /////////////////////
+window.desugarProgram = desugarProgram;
 window.parse = parse;
 })();
