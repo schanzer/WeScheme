@@ -201,7 +201,7 @@ function letExpr(bindings, body) {
   this.bindings = bindings;
   this.body = body;
   this.toString = function(){
-    return "(letrec ("+this.bindings.toString()+") ("+this.body.toString()+"))";
+    return "(let ("+this.bindings.toString()+") ("+this.body.toString()+"))";
   };
 };
 
@@ -826,7 +826,5 @@ var expectedError = function (id, expected, actual) {
 /////////////////////
 /* Export Bindings */
 /////////////////////
-
 window.parse = parse;
-
 })();
