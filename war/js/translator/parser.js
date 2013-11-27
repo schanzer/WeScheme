@@ -1,9 +1,11 @@
 /* TODO
  - JSLint
- - use OO-conventions where appropriate (desugaring?)
  - can one use switch on instanceof in JS?
- - desugaring of structs and local
- - add error messages to desugaring phase
+ - look up the for(k in A) syntax, replace for() loops
+ - desugaring of structs and local, proper handling of 'else' in cond
+ - preserve location information during desugaring
+ - add error messages to desugaring phase for eeeeeeeverything
+ - use OO-conventions where appropriate (desugaring?)
  */
 
 ////////////////////////////////////// ERROR MESSAGES ////////////////
@@ -164,7 +166,6 @@ function definitionName(def) {
 
 ///////////////////////////////////EXPRESSIONS//////////////////////////////
 // Begin expression
-// (not yet used)
 function beginExpr(exprs) {
   this.exprs = exprs;
   this.toString = function(){
@@ -298,8 +299,8 @@ function listExpr(val) {
 function mtListExpr() {};
 
 // boolean expression
-function booleanExpr(val) {
-  this.val = val;
+function booleanExpr(sym) {
+  this.val = (sym.val === "true" || sym.val === "#t");
   this.toString = function(){
     return this.val? "#t" : "#f";
   };
@@ -694,12 +695,11 @@ var parseExprSingleton = function (sexp) {
     return makeImageExpr(encodeImage(img), imageWidth(img), imageHeight(img), pinholeX(img), pinholeY(img));
   };
   var singleton = isString(sexp) ? makeStringExpr(sexp) :
-    isChar(sexp) ? makeCharExpr(sexp) :
     isNumber(sexp) ? makeNumberExpr(sexp) :
-    isSymbol(sexp) ? sexpIsisPrimop(sexp) ? makePrimop(sexp) :
-    isSymbolEqualTo(types.symbol("empty"), sexp) ? makeCall(makePrimop(types.symbol("list")), []) :
+    isChar(sexp) ? makeCharExpr(sexp) :
     ((isSymbolEqualTo(types.symbol("true"), sexp)) || (isSymbolEqualTo(types.symbol("false"), sexp))) ? makeBooleanExpr(sexp) :
-    sexp :
+    isSymbolEqualTo(types.symbol("empty"), sexp) ? makeCall(makePrimop(types.symbol("list")), []) :
+    isSymbol(sexp) ? sexpIsisPrimop(sexp) ? makePrimop(sexp) : sexp :
     imageP(sexp) ? parseImage(sexp) :
     error(types.symbol("parse-expr-singleton"), stringAppend("( ): ", sexpGreaterThanString(sexp), "expected a function, but nothing's there"));
  singleton.location = sexp.location;
@@ -862,8 +862,8 @@ function desugarProgram(program){
      } else if(p instanceof call){
       return makeCall(desugar(p.func), p.args.map(desugar));
      } else if(p instanceof condExpr){
-      var desugared = second(p.clauses[p.clauses.length-1]);
-      for(i=p.clauses.length-1; i>-1; i--){
+      var desugared = p.clauses[p.clauses.length-1].second;
+      for(i=p.clauses.length-2; i>-1; i--){
         desugared = makeIfExpr(p.clauses[i].first, p.clauses[i].second, desugared);
       }
       return desugared;
@@ -874,9 +874,19 @@ function desugarProgram(program){
     } else if(p instanceof beginExpr){
       return makeBeginExpr(p.exprs.map(desugar));
     } else if(p instanceof andExpr){
-      return makeAndExpr(p.exprs.map(desugar));
+      var exprs = p.exprs.map(desugar),
+          desugared = exprs[exprs.length-1]; // ASSUME length >=2!!!
+      for(i=exprs.length-2; i>-1; i--){
+        desugared = makeIfExpr(exprs[i], desugared, makeBooleanExpr(types.symbol("false")));
+      }
+      return desugared;
     } else if(p instanceof orExpr){
-      return makeOrExpr(p.exprs.map(desugar));
+      var exprs = p.exprs.map(desugar),
+          desugared = exprs[exprs.length-1]; // ASSUME length >=2!!!
+      for(i=exprs.length-2; i>-1; i--){
+        desugared = makeIfExpr(exprs[i], makeBooleanExpr(types.symbol("true")), desugared);
+      }
+      return desugared;
     } else {
        return p;
     }
