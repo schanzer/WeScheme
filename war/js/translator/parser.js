@@ -1,3 +1,7 @@
+/* TODO
+ - JSLint
+ */
+
 ////////////////////////////////////// ERROR MESSAGES ////////////////
 
 // the location struct
@@ -30,6 +34,7 @@ function makeLetStarExpr(bindings, body) { return new letStarExpr(bindings, body
 function makeCall(func, args) { return new call(func, args); };
 function makeCondExpr(clauses) { return new condExpr(clauses); };
 function makeIfExpr(predicate, consequence, alternative) { return new ifExpr(predicate, consequence, alternative); };
+function makeBeginExpr(exprs) { return new beginExpr(exprs); };
 function makeAndExpr(exprs) { return new andExpr(exprs); };
 function makeOrExpr(exprs) { return new orExpr(exprs); };
 function makeTimeExpr(val) { return new timeExpr(val); };
@@ -97,7 +102,7 @@ var isDefinition = function (x) {
 // an expression is a lambda, local, letrec, let, let*, call, cond, if, and, or, time, symbol, primop,
 // number, string, char, list, boolean, image, quote or quasiquote
 var isExpr = function (x) {
-             return ((isLambdaExpr(x)) || (isLocalExpr(x)) || (isLetrecExpr(x)) || (isLetExpr(x)) || (isLetStarExpr(x)) || (isCall(x)) || (isCondExpr(x)) || (isIfExpr(x)) || (isAndExpr(x)) || (isOrExpr(x)) || (isTimeExpr(x)) || (isSymbol(x)) || (isPrimop(x)) || (isSymbolExpr(x)) || (isNumberExpr(x)) || (isStringExpr(x)) || (isCharExpr(x)) || (isListExpr(x)) || (isMTListExpr(x)) || (isBooleanExpr(x)) || (isQuotedExpr(x)) || (isQuasiQuotedExpr(x)) || (isImageExpr(x)));
+             return ((isLambdaExpr(x)) || (isLocalExpr(x)) || (isLetrecExpr(x)) || (isLetExpr(x)) || (isLetStarExpr(x)) || (isCall(x)) || (isCondExpr(x)) || (isIfExpr(x)) || (isBeginExpr(x))|| (isAndExpr(x)) || (isOrExpr(x)) || (isTimeExpr(x)) || (isSymbol(x)) || (isPrimop(x)) || (isSymbolExpr(x)) || (isNumberExpr(x)) || (isStringExpr(x)) || (isCharExpr(x)) || (isListExpr(x)) || (isMTListExpr(x)) || (isBooleanExpr(x)) || (isQuotedExpr(x)) || (isQuasiQuotedExpr(x)) || (isImageExpr(x)));
              };
 // a test case is a check-expect, check-within or check-error
 var isTestCase = function (x) {
@@ -159,7 +164,7 @@ function definitionName(def) {
 function beginExpr(exprs) {
   this.exprs = exprs;
   this.toString = function(){
-    return "(begin "+this.exprs.toString()+")";
+    return "(begin "+this.exprs.join(" ")+")";
   };
 };
 
@@ -239,7 +244,7 @@ function ifExpr(predicate, consequence, alternative) {
 // and expression
 function andExpr(exprs) {
   this.exprs = exprs;
-  this.toString = function(){ return "(and "+this.exprs.toString()+")"; };
+  this.toString = function(){ return "(and "+this.exprs.join(" ")+")"; };
 };
 
 // or expression
@@ -550,6 +555,9 @@ var parseExprList = function (sexp) {
   function isIf(sexp) {
     return isQuadWithFirstEqualTo(sexp, types.symbol("if"));
   };
+  function isBegin(sexp) {
+    return ((isCons(sexp)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("begin"))));
+  };
   function isAnd(sexp) {
     return ((isCons(sexp)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("and"))));
   };
@@ -589,6 +597,10 @@ var parseExprList = function (sexp) {
     return isIf(sexp) ? makeIfExpr(parseExpr(second(sexp)), parseExpr(third(sexp)), parseExpr(fourth(sexp))) :
     expectedError(types.symbol("parse-if-expr"), "if expression sexp", sexp);
   };
+  function parseBeginExpr(sexp) {
+    return isBegin(sexp) ? makeBeginExpr(map(parseExpr, rest(sexp))) :
+    expectedError(types.symbol("parse-begin-expr"), "begin expression sexp", sexp);
+  };
   function parseAndExpr(sexp) {
     return isAnd(sexp) ? makeAndExpr(map(parseExpr, rest(sexp))) :
     expectedError(types.symbol("parse-and-expr"), "and expression sexp", sexp);
@@ -621,6 +633,7 @@ var parseExprList = function (sexp) {
                   isSymbolEqualTo(types.symbol("let*"), peek)    ? parseLetStarExpr(sexp) :
                   isSymbolEqualTo(types.symbol("cond"), peek)    ? parseCondExpr(sexp) :
                   isSymbolEqualTo(types.symbol("if"), peek)      ? parseIfExpr(sexp) :
+                  isSymbolEqualTo(types.symbol("begin"), peek)   ? parseBeginExpr(sexp) :
                   isSymbolEqualTo(types.symbol("and"), peek)     ? parseAndExpr(sexp) :
                   isSymbolEqualTo(types.symbol("or"), peek)      ? parseOrExpr(sexp) :
                   isSymbolEqualTo(types.symbol("time"), peek)    ? parseTimeExpr(sexp) :
@@ -676,7 +689,6 @@ var parseExprSingleton = function (sexp) {
   function parseImage(img) {
     return makeImageExpr(encodeImage(img), imageWidth(img), imageHeight(img), pinholeX(img), pinholeY(img));
   };
- console.log(makeCharExpr(sexp));
   var singleton = isString(sexp) ? makeStringExpr(sexp) :
     isChar(sexp) ? makeCharExpr(sexp) :
     isNumber(sexp) ? makeNumberExpr(sexp) :
