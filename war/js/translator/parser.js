@@ -127,6 +127,16 @@ function defVar(name, expr) {
   };
 };
 
+// Variable**S** definition
+// (not yet used)
+function defVars(names, expr) {
+  this.names = names;
+  this.expr = expr;
+  this.toString = function(){
+    return "(define ("+this.names.join(" ")+") "+this.expr.toString()+")";
+  };
+};
+
 // Structure definition
 function defStruct(name, fields) {
   this.name = name;
@@ -144,6 +154,16 @@ function definitionName(def) {
   };
 
 ///////////////////////////////////EXPRESSIONS//////////////////////////////
+// Begin expression
+// (not yet used)
+function beginExpr(exprs) {
+  this.exprs = exprs;
+  this.toString = function(){
+    return "(begin "+this.exprs.toString()+")";
+  };
+};
+
+
 // Lambda expression
 function lambdaExpr(args, body) {
   this.args = args;
