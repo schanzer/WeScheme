@@ -29,7 +29,7 @@ function makeLetExpr(bindings, body) { return new letExpr(bindings, body); };
 function makeLetStarExpr(bindings, body) { return new letStarExpr(bindings, body); };
 function makeCall(func, args) { return new call(func, args); };
 function makeCondExpr(clauses) { return new condExpr(clauses); };
-function makeIfExpr(predicate, then, els) { return new ifExpr(predicate, then, els); };
+function makeIfExpr(predicate, consequence, alternative) { return new ifExpr(predicate, consequence, alternative); };
 function makeAndExpr(exprs) { return new andExpr(exprs); };
 function makeOrExpr(exprs) { return new orExpr(exprs); };
 function makeTimeExpr(val) { return new timeExpr(val); };
@@ -40,7 +40,7 @@ function makeCharExpr(char) { return new charExpr(char.val); };
 function makeListExpr(val) { return new listExpr(val); };
 function makeMtListExpr() { return new mtListExpr(); };
 function makeBooleanExpr(val) { return new booleanExpr(val); };
-function makeQuotedExpr(val) { return types.symboldExpr(val); };
+function makeQuotedExpr(val) { return types.symbolExpr(val); };
 function makeQuasiquotedExpr(val) { return new quasiquotedExpr(val); };
 function makeImageExpr(val, width, height, x, y) { return new imageExpr(val, width, height, x, y); };
 function makeQqList(val) { return new qqList(val); };
@@ -77,7 +77,7 @@ function isListExpr(x) { return x instanceof listExpr; };
 function isMTListExpr(x) { return x instanceof mtListExpr; };
 function isBooleanExpr(x) { return x instanceof booleanExpr; };
 function isQuotedExpr(x) { return x instanceof quotedExpr; };
-function quasiisQuotedExpr(x) { return x instanceof quasiquotedExpr; };
+function isQuasiQuotedExpr(x) { return x instanceof quasiquotedExpr; };
 function isImageExpr(x) { return x instanceof imageExpr; };
 function isQQList(x) { return x instanceof qqList; };
 function isQQSplice(x) { return x instanceof qqSplice; };
@@ -97,7 +97,7 @@ var isDefinition = function (x) {
 // an expression is a lambda, local, letrec, let, let*, call, cond, if, and, or, time, symbol, primop,
 // number, string, char, list, boolean, image, quote or quasiquote
 var isExpr = function (x) {
-             return ((isLambdaExpr(x)) || (isLocalExpr(x)) || (isLetrecExpr(x)) || (isLetExpr(x)) || (isLetStarExpr(x)) || (isCall(x)) || (isCondExpr(x)) || (isIfExpr(x)) || (isAndExpr(x)) || (isOrExpr(x)) || (isTimeExpr(x)) || (isSymbol(x)) || (isPrimop(x)) || (isSymbolExpr(x)) || (isNumberExpr(x)) || (isStringExpr(x)) || (isCharExpr(x)) || (isListExpr(x)) || (isMTListExpr(x)) || (isBooleanExpr(x)) || (isQuotedExpr(x)) || (quasiisQuotedExpr(x)) || (isImageExpr(x)));
+             return ((isLambdaExpr(x)) || (isLocalExpr(x)) || (isLetrecExpr(x)) || (isLetExpr(x)) || (isLetStarExpr(x)) || (isCall(x)) || (isCondExpr(x)) || (isIfExpr(x)) || (isAndExpr(x)) || (isOrExpr(x)) || (isTimeExpr(x)) || (isSymbol(x)) || (isPrimop(x)) || (isSymbolExpr(x)) || (isNumberExpr(x)) || (isStringExpr(x)) || (isCharExpr(x)) || (isListExpr(x)) || (isMTListExpr(x)) || (isBooleanExpr(x)) || (isQuotedExpr(x)) || (isQuasiQuotedExpr(x)) || (isImageExpr(x)));
              };
 // a test case is a check-expect, check-within or check-error
 var isTestCase = function (x) {
@@ -136,12 +136,12 @@ function defStruct(name, fields) {
   };
 };
 
-var definitionName = (function (def) {
-                          return isDefFunc(def) ? def.name :
-                          isDefVar(def) ? def.name :
-                          isDefStruct(def) ? def.name :
-                          err("cond", "all questions false");
-                          });
+function definitionName(def) {
+  return isDefFunc(def) ? def.name :
+         isDefVar(def) ? def.name :
+         isDefStruct(def) ? def.name :
+         err("cond", "all questions false");
+  };
 
 ///////////////////////////////////EXPRESSIONS//////////////////////////////
 // Lambda expression
@@ -207,12 +207,12 @@ function condExpr(clauses) {
 };
 
 // if expression
-function ifExpr(predicate, then, els) {
+function ifExpr(predicate, consequence, alternative) {
   this.predicate = predicate;
-  this.then = then;
-  this.els = els;
+  this.consequence = consequence;
+  this.alternative = alternative;
   this.toString = function(){
-    return "(if "+this.predicate.toString()+" "+this.then.toString()+" "+this.els.toString()+")";
+    return "(if "+this.predicate.toString()+" "+this.consequence.toString()+" "+this.alternative.toString()+")";
   };
 };
 
