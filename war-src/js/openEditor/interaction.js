@@ -653,40 +653,8 @@ WeSchemeInteractions = (function () {
                 that,
                 function() {
                     that.notifyBus("before-run", that);
-
                     that.disableInput();
-                    var sexp, AST, progres, result;
-                    try { //////////////////// LEX ///////////////////
-                      var sexp = lex(aSource);
-                    } catch(e) {
-                      throw Error("LEXING ERROR\n"+e);
-                    }
-                    console.log("LEXER OUTPUT (raw and prettyprinted):");
-                    console.log(sexp);
-                    console.log(sexpToString(sexp));
-                    try{ //////////////////// PARSE ///////////////////
-                      var AST = parse(sexp);
-                    } catch(e) {
-                      throw Error("PARSING ERROR\n"+e);
-                    }
-                    console.log("PARSER OUTPUT (raw and prettyprinted):");
-                    console.log(AST);
-                    console.log(AST.join("\n"));
-                    try { ////////////////// RUN /////////////////////
-                      var result = runprogSlashEnvs(AST, that.prompt.__nenv, that.prompt.__venv);
-                      var progres = first(result); // the program-result
-                      that.prompt.__nenv = second(result); // update the environments for future use
-                      that.prompt.__venv = third(result);
-                      var res = [];
-                      for(var i = 0; i < progres.vals.length; i++) {
-                        res[i] = sexpToString(progres.vals[i]);
-                      }
-                      console.log(res);
-                    // if an error occured, we want to hand it off to WeScheme's built-in error handler
-                    } catch(e){
-                      console.log("RUN ERROR:\n");
-                                  console.log(e);
-                    }
+                    // compile and execute the program
                     that.evaluator.executeProgram(
                         sourceName,
                         aSource,
@@ -1044,13 +1012,11 @@ WeSchemeInteractions = (function () {
         if (types.isSchemeError(err) && types.isExnBreak(err.val)) {
             dom['className'] = 'moby-break-error';
             msg = "Program stopped by user (user break)";
-        } 
-        else {
+        } else {
             dom['className'] = 'moby-error';
             if(err.structuredError && err.structuredError.message) {
                 msg = structuredErrorToMessage(err.structuredError.message);
-            }
-            else {
+            } else {
                 msg = that.evaluator.getMessageFromExn(err);
             }
         }
@@ -1068,13 +1034,12 @@ WeSchemeInteractions = (function () {
         } else {
             if(err.domMessage){
               dom.appendChild(err.domMessage);
-            }
-            else {
+            } else {
               msgDom.appendChild(document.createTextNode(msg));
             }
         } 
         dom.appendChild(msgDom);
-
+                        console.log(dom);
         if(err.structuredError && err.structuredError.message) {
             var link = that.createLocationHyperlink(err.structuredError.location);
             dom.appendChild(link);

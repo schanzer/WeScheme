@@ -9,6 +9,9 @@
 // - types.String
 // - types.Character
 
+/* TODO
+- JSLint
+*/
 (function () {
 
 /////////////////////
@@ -137,8 +140,7 @@ function readList(str, i) {
                                             new Location(sCol, sLine, iStart, i-iStart))
                       ]);
    var err = types.schemeError(types.incompleteExn(types.exnFailContract, msg), []);
-               console.log(err);
-   throw err;
+   throwError();
   }
   if(!matchingDelims(openingDelim, str.charAt(i))) {
     throwError("read: expected a " +
@@ -461,7 +463,30 @@ function isDelim(x) {
 function Comment(txt) {this.txt = txt;}
 
 // less letters to type than throw new Error()
-function throwError(x) { throw new Error(x); }
+function throwError(x) {
+      var json = {"type": "moby-failure"
+               , "dom-message": ["span"
+                                ,[["class", "Error"]]
+                                ,["span", [["class", "Message"]]
+                                        , "read: expected a ", ")", " to close ", "(", "", ""]
+                                ,["br", [], ""]
+                                , ["span"
+                                   , [["class", "Error.location"]]
+                                   , ["span"
+                                      , [["class", "location-reference"]
+                                         , ["style", "display:none"]]
+                                      , ["span", [["class", "location-offset"]], "1"]
+                                      , ["span", [["class", "location-line"]], "1"]
+                                      , ["span", [["class", "location-column"]], "0"]
+                                      , ["span", [["class", "location-span"]], "1"]
+                                      , ["span", [["class", "location-id"]], "<definitions>"]
+                                      ]
+                                   ]
+                                 ]
+               , "structured-error": '{"message": ["read: expected a ", ")", " to close ", {"type": "ColoredPart", "text": "(", "loc": {"line": "0", "span": "1", "offset": "1", "column": "0", "id": "<definitions>"}}, "", ""], "location": {"line": "1", "span": "1", "offset": "1", "column": "0", "id": "<definitions>"}}'
+               };
+               throw JSON.stringify(json);
+}
 
 // determines if the character is valid as a part of a symbol
 function isValidSymbolCharP(x) {

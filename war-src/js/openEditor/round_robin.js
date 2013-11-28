@@ -109,6 +109,41 @@ goog.provide("plt.wescheme.RoundRobin");
     var tryServerN = function(n, countFailures, 
                               programName, code, 
                               onDone, onDoneError) {
+       // try client-side parsing first, to see if we can avoid hitting the server altogether
+       try{
+          var sexp, AST, progres, result;
+          try { //////////////////// LEX ///////////////////
+            var sexp = lex(code);
+          } catch(e) {
+            console.log("LEXING ERROR\n"+e);
+            throw e;
+          }
+          console.log("LEXER OUTPUT (raw and prettyprinted):");
+          console.log(sexp);
+          console.log(sexpToString(sexp));
+          try{ //////////////////// PARSE ///////////////////
+            var AST = parse(sexp);
+          } catch(e) {
+            console.log("PARSING ERROR\n"+e);
+            throw e;
+          }
+          console.log("PARSER OUTPUT (raw and prettyprinted):");
+          console.log(AST);
+          console.log(AST.join("\n"));
+          try { ////////////////// DESUGAR /////////////////////
+            var AST = desugarProgram(AST);
+            console.log("DESUGARING:\nraw:");
+            console.log(AST);
+            console.log("pretty:");
+            console.log(AST.join("\n"));
+          } catch (e) {
+            console.log("DESUGARING ERROR\n"+e);
+            throw e;
+          }
+        } catch (e) {
+           return onDoneError(e);
+        }
+                   
 
         if (n < liveServers.length) {
             liveServers[n].xhr.compileProgram(

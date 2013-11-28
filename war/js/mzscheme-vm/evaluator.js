@@ -182,19 +182,15 @@ var Evaluator = (function() {
 
 
     // executeProgram: string string (-> void) (exn -> void) -> void
-    Evaluator.prototype.executeProgram = function(programName, code,
-						  onDone,
-						  onDoneError) {
-	var that = this;
+    Evaluator.prototype.executeProgram = function(programName, code, onDone, onDoneError) {
+        var that = this;
         this.compileProgram(programName, code,
                             function(responseText) {
                                 var result = JSON.parse(responseText);
-		                that._onCompilationSuccess((0,eval)('(' + result.bytecode + ')'), 
-					                   onDone, onDoneError);
+                                that._onCompilationSuccess((0,eval)('(' + result.bytecode + ')'), onDone, onDoneError);
                             },
                             function(responseErrorText) {
-		                that._onCompilationFailure(JSON.parse(responseErrorText || '""'),
-					                   onDoneError);
+                                that._onCompilationFailure(JSON.parse(responseErrorText || '""'), onDoneError);
                             })
     };
 
@@ -211,26 +207,26 @@ var Evaluator = (function() {
     // compileProgram: string string (string -> any) (string -> any) -> void
     // Runs the compiler on the given program.
     Evaluator.prototype.compileProgram = function(programName, code, onDone, onDoneError) {
-	var that = this;
-	var params = encodeUrlParameters({'name': programName,
-					  'program': code,
-                                          'format': 'json',
-					  'compiler-version' : '1'});
-	var xhr = new XMLHttpRequest();
-	xhr.onreadystatechange = function() {
-	    if (xhr.readyState == 4) {
-                if (xhr.status == 503) {
-                    that.compileProgram(programName, code, onDone, onDoneError);
-                } else if (xhr.status === 200) {
-                    onDone(xhr.responseText);
-		} else {
-                    onDoneError(xhr.responseText);
-		}
-	    }
-	};
-	xhr.open("POST", this.compilationServletUrl, true);
-	xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-	xhr.send(params);
+      var that = this;
+      var params = encodeUrlParameters({'name': programName,
+                                       'program': code,
+                                        'format': 'json',
+                                       'compiler-version' : '1'});
+      var xhr = new XMLHttpRequest();
+      xhr.onreadystatechange = function() {
+          if (xhr.readyState == 4) {
+                    if (xhr.status == 503) {
+                        that.compileProgram(programName, code, onDone, onDoneError);
+                    } else if (xhr.status === 200) {
+                        onDone(xhr.responseText);
+                    } else {
+                        onDoneError(xhr.responseText);
+                     }
+          }
+      };
+      xhr.open("POST", this.compilationServletUrl, true);
+      xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+      xhr.send(params);
     };
 
 
@@ -315,21 +311,28 @@ var Evaluator = (function() {
 
 
     Evaluator.prototype.getMessageFromExn = function(exn) {
+                 console.log(exn);
 	if (typeof(exn) === 'undefined') {
 	    // We should never get here
 	    return 'internal undefined error';
 	} else if (types.isSchemeError(exn)) {
+                 console.log(1);
 	    var errorValue = exn.val;
 	    if (types.isExn(errorValue)) {
-		return types.exnMessage(errorValue);
+                 console.log('1a');
+        return types.exnMessage(errorValue);
 	    } else {
-		return errorValue + '';
+                 console.log('1b');
+        return errorValue + '';
 	    }
 	} else if (types.isInternalError(exn)) {
+                 console.log('2');
 	    return exn.val + '';
 	} else if (exn.nodeType) {
+                 console.log('3');
 	    return exn;
 	} else {
+                 console.log('4');
 	    return exn.message;
 	}
     };
