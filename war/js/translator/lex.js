@@ -42,6 +42,8 @@ function readProg(str) {
   var i = sCol = column = 0, sline = line = 1; // initialize all position indices
   var sexps = [];
   delims = [];
+  // get rid of any whitespace at thr start of the string
+  i = chewWhiteSpace(str, 0);
   while(i < str.length) {
     var sexp = readSExpByIndex(str, i);
     if(!(sexp instanceof Comment)) {
