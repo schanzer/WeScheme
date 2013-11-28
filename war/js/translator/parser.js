@@ -739,8 +739,13 @@ var parseCondExpr = function (sexp) {
 };
 
 var parseCondCouple = function (sexp) {
-  return sexpIsisCouple(sexp) ? makeCouple(parseExpr(first(sexp)), parseExpr(second(sexp))) :
-  expectedError(types.symbol("parse-cond-couple"), "couple of expressions sexp", sexp);
+ if(sexpIsisCouple(sexp)){
+    var couple = makeCouple(parseExpr(first(sexp)), parseExpr(second(sexp)));
+    couple.location = sexp.location;
+    return couple;
+ } else {
+    return expectedError(types.symbol("parse-cond-couple"), "couple of expressions sexp", sexp);
+ }
 };
 
 var parseLetCouple = function (sexp) {
