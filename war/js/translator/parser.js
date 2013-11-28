@@ -1,11 +1,9 @@
 /* TODO
  - JSLint
- - can one use switch on instanceof in JS?
  - look up the for(k in A) syntax, replace for() loops
  - desugaring of structs and local, proper handling of 'else' in cond
  - preserve location information during desugaring
  - add error messages to desugaring phase for eeeeeeeverything
- - use OO-conventions where appropriate (desugaring?)
  */
 
 ////////////////////////////////////// ERROR MESSAGES ////////////////
@@ -115,7 +113,12 @@ var isTestCase = function (x) {
                      return ((isChkExpect(x)) || (isChkWithin(x)) || (isChkError(x)));
                      };
 
-
+// Inheritance from pg 168: Javascript, the Definitive Guide.
+var heir = function(p) {
+  var f = function() {};
+  f.prototype = p;
+  return new f();
+};
 
 ///////////////////////////////////////// DEFINITIONS /////////////////////////////////
 // Function definition
@@ -125,6 +128,9 @@ function defFunc(name, args, body) {
   this.body = body;
   this.toString = function(){
     return "(define ("+this.name.toString()+" "+this.args.join(" ")+")\n    "+this.body.toString()+")";
+  };
+  this.desugar = function(pinfo){
+    return makeDefFunc(this.name, this.args, this.body.desugar());
   };
 };
 
@@ -136,6 +142,9 @@ function defVar(name, expr) {
   this.toString = function(){
     return "(define "+this.name.toString()+" "+this.expr.toString()+")";
   };
+  this.desugar = function(pinfo){
+    return makeDefVar(this.name, this.expr.desugar());
+  };
 };
 
 // Variable**S** definition
@@ -146,6 +155,9 @@ function defVars(names, expr) {
   this.toString = function(){
     return "(define ("+this.names.join(" ")+") "+this.expr.toString()+")";
   };
+  this.desugar = function(pinfo){
+    return this;
+  };
 };
 
 // Structure definition
@@ -154,6 +166,9 @@ function defStruct(name, fields) {
   this.fields = fields;
   this.toString = function(){
     return "(define-struct "+this.name.toString()+" ("+this.fields.toString()+"))";
+  };
+  this.desugar = function(pinfo){
+    return this;
   };
 };
 
@@ -171,6 +186,9 @@ function beginExpr(exprs) {
   this.toString = function(){
     return "(begin "+this.exprs.join(" ")+")";
   };
+  this.desugar = function(pinfo){
+    return makeBeginExpr(desugarAll(this.exprs.map));
+  };
 };
 
 
@@ -181,6 +199,9 @@ function lambdaExpr(args, body) {
   this.toString = function(){
     return "(lambda ("+this.args.join(" ")+") ("+this.body.toString()+"))";
   };
+  this.desugar = function(pinfo){
+    return makeLambdaExpr(this.args, this.body.desugar());
+  };
 };
 
 // Local expression TODO
@@ -189,6 +210,10 @@ function localExpr(defs, body) {
   this.body = body;
   this.toString = function(){
     return "(local ("+this.defs.toString()+") ("+this.body.toString()+"))";
+  };
+  this.desugar = function(pinfo){
+    console.log("WARNING: we don't yet desugar local");
+    return this;
   };
 };
 
@@ -199,6 +224,10 @@ function letrecExpr(bindings, body) {
   this.toString = function(){
     return "(letrec ("+this.bindings.toString()+") ("+this.body.toString()+"))";
   };
+  this.desugar = function(pinfo){
+    function bindingToDefn(b){return makeDefVar(b.first, b.second.desugar());};
+    return makeLocalExpr(this.bindings.map(bindingToDefn), this.body.desugar());
+  };
 };
 
 // Let expression
@@ -207,6 +236,11 @@ function letExpr(bindings, body) {
   this.body = body;
   this.toString = function(){
     return "(let ("+this.bindings.toString()+") ("+this.body.toString()+"))";
+  };
+  this.desugar = function(pinfo){
+    var ids   = this.bindings.map(coupleFirst),
+        exprs = desugarAll(this.bindings.map(coupleSecond));
+    return makeCall(makeLambdaExpr(ids, this.body.desugar()), exprs);
   };
 };
 
@@ -217,6 +251,15 @@ function letStarExpr(bindings, body) {
   this.toString = function(){
     return "(let* ("+this.bindings.toString()+") ("+this.body.toString()+"))";
   };
+  this.desugar = function(pinfo){
+    var ids   = this.bindings.map(coupleFirst),
+        exprs = desugarAll(this.bindings.map(coupleSecond)),
+    desugared = this.body.desugar();
+    for(i=this.bindings.length-1; i>-1; i--){
+      desugared = makeLetExpr([makeCouple(ids[i], exprs[i])], desugared);
+    }
+    return desugared;
+  };
 };
 
 // application expression
@@ -226,6 +269,9 @@ function call(func, args) {
   this.toString = function(){
     return "("+this.func.toString()+" "+this.args.join(" ")+")";
   };
+  this.desugar = function(pinfo){
+    return makeCall(this.func.desugar(), desugarAll(this.args));
+  };
 };
 
 // cond expression
@@ -233,6 +279,13 @@ function condExpr(clauses) {
   this.clauses = clauses;
   this.toString = function(){
     return "(cond\n    "+this.clauses.join("\n    ")+")";
+  };
+  this.desugar = function(pinfo){
+    var desugared = this.clauses[this.clauses.length-1].second;
+    for(i=this.clauses.length-2; i>-1; i--){
+      desugared = makeIfExpr(this.clauses[i].first, this.clauses[i].second, desugared);
+    }
+    return desugared;
   };
 };
 
@@ -244,82 +297,107 @@ function ifExpr(predicate, consequence, alternative) {
   this.toString = function(){
     return "(if "+this.predicate.toString()+" "+this.consequence.toString()+" "+this.alternative.toString()+")";
   };
+  this.desugar = function(pinfo){
+    return makeIfExpr(this.predicate.desugar()
+                    ,this.consequence.desugar()
+                    ,this.alternate.desugar());
+  };
 };
 
 // and expression
 function andExpr(exprs) {
   this.exprs = exprs;
   this.toString = function(){ return "(and "+this.exprs.join(" ")+")"; };
+  this.desugar = function(pinfo){
+    var exprs = desugarAll(this.exprs),
+    desugared = exprs[exprs.length-1]; // ASSUME length >=2!!!
+    for(i=exprs.length-2; i>-1; i--){
+      desugared = makeIfExpr(exprs[i], desugared, makeBooleanExpr(types.symbol("false")));
+    }
+    return desugared;
+  };
 };
 
 // or expression
 function orExpr(exprs) {
   this.exprs = exprs;
   this.toString = function(){ return "(or "+this.exprs.toString()+")"; };
+  this.desugar = function(pinfo){
+    var exprs = desugarAll(this.exprs),
+    desugared = exprs[exprs.length-1]; // ASSUME length >=2!!!
+    for(i=exprs.length-2; i>-1; i--){
+      desugared = makeIfExpr(exprs[i], makeBooleanExpr(types.symbol("true")), desugared);
+    }
+    return desugared;
+  };
 };
 
 // time expression TODO
 function timeExpr(val) {
   this.val = val;
+  this.toString = function(){ return this.val.toString(); };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // symbol expression
 function symbolExpr(val) {
   this.val = val;
-  this.toString = function(){
-    return this.val.toString();
-  };
+  this.toString = function(){ return this.val.toString(); };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // number expression
 function numberExpr(val) {
   this.val = val;
   this.toString = function(){ return this.val.toString(); };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // string expression
 function stringExpr(val) {
   this.val = val;
   this.toString = function(){ return "\""+this.val.toString()+"\""; };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // char expression
 function charExpr(val) {
   this.val = val;
   this.toString = function(){ return "#\\"+this.val.str.toString(); };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // list expression TODO
 function listExpr(val) {
   this.val = val;
   this.toString = function(){ return "(list "+this.val.toString() + ")"; };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // mtList expression TODO
-function mtListExpr() {};
+function mtListExpr() {
+  this.desugar = function(pinfo){ return this; };
+};
 
 // boolean expression
 function booleanExpr(sym) {
   this.val = (sym.val === "true" || sym.val === "#t");
-  this.toString = function(){
-    return this.val? "#t" : "#f";
-  };
+  this.toString = function(){ return this.val? "#t" : "#f";};
+  this.desugar = function(pinfo){ return this; };
 };
 
 // quoted expression TODO
 function quotedExpr(val) {
   this.val = val;
-  this.toString = function(){
-    return "'"+this.val.toString();
-  };
+  this.toString = function(){ return "'"+this.val.toString(); };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // quasiquoted expression TODO
 function quasiquotedExpr(val) {
   this.val = val;
-  this.toString = function(){
-    return "`"+this.val.toString();
-  };
+  this.toString = function(){ return "`"+this.val.toString(); };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // image expression
@@ -332,17 +410,18 @@ function imageExpr(val, width, height, x, y) {
   this.toString = function(){
     return "["+this.width+"x"+this.height+"image]";
   };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // quasiquoted list expression TODO
 function qqList(val) {
   this.val = val;
-  this.toString = function(){
-    return "`"+this.val.toString();
-  };
+  this.toString = function(){ return "`"+this.val.toString();};
+  this.desugar = function(pinfo){ return this; };
 };
 function qqSplice(val) {
   this.val = val;
+  this.desugar = function(pinfo){ return this; };
 };
 
 var letSlashStarSlashRecBindings = (function (x) {
@@ -372,9 +451,8 @@ function coupleSecond(x) { return x.second; };
 // primop expression
 function primop(val) {
   this.val = val;
-  this.toString = function(){
-    return this.val.toString();
-  };
+  this.toString = function(){ return this.val.toString(); };
+  this.desugar = function(pinfo){ return this; };
 };
 ////////////////////// CHECK-EXPECTS ////////////////////////
 // check-expect TODO
@@ -385,6 +463,7 @@ function chkExpect(actual, expected, sexp) {
   this.toString = function(){
     return "(check-expect "+this.sexp.toString() +" "+this.expected+")";
   };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // check-within TODO
@@ -396,6 +475,7 @@ function chkWithin(actual, expected, range, sexp) {
   this.toString = function(){
     return "(check-within "+this.sexp.toString() +" "+this.expected+")";
   };
+  this.desugar = function(pinfo){ return this; };
 };
 
 // check-error
@@ -406,6 +486,7 @@ function chkError(actual, error, sexp) {
   this.toString = function(){
     return "(check-error "+this.sexp.toString() +" "+this.error+")";
   };
+  this.desugar = function(pinfo){ return this; };
 };
 
 
@@ -414,6 +495,7 @@ function chkError(actual, error, sexp) {
 function req(uri) {
   this.uri = uri;
   this.toString = function(){ return "(require "+this.uri+")"; };
+  this.desugar = function(pinfo){ return this; };
 };
 function reqUri(x) {
   return x.uri;
@@ -445,9 +527,8 @@ var isRequirelanetP = (function (x) {
 ////////////////////////////////// PROVIDE /////////////////////////////
 function provideStatement(val) {
   this.val = val;
-  this.toString = function(){
-    return "(provide "+this.val+")"
-  };
+  this.toString = function(){ return "(provide "+this.val+")" };
+  this.desugar = function(pinfo){ return this; };
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -627,7 +708,6 @@ var parseExprList = function (sexp) {
     isSymbol(sexp) ? makeSymbolExpr(sexp) :
     expectedError(types.symbol("parse-quoted-expr"), "quoted sexp", sexp);
   };
-
   return (function () {
       var peek = first(sexp);
       var expr = not(isSymbol(peek)) ? parseFuncCall(sexp) :
@@ -826,77 +906,17 @@ var sexpGreaterThanString = function (sexp) {
 var expectedError = function (id, expected, actual) {
   return error(id, stringAppend("Expected a ", expected, " but found: ", sexpGreaterThanString(actual)));
 };
- 
-///////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////// DESUGARING /////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////
-// desugarProgram : (listof program) -> (listof program)
-function desugarProgram(program){
- function desugar(p){
-    if(p instanceof defFunc){
-      return makeDefFunc(p.name, p.args, desugar(p.body));
-    } else if(p instanceof defVar) {
-      return makeDefVar(p.name, desugar(p.expr));
-    } else if(p instanceof defStruct){
-      return p;
-    } else if(p instanceof lambdaExpr){
-      return makeLambdaExpr(p.args, desugar(p.body));
-    } else if(p instanceof localExpr){
-      console.log("WARNING: we don't yet desugar local")
-      return p;
-    } else if(p instanceof letrecExpr){
-      function bindingToDefn(b){return makeDefVar(b.first, desugar(b.second));};
-      return makeLocalExpr(p.bindings.map(bindingToDefn), desugar(p.body))
-    } else if(p instanceof letExpr){
-      var ids   = p.bindings.map(coupleFirst),
-          exprs = p.bindings.map(coupleSecond).map(desugar);
-      return makeCall(makeLambdaExpr(ids, desugar(p.body)), exprs);
-    } else if(p instanceof letStarExpr){
-      var ids   = p.bindings.map(coupleFirst),
-          exprs = p.bindings.map(coupleSecond).map(desugar),
-          desugared = desugar(p.body);
-      for(i=p.bindings.length-1; i>-1; i--){
-        desugared = makeLetExpr([makeCouple(ids[i], exprs[i])], desugared);
-      }
-      return desugared;
-     } else if(p instanceof call){
-      return makeCall(desugar(p.func), p.args.map(desugar));
-     } else if(p instanceof condExpr){
-      var desugared = p.clauses[p.clauses.length-1].second;
-      for(i=p.clauses.length-2; i>-1; i--){
-        desugared = makeIfExpr(p.clauses[i].first, p.clauses[i].second, desugared);
-      }
-      return desugared;
-    } else if(p instanceof ifExpr){
-      return makeIfExpr(desugar(p.predicate)
-                      , desugar(p.consequence)
-                      , desugar(p.alternate));
-    } else if(p instanceof beginExpr){
-      return makeBeginExpr(p.exprs.map(desugar));
-    } else if(p instanceof andExpr){
-      var exprs = p.exprs.map(desugar),
-          desugared = exprs[exprs.length-1]; // ASSUME length >=2!!!
-      for(i=exprs.length-2; i>-1; i--){
-        desugared = makeIfExpr(exprs[i], desugared, makeBooleanExpr(types.symbol("false")));
-      }
-      return desugared;
-    } else if(p instanceof orExpr){
-      var exprs = p.exprs.map(desugar),
-          desugared = exprs[exprs.length-1]; // ASSUME length >=2!!!
-      for(i=exprs.length-2; i>-1; i--){
-        desugared = makeIfExpr(exprs[i], makeBooleanExpr(types.symbol("true")), desugared);
-      }
-      return desugared;
-    } else {
-       return p;
-    }
-  }
- return program.map(desugar);
-}
+
+ // desugarAll : Listof SExps -> Listof SExps
+ function desugarAll(programs){
+  var desugared = [];
+  for(var i=0; i<programs.length; i++) desugared.push(programs[i].desugar());
+  return desugared;
+ }
 
 /////////////////////
 /* Export Bindings */
 /////////////////////
-window.desugarProgram = desugarProgram;
-window.parse = parse;
+ window.desugarAll = desugarAll;
+ window.parse = parse;
 })();
