@@ -34,7 +34,7 @@ function charValP(x) { return x instanceof charVal; };
 function charValStr(x) { return x.str; };
 
 function quote(x)    { this.x = x; }
-var isSymbol = types.isSymbol;
+function isSymbol(x) {return x instanceof symbolExpr;}
 function quoteVal(q) { return q.x; }
 quote.prototype.toString = function () {
     return this.x.toString();
@@ -1005,6 +1005,8 @@ function charEqualSignP() {
 // are these all symbols of the same value?
 function isSymbolEqualTo() {
   function proc(x,y){
+    x = (x instanceof symbolExpr)? x.val : x;
+    y = (y instanceof symbolExpr)? y.val : y;
     return x.val === y.val && types.isSymbol(x) && types.isSymbol(y);
   }
   return consecCmp(proc, arguments);
