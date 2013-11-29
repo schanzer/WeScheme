@@ -47,31 +47,6 @@
     // this is returned when a comment is read
     function Comment(txt) {this.txt = txt;}
 
-    // encode the msg and location as a JSON error
-    function throwError(msg, loc) {
-          var json = {"type": "moby-failure"
-                   , "dom-message": ["span"
-                                    ,[["class", "Error"]]
-                                    ,["span", [["class", "Message"]]].concat(msg)
-                                    ,["br", [], ""]
-                                    ,["span"
-                                       , [["class", "Error.location"]]
-                                       , ["span"
-                                          , [["class", "location-reference"]
-                                             , ["style", "display:none"]]
-                                          , ["span", [["class", "location-offset"]], loc.offset]
-                                          , ["span", [["class", "location-line"]], loc.sLine]
-                                          , ["span", [["class", "location-column"]], loc.sCol]
-                                          , ["span", [["class", "location-span"]], loc.span]
-                                          , ["span", [["class", "location-id"]], loc.source]
-                                          ]
-                                       ]
-                                     ]
-                   , "structured-error": '{"message": ["read: expected a ", ")", " to close ", {"type": "ColoredPart", "text": "(", "loc": {"line": "'+loc.sLine+'", "span": "'+loc.span+'", "offset": "'+loc.offset+'", "column": "'+loc.sCol+'", "id": "'+loc.source+'"}}, "", ""], "location": {"line": "'+loc.sLine+'", "span": "'+loc.span+'", "offset": "'+loc.offset+'", "column": "'+loc.sCol+'", "id": "'+loc.source+'"}}'
-                   };
-                   throw JSON.stringify(json);
-    }
-
     // determines if the character is valid as a part of a symbol
     function isValidSymbolCharP(x) {
       return !isDelim(x) && !isWhiteSpace(x)
