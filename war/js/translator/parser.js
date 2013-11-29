@@ -380,7 +380,7 @@ function mtListExpr() {
 
 // boolean expression
 function booleanExpr(sym) {
-  sym = (symb instanceof symbolExpr)? sym.val : sym;
+  sym = (sym instanceof symbolExpr)? sym.val : sym;
   this.val = (sym.val === "true" || sym.val === "#t");
   this.toString = function(){ return this.val? "#t" : "#f";};
   this.desugar = function(pinfo){ return this; };
