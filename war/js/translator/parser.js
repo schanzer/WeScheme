@@ -6,6 +6,71 @@
  - do test cases get desugared?
  */
 
+// consecCmp : (Any Any -> Boolean) [ListOf Any] -> Boolean
+function consecCmp(proc, ls) {
+  var res = true;
+  for(var i=1; i < ls.length; i++) {
+    var x = ls[i-1];
+    var y = ls[i];
+    res = proc(x,y);
+  }
+  
+  return res;
+}
+
+
+function isSymbol(x) {return x instanceof symbolExpr;}
+
+// isSymbolEqualTo : Any ... -> Boolean
+// are these all symbols of the same value?
+function isSymbolEqualTo() {
+  function proc(x,y){
+    x = (x instanceof symbolExpr)? x.val : x;
+    y = (y instanceof symbolExpr)? y.val : y;
+    return x.val === y.val && types.isSymbol(x) && types.isSymbol(y);
+  }
+  return consecCmp(proc, arguments);
+}
+
+// cons : Any [ListOf Any] -> [ListOf Any]
+function cons(x, y) {
+  return [x].concat(y);
+}
+
+// isCons : Any -> Boolean
+// is this a list and can I take the first and rest of it?
+function isCons(x) {
+  return x instanceof Array && x.length>=1;
+}
+
+// emptyP : Any -> Boolean
+// is this the empty list?
+function emptyP(x) {
+  return x instanceof Array && x.length===0;
+}
+
+// first : [ListOf X] -> X
+function first(ls) {
+  return ls[0];
+}
+
+// rest : [ListOf X] -> X
+function rest(ls) {
+  return ls.slice(1);
+}
+
+// second : [ListOf X] -> X
+function second(ls) {
+  return ls[1];
+}
+
+function third(ls)   { return ls[2]; };
+function fourth(ls)  { return ls[3]; };
+function fifth(ls)   { return ls[4]; };
+function sixth(ls)   { return ls[5]; };
+function seventh(ls) { return ls[6]; };
+function eighth(ls)  { return ls[7]; };
+
 
 ////////////////////////////////////// ERROR MESSAGES ////////////////
 
@@ -57,6 +122,9 @@ function throwError(msg, loc) {
 }
 
 //////////////////////////////////// INSTANCE CHECKING WRAPPERS //////////////////////////////
+function isString(x) { return (x instanceof Constant && types.isString(x.val));}
+function isNumber(x) {return (x instanceof Constant && types.isNumber(x.val));}
+var isChar = types.isChar;
 function isDefFunc(x) { return x instanceof defFunc; };
 function isDefVar(x) { return x instanceof defVar; };
 function isDefStruct(x) { return x instanceof defStruct; };
@@ -540,7 +608,7 @@ function provideStatement(val) {
 // parse : sexp -> AST
 var parse = (function (sexp) {
   return emptyP(sexp) ? [] :
-  not(isCons(sexp)) ? error(types.symbol("parse"), "The sexp is not a list of definitions or expressions: ", sexpGreaterThanString(sexp)) :
+  (!isCons(sexp)) ? error(types.symbol("parse"), "The sexp is not a list of definitions or expressions: ", sexpGreaterThanString(sexp)) :
   parseStar(sexp);
 });
 
@@ -554,7 +622,7 @@ var parseStar = function (sexps) {
    isProvide(sexp) ? parseProvide(sexp) :
    error(types.symbol("parse"), "Not a Definition, Expression, Test Case, Library Require, or Provide");
  };
-  return map(parseSExp, sexps);
+  return sexps.map(parseSExp);
 };
 
 
@@ -566,7 +634,7 @@ var isDefinition = function (sexp) {
 // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define-struct'
 var isStructDefinition = function (sexp) {
   return ((isCons(sexp))
-          && (EqualSign(length(sexp), 3))
+          && (sexp.length === 3)
           && (isSymbol(first(sexp)))
           && (isSymbolEqualTo(types.symbol("define-struct"), first(sexp))));
 };
@@ -574,7 +642,7 @@ var isStructDefinition = function (sexp) {
 // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define' and rest is a Cons
 var isFunctionDefinition = function (sexp) {
   return ((isCons(sexp))
-          && (EqualSign(length(sexp), 3))
+          && (sexp.length === 3)
           && (isSymbol(first(sexp)))
           && (isSymbolEqualTo(types.symbol("define"), first(sexp)))
           && (isCons(second(sexp))));
@@ -583,7 +651,7 @@ var isFunctionDefinition = function (sexp) {
 // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define' and rest is NOT a Cons
 var isVariableDefinition = function (sexp) {
   return ((isCons(sexp))
-          && (EqualSign(length(sexp), 3))
+          && (sexp.length === 3)
           && (isSymbol(first(sexp)))
           && (isSymbolEqualTo(types.symbol("define"), first(sexp)))
           && (!(isCons(second(sexp)))));
@@ -592,10 +660,10 @@ var isVariableDefinition = function (sexp) {
 // : parseDefinition : SExp -> AST (definition)
 var parseDefinition = function (sexp) {
   function parseDefStruct(sexp) {
-    return new defStruct(parseIdExpr(second(sexp)), map(parseIdExpr, third(sexp)));
+    return new defStruct(parseIdExpr(second(sexp)), third(sexp).map(parseIdExpr));
   };
   function parseDefFunc(sexp) {
-    return GreaterThan(length(rest(second(sexp))), 0) ? new defFunc(parseIdExpr(first(second(sexp))), map(parseIdExpr, rest(second(sexp))), parseExpr(third(sexp))) :
+    return GreaterThan(length(rest(second(sexp))), 0) ? new defFunc(parseIdExpr(first(second(sexp))), rest(second(sexp)).map(parseIdExpr), parseExpr(third(sexp))) :
         error(types.symbol("parse-def-func"), stringAppend("expected at least one argument name after the", " function name, but found none."));
   };
   function parseDef(sexp) {
@@ -655,7 +723,7 @@ var parseExprList = function (sexp) {
     return isTupleStartingWithOfLength(sexp, types.symbol("time"), 2);
   };
   function parseFuncCall(sexp) {
-    return isCons(sexp)? new call(parseExpr(first(sexp)), map(parseExpr, rest(sexp))) :
+    return isCons(sexp)? new call(parseExpr(first(sexp)), rest(sexp).map(parseExpr)) :
                         expectedError(types.symbol("parse-func-call"), "function call sexp", sexp);
   };
   function parseLambdaExpr(sexp) {
@@ -711,7 +779,7 @@ var parseExprList = function (sexp) {
   };
   return (function () {
       var peek = first(sexp);
-      var expr = not(isSymbol(peek)) ? parseFuncCall(sexp) :
+      var expr = !(isSymbol(peek)) ? parseFuncCall(sexp) :
                   isSymbolEqualTo(types.symbol("lambda"), peek)  ? parseLambdaExpr(sexp) :
                   isSymbolEqualTo(types.symbol("local"), peek)   ? parseLocalExpr(sexp) :
                   isSymbolEqualTo(types.symbol("letrec"), peek)  ? parseLetrecExpr(sexp) :
@@ -807,7 +875,7 @@ var parseIdExpr = function (sexp) {
 };
 
 var isTupleStartingWithOfLength = function (sexp, symbol, n) {
-  return ((isCons(sexp)) && (EqualSign(length(sexp), n)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), symbol)));
+  return ((isCons(sexp)) && (sexp.length === n) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), symbol)));
 };
 
 var isTripleWithFirstEqualTo = function (sexp, symbol) {
@@ -819,7 +887,7 @@ var isQuadWithFirstEqualTo = function (sexp, symbol) {
 };
 
 var sexpIsisCouple = function (sexp) {
-  return ((isCons(sexp)) && (EqualSign(length(sexp), 2)));
+  return ((isCons(sexp)) && ((sexp.length === 2)));
 };
 
 var sexpIsisPrimop = function (sexp) {
@@ -827,7 +895,7 @@ var sexpIsisPrimop = function (sexp) {
 };
 
 var sexpIsCondListP = function (sexp) {
-  return ((isCons(sexp)) && (GreaterThanEqualSign(length(sexp), 2)) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("cond"))));
+  return ((isCons(sexp)) && (sexp.length >= 2) && (isSymbol(first(sexp))) && (isSymbolEqualTo(first(sexp), types.symbol("cond"))));
 };
 
 var isId = function (sexp) {
