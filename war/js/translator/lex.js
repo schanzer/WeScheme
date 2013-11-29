@@ -16,7 +16,7 @@
 */
 (function () {
  'use strict';
- /*global Comment, Constant, Location, charVal, types */
+ /*global Comment, Constant, Location, charVal, types, throwError, imageP, proc */
     /////////////////////
     /*      Data       */
     /////////////////////
@@ -59,9 +59,9 @@
     // determines if they are matching delimiter pairs
     // ie ( and ) [ and ] { and }
     function matchingDelims(x, y) {
-      return x === '(' && y === ')'
-        ||   x === '[' && y === ']'
-        ||   x === '{' && y === '}';
+      return (x === '(' && y === ')')
+        ||   (x === '[' && y === ']')
+        ||   (x === '{' && y === '}');
     }
 
     // gets the matching delim given the other delim in a pair
@@ -104,14 +104,6 @@
         "",
         sexp);
         str = "(" + str.substring(0,str.length-1) + ")";
-      } else if (sexp instanceof proc) {
-        str = "(lambda (";
-        for(var i=1;i<=procArity(sexp); i++) {
-          str += "a" + i + (i===procArity(sexp) ? "" : " ");
-        }
-        str += ") ...)";
-      } else if (sexp instanceof prim) {
-        str = primName(sexp);
       } else if (sexp instanceof types.symbol) {
         str = sexp.val;
       } else if (sexp instanceof types.string) {

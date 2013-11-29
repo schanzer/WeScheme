@@ -6,6 +6,7 @@
  - do test cases get desugared?
  */
 
+
 ////////////////////////////////////// ERROR MESSAGES ////////////////
 
 // the location struct
@@ -104,13 +105,6 @@ var isExpr = function (x) {
 var isTestCase = function (x) {
                      return ((isChkExpect(x)) || (isChkWithin(x)) || (isChkError(x)));
                      };
-
-// Inheritance from pg 168: Javascript, the Definitive Guide.
-var heir = function(p) {
-  var f = function() {};
-  f.prototype = p;
-  return new f();
-};
 
 ///////////////////////////////////////// DEFINITIONS /////////////////////////////////
 // Function definition
@@ -592,7 +586,7 @@ var isVariableDefinition = function (sexp) {
           && (EqualSign(length(sexp), 3))
           && (isSymbol(first(sexp)))
           && (isSymbolEqualTo(types.symbol("define"), first(sexp)))
-          && (not(isCons(second(sexp)))));
+          && (!(isCons(second(sexp)))));
 };
 
 // : parseDefinition : SExp -> AST (definition)
@@ -619,7 +613,7 @@ var parseDefinition = function (sexp) {
 
 //////////////////////////////////////// EXPRESSION PARSING ////////////////////////////////
 var isExpr = function (sexp) {
-  return ((not(isDefinition(sexp))) && (not(isTestCase(sexp))) && (not(isRequire(sexp))) && (not(isProvide(sexp))));
+  return ((!(isDefinition(sexp))) && (!(isTestCase(sexp))) && (!(isRequire(sexp))) && (!(isProvide(sexp))));
 };
 
 var parseExpr = function (sexp) {
@@ -665,25 +659,25 @@ var parseExprList = function (sexp) {
                         expectedError(types.symbol("parse-func-call"), "function call sexp", sexp);
   };
   function parseLambdaExpr(sexp) {
-    return isLambda(sexp) ? GreaterThan(length(second(sexp)), -1) ? new lambdaExpr(map(parseIdExpr, second(sexp)), parseExpr(third(sexp))) :
+    return isLambda(sexp) ? GreaterThan(length(second(sexp)), -1) ? new lambdaExpr(second(sexp).map(parseIdExpr), parseExpr(third(sexp))) :
     error(types.symbol("parse-lambda-expr"), stringAppend("expected at least one argument name in the ", "sequence after `lambda', but found none")) :
     expectedError(types.symbol("parse-lambda-expt"), "lambda function sexp", sexp);
   };
   function parseLocalExpr(sexp) {
-    return isLocal(sexp) ? new localExpr(map(parseDefinition, second(sexp)), parseExpr(third(sexp))) :
+    return isLocal(sexp) ? new localExpr(second(sexp).map(parseDefinition), parseExpr(third(sexp))) :
     expectedError(types.symbol("parse-local-expr"), "local expression sexp", sexp);
   };
   function parseLetrecExpr(sexp) {
-    return isLetrec(sexp) ? new letrecExpr(map(parseLetCouple, second(sexp)), parseExpr(third(sexp))) :
+    return isLetrec(sexp) ? new letrecExpr(second(sexp).map(parseLetCouple), parseExpr(third(sexp))) :
     expectedError(types.symbol("parse-letrec-expr"), "letrec expression sexp", sexp);
   };
 
   function parseLetExpr(sexp) {
-    return isLet(sexp) ? new letExpr(map(parseLetCouple, second(sexp)), parseExpr(third(sexp))) :
+    return isLet(sexp) ? new letExpr(second(sexp).map(parseLetCouple), parseExpr(third(sexp))) :
     expectedError(types.symbol("parse-let-expr"), "let expression sexp", sexp);
   };
   function parseLetStarExpr(sexp) {
-    return isLetStar(sexp) ? new letStarExpr(map(parseLetCouple, second(sexp)), parseExpr(third(sexp))) :
+    return isLetStar(sexp) ? new letStarExpr(second(sexp).map(parseLetCouple), parseExpr(third(sexp))) :
     expectedError(types.symbol("parse-let*-expr"), "let* expression sexp", sexp);
   };
   function parseIfExpr(sexp) {
@@ -691,15 +685,15 @@ var parseExprList = function (sexp) {
     expectedError(types.symbol("parse-if-expr"), "if expression sexp", sexp);
   };
   function parseBeginExpr(sexp) {
-    return isBegin(sexp) ? new beginExpr(map(parseExpr, rest(sexp))) :
+    return isBegin(sexp) ? new beginExpr(rest(sexp).map(parseExpr)) :
     expectedError(types.symbol("parse-begin-expr"), "begin expression sexp", sexp);
   };
   function parseAndExpr(sexp) {
-    return isAnd(sexp) ? new andExpr(map(parseExpr, rest(sexp))) :
+    return isAnd(sexp) ? new andExpr(rest(sexp).map(parseExpr)) :
     expectedError(types.symbol("parse-and-expr"), "and expression sexp", sexp);
   };
   function parseOrExpr(sexp) {
-    return isOr(sexp) ? new orExpr(map(parseExpr, rest(sexp))) :
+    return isOr(sexp) ? new orExpr(rest(sexp).map(parseExpr)) :
     expectedError(types.symbol("parse-or-expr"), "or expression sexp", sexp);
   };
   function parseTimeExpr(sexp) {
@@ -740,7 +734,7 @@ var parseExprList = function (sexp) {
 var parseCondExpr = function (sexp) {
  if(sexpIsCondListP(sexp)){
     return new condExpr(rest(sexp).reduceRight((function (rst, couple) {
-                               if((isSymbol(first(couple))) && (isSymbolEqualTo(first(couple), types.symbol("else"))) && (not(emptyP(rst)))){
+                               if((isSymbol(first(couple))) && (isSymbolEqualTo(first(couple), types.symbol("else"))) && (!(emptyP(rst)))){
                                return error(types.symbol("parse-cond-expr"),
                                             stringAppend("found an `else' clause", " that isn't the last", " clause in its `cond'", " expression"));
                                } else {
@@ -781,12 +775,12 @@ var parseQqList = function (sexp, inlist) {
   return isSymbol(first(sexp)) ? isSymbolEqualTo(first(sexp), types.symbol("unquote")) ? parseExpr(second(sexp)) :
   isSymbolEqualTo(first(sexp), types.symbol("unquote-splicing")) ? inlist ? new qqSplice(parseExpr(second(sexp))) :
   error(types.symbol("unquote-splicing"), "misuse of ,@ or `unquote-splicing' within a quasiquoting backquote") :
-  new qqList(map((function (x) {
+  new qqList(sexp.map((function (x) {
   return parseQuasiQuotedExpr(x, true);
-}), sexp)) :
-  new qqList(map((function (x) {
+}))) :
+  new qqList(sexp.map((function (x) {
                   return parseQuasiQuotedExpr(x, true);
-                  }), sexp));
+                  })));
 };
 
 var parseExprSingleton = function (sexp) {
