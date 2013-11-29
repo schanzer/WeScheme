@@ -705,13 +705,13 @@ var parseExprList = function (sexp) {
     expectedError(types.symbol("parse-time-expr"), "time expression sexp", sexp);
   };
   function parseQuotedExpr(sexp) {
-    return emptyP(sexp) ?   new call(new primop(types.symbol("list")), []) :
-          isCons(sexp) ?    new call(new primop(types.symbol("list")), map(parseQuotedExpr, sexp)) :
-          isNumber(sexp) ?  new numberExpr(sexp) :
-          isString(sexp) ?  new stringExpr(sexp) :
-          isChar(sexp) ?    new charExpr(string(sexp.val.str)) :
-          isSymbol(sexp) ?  new symbolExpr(sexp) :
-    expectedError(types.symbol("parse-quoted-expr"), "quoted sexp", sexp);
+    return new quotedExpr(emptyP(sexp) ?   new call(new primop(types.symbol("list")), []) :
+                          isCons(sexp) ?    new call(new primop(types.symbol("list")), map(parseQuotedExpr, sexp)) :
+                          isNumber(sexp) ?  new numberExpr(sexp) :
+                          isString(sexp) ?  new stringExpr(sexp) :
+                          isChar(sexp) ?    new charExpr(sexp.val) :
+                          isSymbol(sexp) ?  new symbolExpr(sexp) :
+                          expectedError(types.symbol("parse-quoted-expr"), "quoted sexp", sexp));
   };
   return (function () {
       var peek = first(sexp);
@@ -770,7 +770,7 @@ var parseQuasiQuotedExpr = function (sexp, inlist) {
   isCons(sexp) ? parseQqList(sexp, inlist) :
   isNumber(sexp) ? new numberExpr(sexp) :
   isString(sexp) ? new stringExpr(sexp) :
-  isChar(sexp) ? new charExpr(string(sexp.val.str)) :
+  isChar(sexp) ? new charExpr(sexp.val) :
   isSymbol(sexp) ? new symbolExpr(sexp) :
   expectedError(types.symbol("parse-quoted-expr"), "quoted sexp", sexp);
 };
@@ -792,12 +792,13 @@ var parseExprSingleton = function (sexp) {
     return new imageExpr(encodeImage(img), imageWidth(img), imageHeight(img), pinholeX(img), pinholeY(img));
   };
   var singleton = isString(sexp) ? new stringExpr(sexp) :
-    isNumber(sexp) ? new numberExpr(sexp) :
-    isChar(sexp) ? new charExpr(sexp.val.str) :
-    ((isSymbolEqualTo(types.symbol("true"), sexp)) || (isSymbolEqualTo(types.symbol("false"), sexp))) ? new booleanExpr(sexp) :
-    isSymbolEqualTo(types.symbol("empty"), sexp) ? new call(new primop(types.symbol("list")), []) :
-    isSymbol(sexp) ? sexpIsisPrimop(sexp) ? new primop(sexp) : sexp :
-    imageP(sexp) ? parseImage(sexp) :
+                  isNumber(sexp) ? new numberExpr(sexp) :
+                  isSymbolEqualTo(types.symbol("quote"), sexp) ? new quotedExpr(sexp) :
+                  isChar(sexp) ? new charExpr(sexp.val) :
+                  ((isSymbolEqualTo(types.symbol("true"), sexp)) || (isSymbolEqualTo(types.symbol("false"), sexp))) ? new booleanExpr(sexp) :
+                  isSymbolEqualTo(types.symbol("empty"), sexp) ? new call(new primop(types.symbol("list")), []) :
+                  isSymbol(sexp) ? sexpIsisPrimop(sexp) ? new primop(sexp) : sexp :
+                  imageP(sexp) ? parseImage(sexp) :
     error(types.symbol("parse-expr-singleton"), stringAppend("( ): ", sexpGreaterThanString(sexp), "expected a function, but nothing's there"));
  singleton.location = sexp.location;
  return singleton;

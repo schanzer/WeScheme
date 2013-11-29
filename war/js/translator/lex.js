@@ -12,6 +12,7 @@
 /* TODO
 - JSLint
 - fix out-of-order rightDelim
+- fix #\f
 */
 (function () {
  'use strict';
@@ -116,7 +117,7 @@
       } else if (sexp instanceof types.string) {
         str = '"' + sexp + '"';
       } else if (sexp instanceof Char) {
-        str = sexp.val.str;
+        str = sexp.toString();
       } else if (imageP(sexp)) {
         if(sexp instanceof imgVal) {
           str = '#(struct:object:image-snip% ... ...)';
@@ -343,7 +344,6 @@
     //               console.log("readChar: i is "+i);
       var sCol = column, sLine = line, iStart = i;
       i+=2;  column+=2; // skip over the #\\
-
       var datum = "";
       while(i < str.length && !isDelim(str.charAt(i)) && !isWhiteSpace(str.charAt(i))) {
         // check for newlines
@@ -352,16 +352,16 @@
         datum += str.charAt(i++);
         column++;
       }
-      datum = datum === 'nul' || datum === 'null' ? new charVal('\u0000') :
-                          datum === 'backspace' ? new charVal('\b') :
-                          datum === 'tab'       ? new charVal('\t') :
-                          datum === 'newline'   ? new charVal('\n') :
-                          datum === 'vtab'      ? new charVal('\u000B') :
-                          datum === 'page'      ? new charVal('\u000C') :
-                          datum === 'return'    ? new charVal('\r') :
-                          datum === 'space'     ? new charVal('\u0020') :
-                          datum === 'rubout'    ? new charVal('\u007F') :
-                          datum.length === 1   ? new charVal(datum) :
+      datum = datum === 'nul' || datum === 'null' ? '\u0000' :
+                          datum === 'backspace' ? '\b' :
+                          datum === 'tab'       ? '\t' :
+                          datum === 'newline'   ? '\n' :
+                          datum === 'vtab'      ? '\u000B' :
+                          datum === 'page'      ? '\u000C' :
+                          datum === 'return'    ? '\r' :
+                          datum === 'space'     ? '\u0020' :
+                          datum === 'rubout'    ? '\u007F' :
+                          datum.length === 1   ? datum :
                             throwError(new types.Message(["read: Unsupported character: #\\",datum]),
                                        new Location(sCol, sLine, iStart, i-iStart));
       var chr = new types.char(datum);
@@ -448,7 +448,7 @@
         }
       }
       var sexp = readSExpByIndex(str, i+1);
-      var quotedSexp = [symbol, sexp];
+      var quotedSexp = [new symbolExpr(symbol), sexp];
       quotedSexp.location = sexp.location;
       return quotedSexp;
     }
