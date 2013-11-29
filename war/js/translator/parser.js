@@ -53,9 +53,7 @@ function throwError(msg, loc) {
   console.log(json);
   throw JSON.stringify(json);
 }
-/// Constructor Wrappers we should do without
-function makeDefStruct(name, fields){return new defStruct(name, fields)}
-function makeCouple(first, second){return new couple(first, second);}
+
 //////////////////////////////////// INSTANCE CHECKING WRAPPERS //////////////////////////////
 function isDefFunc(x) { return x instanceof defFunc; };
 function isDefVar(x) { return x instanceof defVar; };
@@ -739,7 +737,7 @@ var parseCondExpr = function (sexp) {
 
 var parseCondCouple = function (sexp) {
  if(sexpIsisCouple(sexp)){
-    var couple = makeCouple(parseExpr(first(sexp)), parseExpr(second(sexp)));
+    var couple = new couple(parseExpr(first(sexp)), parseExpr(second(sexp)));
     couple.location = sexp.location;
     return couple;
  } else {
@@ -748,7 +746,7 @@ var parseCondCouple = function (sexp) {
 };
 
 var parseLetCouple = function (sexp) {
-  return sexpIsisCouple(sexp) ? makeCouple(parseIdExpr(first(sexp)), parseExpr(second(sexp))) :
+  return sexpIsisCouple(sexp) ? new couple(parseIdExpr(first(sexp)), parseExpr(second(sexp))) :
   expectedError(types.symbol("parse-let-couple"), "couple of an id and an expression sexp", sexp);
 };
 
