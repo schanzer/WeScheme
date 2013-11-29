@@ -1,8 +1,9 @@
 /* TODO
  - JSLint
- - desugaring of structs and local, proper handling of 'else' in cond
+ - desugaring of structs, require, provide and local. proper handling of 'else' in cond
  - preserve location information during desugaring
  - add error messages to desugaring phase for eeeeeeeverything
+ - do test cases get desugared?
  */
 
 ////////////////////////////////////// ERROR MESSAGES ////////////////
@@ -88,7 +89,7 @@ function isChkWithin(x) { return x instanceof chkWithin; };
 function isChkError(x) { return x instanceof chkError; };
 function isReq(x) { return x instanceof req; };
 function isProvideStatement(x) { return x instanceof provideStatement; };
-var isRequire = isReq
+var isRequire = isReq;
 var isProvide = isProvideStatement;
 // a definition is a function, variable or struct
 var isDefinition = function (x) {
@@ -248,8 +249,6 @@ function letStarExpr(bindings, body) {
     var ids   = this.bindings.map(coupleFirst),
         exprs = desugarAll(this.bindings.map(coupleSecond)),
         desugared = this.body.desugar();
-    console.log(exprs);
-
     for(var i=0; i<this.bindings.length; i++){
       desugared = new letExpr([new couple(ids[i], exprs[i])], desugared);
     }
@@ -362,7 +361,7 @@ function charExpr(val) {
   this.desugar = function(pinfo){ return this; };
 };
 
-// list expression TODO
+// list expression
 function listExpr(val) {
   this.val = val;
   this.toString = function(){ return "(list "+this.val.toString() + ")"; };
@@ -433,8 +432,9 @@ var letSlashStarSlashRecBody = (function (x) {
                                     isLetStarExpr(x) ? x.body :
                                     err("cond", "all questions false");
                                     });
-// couples...used for cond branches??
+// couples = pair
 function couple(first, second) {
+  console.log('made couple');
   this.first = first;
   this.second = second;
   this.toString = function(){
@@ -450,6 +450,14 @@ function primop(val) {
   this.toString = function(){ return this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
 };
+
+// desugarAll : Listof SExps -> Listof SExps
+function desugarAll(programs){
+  var desugared = [];
+  for(var i=0; i<programs.length; i++) desugared.push(programs[i].desugar());
+  return desugared;
+}
+
 ////////////////////// CHECK-EXPECTS ////////////////////////
 // check-expect TODO
 function chkExpect(actual, expected, sexp) {
@@ -728,18 +736,25 @@ var parseExprList = function (sexp) {
 };
 
 var parseCondExpr = function (sexp) {
-  return sexpIsCondListP(sexp) ? new condExpr(foldr((function (couple, rst) {
-  return ((isSymbol(first(couple))) && (isSymbolEqualTo(first(couple), types.symbol("else"))) && (not(emptyP(rst)))) ? error(types.symbol("parse-cond-expr"), stringAppend("found an `else' clause", " that isn't the last", " clause in its `cond'", " expression")) :
-  cons(parseCondCouple(couple), rst);
-}), [], rest(sexp))) :
+ if(sexpIsCondListP(sexp)){
+    return new condExpr(rest(sexp).reduceRight((function (rst, couple) {
+                               if((isSymbol(first(couple))) && (isSymbolEqualTo(first(couple), types.symbol("else"))) && (not(emptyP(rst)))){
+                               return error(types.symbol("parse-cond-expr"),
+                                            stringAppend("found an `else' clause", " that isn't the last", " clause in its `cond'", " expression"));
+                               } else {
+                                 return cons(parseCondCouple(couple), rst);
+                               }
+                               }), []));
+ } else {
   expectedError(types.symbol("parse-cond-expr"), "cond expression sexp", sexp);
+ }
 };
 
 var parseCondCouple = function (sexp) {
  if(sexpIsisCouple(sexp)){
-    var couple = new couple(parseExpr(first(sexp)), parseExpr(second(sexp)));
-    couple.location = sexp.location;
-    return couple;
+    var cpl = new couple(parseExpr(first(sexp)), parseExpr(second(sexp)));
+    cpl.location = sexp.location;
+    return cpl;
  } else {
     return expectedError(types.symbol("parse-cond-couple"), "couple of expressions sexp", sexp);
  }
@@ -809,7 +824,6 @@ var isQuadWithFirstEqualTo = function (sexp, symbol) {
 var sexpIsisCouple = function (sexp) {
   return ((isCons(sexp)) && (EqualSign(length(sexp), 2)));
 };
-
 
 var sexpIsisPrimop = function (sexp) {
      return primitive.getPrimitive(sexp);
@@ -908,13 +922,6 @@ var sexpGreaterThanString = function (sexp) {
 var expectedError = function (id, expected, actual) {
   return error(id, stringAppend("Expected a ", expected, " but found: ", sexpGreaterThanString(actual)));
 };
-
- // desugarAll : Listof SExps -> Listof SExps
- function desugarAll(programs){
-  var desugared = [];
- for(var i=0; i<programs.length; i++) desugared.push(programs[i].desugar());
-  return desugared;
- }
 
 /////////////////////
 /* Export Bindings */
