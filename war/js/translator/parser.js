@@ -207,7 +207,7 @@ function localExpr(defs, body) {
   };
   this.desugar = function(pinfo){
     console.log("desugaring local is not yet implemented");
-    return this;
+    return new localExpr(desugarAll(this.defs), this.body.desugar());
   };
 };
 
@@ -277,7 +277,9 @@ function condExpr(clauses) {
   this.desugar = function(pinfo){
     var desugared = this.clauses[this.clauses.length-1].second;
     for(var i=this.clauses.length-2; i>-1; i--){
-      desugared = new ifExpr(this.clauses[i].first, this.clauses[i].second, desugared);
+      desugared = new ifExpr(this.clauses[i].first.desugar(),
+                             this.clauses[i].second.desugar(),
+                             desugared);
     }
     return desugared;
   };
