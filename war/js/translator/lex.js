@@ -11,6 +11,7 @@
 
 /* TODO
 - JSLint
+- fix out-of-order rightDelim
 */
 (function () {
  'use strict';
@@ -70,7 +71,7 @@
               x === ')' ? '(' :
               x === ']' ? '[' :
               x === '}' ? '{' :
-    /* else */ throwError(["otherDelim: Unknown delimiter: ", x]);
+    /* else */ throwError(new types.Message(["otherDelim: Unknown delimiter: ", x]));
     }
 
     // reads through whitespace
@@ -96,7 +97,7 @@
       }
       var str;
       if(sexp instanceof Array) {
-        str = foldl(function(x, xs) {
+        str = sexp.reduce(function(x, xs) {
           return xs + sexpToString(x) + " ";
         },
         "",
@@ -198,8 +199,8 @@
       i = chewWhiteSpace(str, i);
 
       if(i >= str.length) {
-        throwError(["Unexpected EOF while reading a SExp"]
-                   ,new Location(sCol, sLine, iStart, i-iStart));
+        throwError(new types.Message(["Unexpected EOF while reading a SExp"]
+                                 ,new Location(sCol, sLine, iStart, i-iStart)));
       }
       var sexp = res.leftListDelims.test(p) ? readList(str, i) :
                  p === '"'                  ? readString(str, i) :
@@ -213,7 +214,7 @@
     // readList : String Number -> SExp
     // reads a list encoded in this string with the left delimiter at index i
     function readList(str, i) {
-                   console.log("readList");
+//                   console.log("readList");
       var sCol = column, sLine = line, iStart = i;
       var openingDelim = str.charAt(i++);
       column++; // count the openingDelim
@@ -235,23 +236,23 @@
       }
 
       if(i >= str.length) {
-         var msg = ["read: expected a ",
-                    otherDelim(openingDelim),
-                    " to close ",
-                    new types.ColoredPart(openingDelim.toString(),
-                                          new Location(sCol, sLine, iStart, i-iStart))
-                    ];
+         var msg = new types.Message(["read: expected a ",
+                                  otherDelim(openingDelim),
+                                  " to close ",
+                                  new types.ColoredPart(openingDelim.toString(),
+                                                        new Location(sCol, sLine, iStart, i-iStart))
+                                  ]);
          throwError(msg, new Location(sCol, sLine, iStart, i-iStart));
       }
       if(!matchingDelims(openingDelim, str.charAt(i))) {
-         var msg = ["read: expected a ", otherDelim(openingDelim),
-                    " to close ",
-                    new types.ColoredPart(openingDelim.toString(),
-                                          new Location(sCol, sLine, iStart, 1)),
-                    " but found a ",
-                    new types.ColoredPart(str.charAt(i).toString(),
-                                          new Location(column, line, i, 1))
-                    ];
+         var msg = new types.Message(["read: expected a ", otherDelim(openingDelim),
+                                  " to close ",
+                                  new types.ColoredPart(openingDelim.toString(),
+                                                        new Location(sCol, sLine, iStart, 1)),
+                                  " but found a ",
+                                  new types.ColoredPart(str.charAt(i).toString(),
+                                                        new Location(column, line, i, 1))
+                                  ]);
          throwError(msg, new Location(sCol, sLine, iStart, 1));
       }
       // add 1 to span to count the closing delimeter
@@ -289,16 +290,15 @@
           chr === '"'  ? '"' :
           chr === "'"  ? "'" :
           chr === '\\' ? '\\' :
-          throwError(["Escape sequence not supported:", ", \\", chr],
+          throwError(new types.Message(["Escape sequence not supported:", ", \\", chr]),
                       new Location(sCol, sLine, iStart, i-iStart));
         }
         datum += chr;
       }
 
       if(i >= str.length) {
-        throwError("read: expected a closing \'\"\' "
-                   + new Location(sCol, sLine, iStart, i-iStart)
-                   + " ended with " + chr);
+        throwError(new types.Message(["read: expected a closing \'\"\' ", " ended with " + chr])
+                   , new Location(sCol, sLine, iStart, i-iStart));
       }
       var strng = types.string(datum);
       return new Constant(strng, new Location(sCol, sLine, iStart, i+1-iStart));
@@ -326,11 +326,11 @@
                      i+= datum.location.span; break;
           case ';':  datum = readSExpComment(str, i+1);
                      i+= datum.location.span+1; break;
-          default: throwError(["Unknown pound-prefixed sexp: #", p],
+          default: throwError(new types.Message(["Unknown pound-prefixed sexp: #", p]),
                               new Location(sCol, sLine, iStart, i-iStart));
          }
       } else {
-        throwError(["read: Unexpected EOF when reading a pound-prefixed sexp: #", datum],
+        throwError(new types.Message(["read: Unexpected EOF when reading a pound-prefixed sexp: #", datum]),
                    new Location(sCol, sLine, iStart, i-iStart));
       }
       datum.location = new Location(sCol, sLine, iStart, i-iStart);
@@ -362,7 +362,7 @@
                           datum === 'space'     ? new charVal('\u0020') :
                           datum === 'rubout'    ? new charVal('\u007F') :
                           datum.length === 1   ? new charVal(datum) :
-                            throwError(["read: Unsupported character: #\\",datum],
+                            throwError(new types.Message(["read: Unsupported character: #\\",datum]),
                                        new Location(sCol, sLine, iStart, i-iStart));
       var chr = new types.char(datum);
       chr.location = new Location(sCol, sLine, iStart, i-iStart);
@@ -383,7 +383,7 @@
         i++; column++;
       }
       if(i+1 >= str.length) {
-        throwError(["read: Unexpected EOF when reading a multiline comment"]
+        throwError(new types.Message(["read: Unexpected EOF when reading a multiline comment"])
                    ,new Location(sCol, sLine, iStart, i-iStart));
       }
       var atom = new Comment(txt);
@@ -417,7 +417,7 @@
         i++;
       }
       if(i > str.length) {
-        throwError(["read: Unexpected EOF when reading a line comment"],
+        throwError(new types.Message(["read: Unexpected EOF when reading a line comment"]),
                    new Location(sCol, sLine, iStart, i-iStart));
       }
       var atom = new Comment(txt);
@@ -438,7 +438,7 @@
                    "";
       if(p === ',') {
         if(i+1 >= str.length) {
-          throwError(["read: Unexpected EOF when reading a quoted expression"]
+          throwError(new types.Message(["read: Unexpected EOF when reading a quoted expression"])
                      ,new Location(sCol, sLine, iStart, i-iStart));
         }
         if(str.charAt(i+1) === '#') {
@@ -501,7 +501,7 @@
 
       if(i >= str.length) {
         if(datum === "") {
-          throwError(["read: Unexpected EOF while reading a symbol"]
+          throwError(new types.Message(["read: Unexpected EOF while reading a symbol"])
                      ,new Location(sCol, sLine, iStart, i-iStart));
         } else {
           symbl = new symbolExpr(types.symbol(datum));
@@ -532,7 +532,7 @@
       }
 
       if(i >= str.length) {
-        throwError(["Unexpected EOF while reading a verbatim symbol: ", datum]
+        throwError(new types.Message(["Unexpected EOF while reading a verbatim symbol: ", datum])
                    ,new Location(sCol, sLine, iStart, i-iStart));
       }
 

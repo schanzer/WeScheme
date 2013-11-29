@@ -27,10 +27,13 @@ var Constant = function(val, loc){
 
 // encode the msg and location as a JSON error
 function throwError(msg, loc) {
+  loc.source = loc.source || "definitions"; // FIXME -- we should have the source populated
+  
   var json = {"type": "moby-failure"
     , "dom-message": ["span"
                       ,[["class", "Error"]]
-                      ,["span", [["class", "Message"]]].concat(msg)
+                      ,["span"
+                        , [["class", "Message"]].concat(msg)]
                       ,["br", [], ""]
                       ,["span"
                         , [["class", "Error.location"]]
@@ -38,56 +41,21 @@ function throwError(msg, loc) {
                            , [["class", "location-reference"]
                               , ["style", "display:none"]]
                            , ["span", [["class", "location-offset"]], loc.offset]
-                           , ["span", [["class", "location-line"]], loc.sLine]
+                           , ["span", [["class", "location-line"]]  , loc.sLine]
                            , ["span", [["class", "location-column"]], loc.sCol]
-                           , ["span", [["class", "location-span"]], loc.span]
-                           , ["span", [["class", "location-id"]], loc.source]
+                           , ["span", [["class", "location-span"]]  , loc.span]
+                           , ["span", [["class", "location-id"]]    , loc.source]
                            ]
                         ]
                       ]
-    , "structured-error": '{"message": ["read: expected a ", ")", " to close ", {"type": "ColoredPart", "text": "(", "loc": {"line": "'+loc.sLine+'", "span": "'+loc.span+'", "offset": "'+loc.offset+'", "column": "'+loc.sCol+'", "id": "'+loc.source+'"}}, "", ""], "location": {"line": "'+loc.sLine+'", "span": "'+loc.span+'", "offset": "'+loc.offset+'", "column": "'+loc.sCol+'", "id": "'+loc.source+'"}}'
+    , "structured-error": '{"message": "'+msg+'", "location": {"line": "'+loc.sLine+'", "span": "'+loc.span+'", "offset": "'+loc.offset+'", "column": "'+loc.sCol+'", "id": "'+loc.source+'"}}'
   };
+  console.log(json);
   throw JSON.stringify(json);
 }
-
-
-///////////////////////////////////////// Constructor Wrappers ////////////////////////
-function makeDefFunc(name, args, body) { return new defFunc(name, args, body); };
-function makeDefVar(name, expr) { return new defVar(name, expr); };
-function makeDefStruct(name, fields) { return new defStruct(name, fields); };
-function makeLambdaExpr(args, body) { return new lambdaExpr(args, body); };
-function makeLocalExpr(defs, body) { return new localExpr(defs, body); };
-function makeLetrecExpr(bindings, body) { return new letrecExpr(bindings, body); };
-function makeLetExpr(bindings, body) { return new letExpr(bindings, body); };
-function makeLetStarExpr(bindings, body) { return new letStarExpr(bindings, body); };
-function makeCall(func, args) { return new call(func, args); };
-function makeCondExpr(clauses) { return new condExpr(clauses); };
-function makeIfExpr(predicate, consequence, alternative) { return new ifExpr(predicate, consequence, alternative); };
-function makeBeginExpr(exprs) { return new beginExpr(exprs); };
-function makeAndExpr(exprs) { return new andExpr(exprs); };
-function makeOrExpr(exprs) { return new orExpr(exprs); };
-function makeTimeExpr(val) { return new timeExpr(val); };
-function makeSymbolExpr(val) { return new symbolExpr(val); };
-function makeNumberExpr(val) { return new numberExpr(val); };
-function makeStringExpr(val) { return new stringExpr(val); };
-function makeCharExpr(chr) { return new charExpr(chr.val); };
-function makeListExpr(val) { return new listExpr(val); };
-function makeMtListExpr() { return new mtListExpr(); };
-function makeBooleanExpr(val) { return new booleanExpr(val); };
-function makeQuotedExpr(val) { return types.symbolExpr(val); };
-function makeQuasiquotedExpr(val) { return new quasiquotedExpr(val); };
-function makeImageExpr(val, width, height, x, y) { return new imageExpr(val, width, height, x, y); };
-function makeQqList(val) { return new qqList(val); };
-function makeQqSplice(val) { return new qqSplice(val); };
-function makeCouple(first, second) { return new couple(first, second); };
-//function makePrimop(sym) { return primitive.getPrimitive(sym); };
-function makePrimop(sym) { return new primop(sym.val); };
-function makeChkExpect(actual, expected, sexp) { return new chkExpect(actual, expected, sexp); };
-function makeChkWithin(actual, expected, range, sexp) { return new chkWithin(actual, expected, range, sexp); };
-function makeChkError(actual, error, sexp) { return new chkError(actual, error, sexp); };
-function makeReq(uri) { return new req(uri); };
-function makeProvideStatement(val) { return new provideStatement(val); };
-
+/// Constructor Wrappers we should do without
+function makeDefStruct(name, fields){return new defStruct(name, fields)}
+function makeCouple(first, second){return new couple(first, second);}
 //////////////////////////////////// INSTANCE CHECKING WRAPPERS //////////////////////////////
 function isDefFunc(x) { return x instanceof defFunc; };
 function isDefVar(x) { return x instanceof defVar; };
@@ -155,7 +123,7 @@ function defFunc(name, args, body) {
     return "(define ("+this.name.toString()+" "+this.args.join(" ")+")\n    "+this.body.toString()+")";
   };
   this.desugar = function(pinfo){
-    return makeDefFunc(this.name, this.args, this.body.desugar());
+    return new defFunc(this.name, this.args, this.body.desugar());
   };
 };
 
@@ -168,7 +136,7 @@ function defVar(name, expr) {
     return "(define "+this.name.toString()+" "+this.expr.toString()+")";
   };
   this.desugar = function(pinfo){
-    return makeDefVar(this.name, this.expr.desugar());
+    return new defVar(this.name, this.expr.desugar());
   };
 };
 
@@ -181,6 +149,7 @@ function defVars(names, expr) {
     return "(define ("+this.names.join(" ")+") "+this.expr.toString()+")";
   };
   this.desugar = function(pinfo){
+    console.log("desugaring defVars is not yet implemented");
     return this;
   };
 };
@@ -193,6 +162,7 @@ function defStruct(name, fields) {
     return "(define-struct "+this.name.toString()+" ("+this.fields.toString()+"))";
   };
   this.desugar = function(pinfo){
+    console.log("desugaring defStruct is not yet implemented");
     return this;
   };
 };
@@ -212,7 +182,7 @@ function beginExpr(exprs) {
     return "(begin "+this.exprs.join(" ")+")";
   };
   this.desugar = function(pinfo){
-    return makeBeginExpr(desugarAll(this.exprs.map));
+    return new beginExpr(desugarAll(this.exprs));
   };
 };
 
@@ -225,7 +195,7 @@ function lambdaExpr(args, body) {
     return "(lambda ("+this.args.join(" ")+") ("+this.body.toString()+"))";
   };
   this.desugar = function(pinfo){
-    return makeLambdaExpr(this.args, this.body.desugar());
+    return new lambdaExpr(this.args, this.body.desugar());
   };
 };
 
@@ -237,7 +207,7 @@ function localExpr(defs, body) {
     return "(local ("+this.defs.toString()+") ("+this.body.toString()+"))";
   };
   this.desugar = function(pinfo){
-    console.log("WARNING: we don't yet desugar local");
+    console.log("desugaring local is not yet implemented");
     return this;
   };
 };
@@ -250,8 +220,8 @@ function letrecExpr(bindings, body) {
     return "(letrec ("+this.bindings.toString()+") ("+this.body.toString()+"))";
   };
   this.desugar = function(pinfo){
-    function bindingToDefn(b){return makeDefVar(b.first, b.second.desugar());};
-    return makeLocalExpr(this.bindings.map(bindingToDefn), this.body.desugar());
+    function bindingToDefn(b){return new defVar(b.first, b.second.desugar());};
+    return new localExpr(this.bindings.map(bindingToDefn), this.body.desugar());
   };
 };
 
@@ -265,7 +235,7 @@ function letExpr(bindings, body) {
   this.desugar = function(pinfo){
     var ids   = this.bindings.map(coupleFirst),
         exprs = desugarAll(this.bindings.map(coupleSecond));
-    return makeCall(makeLambdaExpr(ids, this.body.desugar()), exprs);
+    return new call(new lambdaExpr(ids, this.body.desugar()), exprs);
   };
 };
 
@@ -279,9 +249,11 @@ function letStarExpr(bindings, body) {
   this.desugar = function(pinfo){
     var ids   = this.bindings.map(coupleFirst),
         exprs = desugarAll(this.bindings.map(coupleSecond)),
-    desugared = this.body.desugar();
-    for(var b in this.bindings){
-      desugared = makeLetExpr([makeCouple(ids[i], exprs[i])], desugared);
+        desugared = this.body.desugar();
+    console.log(exprs);
+
+    for(var i=0; i<this.bindings.length; i++){
+      desugared = new letExpr([new couple(ids[i], exprs[i])], desugared);
     }
     return desugared;
   };
@@ -295,7 +267,7 @@ function call(func, args) {
     return "("+this.func.toString()+" "+this.args.join(" ")+")";
   };
   this.desugar = function(pinfo){
-    return makeCall(this.func.desugar(), desugarAll(this.args));
+    return new call(this.func.desugar(), desugarAll(this.args));
   };
 };
 
@@ -307,8 +279,8 @@ function condExpr(clauses) {
   };
   this.desugar = function(pinfo){
     var desugared = this.clauses[this.clauses.length-1].second;
-    for(i=this.clauses.length-2; i>-1; i--){
-      desugared = makeIfExpr(this.clauses[i].first, this.clauses[i].second, desugared);
+    for(var i=this.clauses.length-2; i>-1; i--){
+      desugared = new ifExpr(this.clauses[i].first, this.clauses[i].second, desugared);
     }
     return desugared;
   };
@@ -323,9 +295,9 @@ function ifExpr(predicate, consequence, alternative) {
     return "(if "+this.predicate.toString()+" "+this.consequence.toString()+" "+this.alternative.toString()+")";
   };
   this.desugar = function(pinfo){
-    return makeIfExpr(this.predicate.desugar()
+    return new ifExpr(this.predicate.desugar()
                     ,this.consequence.desugar()
-                    ,this.alternate.desugar());
+                    ,this.alternative.desugar());
   };
 };
 
@@ -337,7 +309,7 @@ function andExpr(exprs) {
     var exprs = desugarAll(this.exprs),
     desugared = exprs[exprs.length-1]; // ASSUME length >=2!!!
     for(i=exprs.length-2; i>-1; i--){
-      desugared = makeIfExpr(exprs[i], desugared, makeBooleanExpr(types.symbol("false")));
+      desugared = new ifExpr(exprs[i], desugared, new booleanExpr(types.symbol("false")));
     }
     return desugared;
   };
@@ -351,7 +323,7 @@ function orExpr(exprs) {
     var exprs = desugarAll(this.exprs),
     desugared = exprs[exprs.length-1]; // ASSUME length >=2!!!
     for(i=exprs.length-2; i>-1; i--){
-      desugared = makeIfExpr(exprs[i], makeBooleanExpr(types.symbol("true")), desugared);
+      desugared = new ifExpr(exprs[i], new booleanExpr(types.symbol("true")), desugared);
     }
     return desugared;
   };
@@ -388,7 +360,7 @@ function stringExpr(val) {
 // char expression
 function charExpr(val) {
   this.val = val;
-  this.toString = function(){ return "#\\"+this.val.str.toString(); };
+  this.toString = function(){ return "#\\"+this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
 };
 
@@ -468,7 +440,7 @@ function couple(first, second) {
   this.first = first;
   this.second = second;
   this.toString = function(){
-    return "["+this.first.toString() +" "+this.second.toString()+"]";
+    return "("+this.first.toString() +" "+this.second.toString()+")";
   };
 };
 function coupleFirst(x) { return x.first; };
@@ -618,14 +590,14 @@ var isVariableDefinition = function (sexp) {
 // : parseDefinition : SExp -> AST (definition)
 var parseDefinition = function (sexp) {
   function parseDefStruct(sexp) {
-    return makeDefStruct(parseIdExpr(second(sexp)), map(parseIdExpr, third(sexp)));
+    return new defStruct(parseIdExpr(second(sexp)), map(parseIdExpr, third(sexp)));
   };
   function parseDefFunc(sexp) {
-    return GreaterThan(length(rest(second(sexp))), 0) ? makeDefFunc(parseIdExpr(first(second(sexp))), map(parseIdExpr, rest(second(sexp))), parseExpr(third(sexp))) :
+    return GreaterThan(length(rest(second(sexp))), 0) ? new defFunc(parseIdExpr(first(second(sexp))), map(parseIdExpr, rest(second(sexp))), parseExpr(third(sexp))) :
         error(types.symbol("parse-def-func"), stringAppend("expected at least one argument name after the", " function name, but found none."));
   };
   function parseDef(sexp) {
-    return makeDefVar(parseIdExpr(second(sexp)), parseExpr(third(sexp)));
+    return new defVar(parseIdExpr(second(sexp)), parseExpr(third(sexp)));
   };
  
   var def = isStructDefinition(sexp) ? parseDefStruct(sexp) :
@@ -681,58 +653,58 @@ var parseExprList = function (sexp) {
     return isTupleStartingWithOfLength(sexp, types.symbol("time"), 2);
   };
   function parseFuncCall(sexp) {
-    return isCons(sexp)? makeCall(parseExpr(first(sexp)), map(parseExpr, rest(sexp))) :
+    return isCons(sexp)? new call(parseExpr(first(sexp)), map(parseExpr, rest(sexp))) :
                         expectedError(types.symbol("parse-func-call"), "function call sexp", sexp);
   };
   function parseLambdaExpr(sexp) {
-    return isLambda(sexp) ? GreaterThan(length(second(sexp)), -1) ? makeLambdaExpr(map(parseIdExpr, second(sexp)), parseExpr(third(sexp))) :
+    return isLambda(sexp) ? GreaterThan(length(second(sexp)), -1) ? new lambdaExpr(map(parseIdExpr, second(sexp)), parseExpr(third(sexp))) :
     error(types.symbol("parse-lambda-expr"), stringAppend("expected at least one argument name in the ", "sequence after `lambda', but found none")) :
     expectedError(types.symbol("parse-lambda-expt"), "lambda function sexp", sexp);
   };
   function parseLocalExpr(sexp) {
-    return isLocal(sexp) ? makeLocalExpr(map(parseDefinition, second(sexp)), parseExpr(third(sexp))) :
+    return isLocal(sexp) ? new localExpr(map(parseDefinition, second(sexp)), parseExpr(third(sexp))) :
     expectedError(types.symbol("parse-local-expr"), "local expression sexp", sexp);
   };
   function parseLetrecExpr(sexp) {
-    return isLetrec(sexp) ? makeLetrecExpr(map(parseLetCouple, second(sexp)), parseExpr(third(sexp))) :
+    return isLetrec(sexp) ? new letrecExpr(map(parseLetCouple, second(sexp)), parseExpr(third(sexp))) :
     expectedError(types.symbol("parse-letrec-expr"), "letrec expression sexp", sexp);
   };
 
   function parseLetExpr(sexp) {
-    return isLet(sexp) ? makeLetExpr(map(parseLetCouple, second(sexp)), parseExpr(third(sexp))) :
+    return isLet(sexp) ? new letExpr(map(parseLetCouple, second(sexp)), parseExpr(third(sexp))) :
     expectedError(types.symbol("parse-let-expr"), "let expression sexp", sexp);
   };
   function parseLetStarExpr(sexp) {
-    return isLetStar(sexp) ? makeLetStarExpr(map(parseLetCouple, second(sexp)), parseExpr(third(sexp))) :
+    return isLetStar(sexp) ? new letStarExpr(map(parseLetCouple, second(sexp)), parseExpr(third(sexp))) :
     expectedError(types.symbol("parse-let*-expr"), "let* expression sexp", sexp);
   };
   function parseIfExpr(sexp) {
-    return isIf(sexp) ? makeIfExpr(parseExpr(second(sexp)), parseExpr(third(sexp)), parseExpr(fourth(sexp))) :
+    return isIf(sexp) ? new ifExpr(parseExpr(second(sexp)), parseExpr(third(sexp)), parseExpr(fourth(sexp))) :
     expectedError(types.symbol("parse-if-expr"), "if expression sexp", sexp);
   };
   function parseBeginExpr(sexp) {
-    return isBegin(sexp) ? makeBeginExpr(map(parseExpr, rest(sexp))) :
+    return isBegin(sexp) ? new beginExpr(map(parseExpr, rest(sexp))) :
     expectedError(types.symbol("parse-begin-expr"), "begin expression sexp", sexp);
   };
   function parseAndExpr(sexp) {
-    return isAnd(sexp) ? makeAndExpr(map(parseExpr, rest(sexp))) :
+    return isAnd(sexp) ? new andExpr(map(parseExpr, rest(sexp))) :
     expectedError(types.symbol("parse-and-expr"), "and expression sexp", sexp);
   };
   function parseOrExpr(sexp) {
-    return isOr(sexp) ? makeOrExpr(map(parseExpr, rest(sexp))) :
+    return isOr(sexp) ? new orExpr(map(parseExpr, rest(sexp))) :
     expectedError(types.symbol("parse-or-expr"), "or expression sexp", sexp);
   };
   function parseTimeExpr(sexp) {
-    return isTime(sexp) ? makeTimeExpr(parseExpr(second(sexp))) :
+    return isTime(sexp) ? new timeExpr(parseExpr(second(sexp))) :
     expectedError(types.symbol("parse-time-expr"), "time expression sexp", sexp);
   };
   function parseQuotedExpr(sexp) {
-    return emptyP(sexp) ? makeCall(makePrimop(types.symbol("list")), []) :
-    isCons(sexp) ? makeCall(makePrimop(types.symbol("list")), map(parseQuotedExpr, sexp)) :
-    isNumber(sexp) ? makeNumberExpr(sexp) :
-    isString(sexp) ? makeStringExpr(sexp) :
-    isChar(sexp) ? makeCharExpr(string(sexp.val.str)) :
-    isSymbol(sexp) ? makeSymbolExpr(sexp) :
+    return emptyP(sexp) ?   new call(new primop(types.symbol("list")), []) :
+          isCons(sexp) ?    new call(new primop(types.symbol("list")), map(parseQuotedExpr, sexp)) :
+          isNumber(sexp) ?  new numberExpr(sexp) :
+          isString(sexp) ?  new stringExpr(sexp) :
+          isChar(sexp) ?    new charExpr(string(sexp.val.str)) :
+          isSymbol(sexp) ?  new symbolExpr(sexp) :
     expectedError(types.symbol("parse-quoted-expr"), "quoted sexp", sexp);
   };
   return (function () {
@@ -758,7 +730,7 @@ var parseExprList = function (sexp) {
 };
 
 var parseCondExpr = function (sexp) {
-  return sexpIsCondListP(sexp) ? makeCondExpr(foldr((function (couple, rst) {
+  return sexpIsCondListP(sexp) ? new condExpr(foldr((function (couple, rst) {
   return ((isSymbol(first(couple))) && (isSymbolEqualTo(first(couple), types.symbol("else"))) && (not(emptyP(rst)))) ? error(types.symbol("parse-cond-expr"), stringAppend("found an `else' clause", " that isn't the last", " clause in its `cond'", " expression")) :
   cons(parseCondCouple(couple), rst);
 }), [], rest(sexp))) :
@@ -781,37 +753,37 @@ var parseLetCouple = function (sexp) {
 };
 
 var parseQuasiQuotedExpr = function (sexp, inlist) {
-  return emptyP(sexp) ? makeQqList([]) :
+  return emptyP(sexp) ? new qqList([]) :
   isCons(sexp) ? parseQqList(sexp, inlist) :
-  isNumber(sexp) ? makeNumberExpr(sexp) :
-  isString(sexp) ? makeStringExpr(sexp) :
-  isChar(sexp) ? makeCharExpr(sexp) :
-  isSymbol(sexp) ? makeSymbolExpr(sexp) :
+  isNumber(sexp) ? new numberExpr(sexp) :
+  isString(sexp) ? new stringExpr(sexp) :
+  isChar(sexp) ? new charExpr(string(sexp.val.str)) :
+  isSymbol(sexp) ? new symbolExpr(sexp) :
   expectedError(types.symbol("parse-quoted-expr"), "quoted sexp", sexp);
 };
 
 var parseQqList = function (sexp, inlist) {
   return isSymbol(first(sexp)) ? isSymbolEqualTo(first(sexp), types.symbol("unquote")) ? parseExpr(second(sexp)) :
-  isSymbolEqualTo(first(sexp), types.symbol("unquote-splicing")) ? inlist ? makeQqSplice(parseExpr(second(sexp))) :
+  isSymbolEqualTo(first(sexp), types.symbol("unquote-splicing")) ? inlist ? new qqSplice(parseExpr(second(sexp))) :
   error(types.symbol("unquote-splicing"), "misuse of ,@ or `unquote-splicing' within a quasiquoting backquote") :
-  makeQqList(map((function (x) {
+  new qqList(map((function (x) {
   return parseQuasiQuotedExpr(x, true);
 }), sexp)) :
-  makeQqList(map((function (x) {
-  return parseQuasiQuotedExpr(x, true);
-}), sexp));
+  new qqList(map((function (x) {
+                  return parseQuasiQuotedExpr(x, true);
+                  }), sexp));
 };
 
 var parseExprSingleton = function (sexp) {
   function parseImage(img) {
-    return makeImageExpr(encodeImage(img), imageWidth(img), imageHeight(img), pinholeX(img), pinholeY(img));
+    return new imageExpr(encodeImage(img), imageWidth(img), imageHeight(img), pinholeX(img), pinholeY(img));
   };
-  var singleton = isString(sexp) ? makeStringExpr(sexp) :
-    isNumber(sexp) ? makeNumberExpr(sexp) :
-    isChar(sexp) ? makeCharExpr(sexp) :
-    ((isSymbolEqualTo(types.symbol("true"), sexp)) || (isSymbolEqualTo(types.symbol("false"), sexp))) ? makeBooleanExpr(sexp) :
-    isSymbolEqualTo(types.symbol("empty"), sexp) ? makeCall(makePrimop(types.symbol("list")), []) :
-    isSymbol(sexp) ? sexpIsisPrimop(sexp) ? makePrimop(sexp) : sexp :
+  var singleton = isString(sexp) ? new stringExpr(sexp) :
+    isNumber(sexp) ? new numberExpr(sexp) :
+    isChar(sexp) ? new charExpr(sexp.val.str) :
+    ((isSymbolEqualTo(types.symbol("true"), sexp)) || (isSymbolEqualTo(types.symbol("false"), sexp))) ? new booleanExpr(sexp) :
+    isSymbolEqualTo(types.symbol("empty"), sexp) ? new call(new primop(types.symbol("list")), []) :
+    isSymbol(sexp) ? sexpIsisPrimop(sexp) ? new primop(sexp) : sexp :
     imageP(sexp) ? parseImage(sexp) :
     error(types.symbol("parse-expr-singleton"), stringAppend("( ): ", sexpGreaterThanString(sexp), "expected a function, but nothing's there"));
  singleton.location = sexp.location;
@@ -880,15 +852,15 @@ var isCheckWithin = function (sexp) {
 // parseTestCase : SExp -> AST
 var parseTestCase = function (sexp) {
   function parseCheckExpect(sexp) {
-    return isCheckExpect(sexp) ? makeChkExpect(parseExpr(second(sexp)), parseExpr(third(sexp)), sexp) :
+    return isCheckExpect(sexp) ? new chkExpect(parseExpr(second(sexp)), parseExpr(third(sexp)), sexp) :
     expectedError(types.symbol("parse-check-expect"), "check expect sexp", sexp);
   };
   function parseCheckError(sexp) {
-    return isCheckError(sexp) ? makeChkError(parseExpr(second(sexp)), parseExpr(third(sexp)), sexp) :
+    return isCheckError(sexp) ? new chkError(parseExpr(second(sexp)), parseExpr(third(sexp)), sexp) :
     expectedError(types.symbol("parse-check-error"), "check error sexp", sexp);
   };
   function parseCheckWithin(sexp) {
-    return isCheckWithin(sexp) ? makeChkWithin(parseExpr(second(sexp)), parseExpr(third(sexp)), parseExpr(fourth(sexp)), sexp) :
+    return isCheckWithin(sexp) ? new chkWithin(parseExpr(second(sexp)), parseExpr(third(sexp)), parseExpr(fourth(sexp)), sexp) :
     expectedError(types.symbol("parse-check-within"), "check within sexp", sexp);
   };
 
@@ -912,9 +884,9 @@ return ((isSymbol(fst)) && (isSymbolEqualTo(fst, types.symbol("require"))));
 
 var parseRequire = function (sexp) {
   return (function () { var uri = second(sexp);
-    var req = ((isString(uri)) || (isSymbol(uri))) ? makeReq(uri) :
-      isSymbolEqualTo(first(uri), types.symbol("lib")) ? makeReq(uri) :
-      makeReq(cons(types.symbol("planet"), cons(second(uri), [rest(third(uri))])));
+    var req = ((isString(uri)) || (isSymbol(uri))) ? new req(uri) :
+      isSymbolEqualTo(first(uri), types.symbol("lib")) ? new req(uri) :
+      new req(cons(types.symbol("planet"), cons(second(uri), [rest(third(uri))])));
     req.location = sexp.location;
     return req;
  })();
@@ -926,7 +898,7 @@ var isProvide = function (sexp) {
 };
 
 var parseProvide = function (sexp) {
-  var provide = makeProvideStatement(isSymbol(second(sexp)) ? rest(sexp) : types.symbol("all-defined-out"));
+  var provide = new provide(isSymbol(second(sexp)) ? rest(sexp) : types.symbol("all-defined-out"));
   provide.location = sexp.location;
   return provide;
 };
