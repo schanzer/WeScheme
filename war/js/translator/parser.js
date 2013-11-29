@@ -1,6 +1,5 @@
 /* TODO
  - JSLint
- - look up the for(k in A) syntax, replace for() loops
  - desugaring of structs and local, proper handling of 'else' in cond
  - preserve location information during desugaring
  - add error messages to desugaring phase for eeeeeeeverything
@@ -45,7 +44,7 @@ function makeTimeExpr(val) { return new timeExpr(val); };
 function makeSymbolExpr(val) { return new symbolExpr(val); };
 function makeNumberExpr(val) { return new numberExpr(val); };
 function makeStringExpr(val) { return new stringExpr(val); };
-function makeCharExpr(char) { return new charExpr(char.val); };
+function makeCharExpr(chr) { return new charExpr(chr.val); };
 function makeListExpr(val) { return new listExpr(val); };
 function makeMtListExpr() { return new mtListExpr(); };
 function makeBooleanExpr(val) { return new booleanExpr(val); };
@@ -255,7 +254,7 @@ function letStarExpr(bindings, body) {
     var ids   = this.bindings.map(coupleFirst),
         exprs = desugarAll(this.bindings.map(coupleSecond)),
     desugared = this.body.desugar();
-    for(i=this.bindings.length-1; i>-1; i--){
+    for(var b in this.bindings){
       desugared = makeLetExpr([makeCouple(ids[i], exprs[i])], desugared);
     }
     return desugared;
@@ -381,6 +380,7 @@ function mtListExpr() {
 
 // boolean expression
 function booleanExpr(sym) {
+  sym = (symb instanceof symbolExpr)? sym.val : sym;
   this.val = (sym.val === "true" || sym.val === "#t");
   this.toString = function(){ return this.val? "#t" : "#f";};
   this.desugar = function(pinfo){ return this; };
@@ -535,6 +535,7 @@ function provideStatement(val) {
 ///////////////////////////////// PARSER OBJECT //////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 (function () {
+ 'use strict';
 
 // parse : sexp -> AST
 var parse = (function (sexp) {
@@ -915,7 +916,7 @@ var expectedError = function (id, expected, actual) {
  // desugarAll : Listof SExps -> Listof SExps
  function desugarAll(programs){
   var desugared = [];
-  for(var i=0; i<programs.length; i++) desugared.push(programs[i].desugar());
+ for(var i=0; i<programs.length; i++) desugared.push(programs[i].desugar());
   return desugared;
  }
 
