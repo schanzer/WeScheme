@@ -90,20 +90,16 @@
 
       return i;
     }
-                   
+
+    Array.prototype.toString = function () {return this.join(" "); };           
     function sexpToString(sexp) {
       if(!imageP) {
         // if it hasn't yet been defined
         imageP = function (x) { return x instanceof imgVal; };
       }
-      var str;
+      var str="";
       if(sexp instanceof Array) {
-        str = sexp.reduce(function(x, xs) {
-          return xs + sexpToString(x) + " ";
-        },
-        "",
-        sexp);
-        str = "(" + str.substring(0,str.length-1) + ")";
+        str += "(" + sexp + ")";
       } else if (sexp instanceof types.symbol) {
         str = sexp.val;
       } else if (sexp instanceof types.string) {
