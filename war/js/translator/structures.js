@@ -5,36 +5,20 @@
 - do test cases get desugared?
 - Get plain error messages working, complete desugaring, write analyzer
 */
-// consecCmp : (Any Any -> Boolean) [ListOf Any] -> Boolean
-function consecCmp(proc, ls) {
-  var res = true;
-  for(var i=1; i < ls.length; i++) {
-    var x = ls[i-1];
-    var y = ls[i];
-    res = proc(x,y);
-  }
-  
-  return res;
-}
 
-
-function isSymbol(x) {return x instanceof symbolExpr;}
-
-// isSymbolEqualTo : Any ... -> Boolean
+// isSymbolEqualTo : (types.symbol || symbolExpr) x 2 -> Boolean
 // are these all symbols of the same value?
-function isSymbolEqualTo() {
-  function proc(x,y){
+function isSymbolEqualTo(x, y) {
     x = (x instanceof symbolExpr)? x.val : x;
     y = (y instanceof symbolExpr)? y.val : y;
-    return x.val === y.val && types.isSymbol(x) && types.isSymbol(y);
+    return x.val === y.val && isSymbolExpr(x) && isSymbolExpr(y);
   }
-  return consecCmp(proc, arguments);
-}
 
 function cons(x, y) { return [x].concat(y);}
-function isCons(x) { return x instanceof Array && x.length>=1;}
+function isCons(x)  { return x instanceof Array && x.length>=1;}
 function isEmpty(x) { return x instanceof Array && x.length===0;}
-function rest(ls)    { return ls.slice(1); }
+function first(ls)  { return ls[0]; }
+function rest(ls)   { return ls.slice(1); }
 
 
 ////////////////////////////////////// ERROR MESSAGES ////////////////
@@ -132,7 +116,7 @@ var isDefinition = function (x) {
 // an expression is a lambda, local, letrec, let, let*, call, cond, if, and, or, time, symbol, primop,
 // number, string, char, list, boolean, image, quote or quasiquote
 var isExpr = function (x) {
-  return ((isLambdaExpr(x)) || (isLocalExpr(x)) || (isLetrecExpr(x)) || (isLetExpr(x)) || (isLetStarExpr(x)) || (isCall(x)) || (isCondExpr(x)) || (isIfExpr(x)) || (isBeginExpr(x))|| (isAndExpr(x)) || (isOrExpr(x)) || (isTimeExpr(x)) || (isSymbol(x)) || (isPrimop(x)) || (isSymbolExpr(x)) || (isNumberExpr(x)) || (isStringExpr(x)) || (isCharExpr(x)) || (isListExpr(x)) || (isMTListExpr(x)) || (isBooleanExpr(x)) || (isQuotedExpr(x)) || (isQuasiQuotedExpr(x)) || (isImageExpr(x)));
+  return ((isLambdaExpr(x)) || (isLocalExpr(x)) || (isLetrecExpr(x)) || (isLetExpr(x)) || (isLetStarExpr(x)) || (isCall(x)) || (isCondExpr(x)) || (isIfExpr(x)) || (isBeginExpr(x))|| (isAndExpr(x)) || (isOrExpr(x)) || (isTimeExpr(x)) || (isSymbolExpr(x)) || (isPrimop(x)) || (isSymbolExpr(x)) || (isNumberExpr(x)) || (isStringExpr(x)) || (isCharExpr(x)) || (isListExpr(x)) || (isMTListExpr(x)) || (isBooleanExpr(x)) || (isQuotedExpr(x)) || (isQuasiQuotedExpr(x)) || (isImageExpr(x)));
 };
 // a test case is a check-expect, check-within or check-error
 var isTestCase = function (x) {
@@ -539,7 +523,7 @@ var requireFileP = (function (x) {
 
 var isisSymbolred = (function (x) {
                      return (function (y) {
-                             return ((isSymbol(y)) && (isSymbolEqualTo(y, x)));
+                             return ((isSymbolExpr(y)) && (isSymbolEqualTo(y, x)));
                              });
                      });
 
