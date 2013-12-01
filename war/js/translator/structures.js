@@ -135,6 +135,10 @@ function defFunc(name, args, body) {
   this.desugar = function(pinfo){
     return new defFunc(this.name, this.args, this.body.desugar());
   };
+  
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 
@@ -147,6 +151,9 @@ function defVar(name, expr) {
   };
   this.desugar = function(pinfo){
     return new defVar(this.name, this.expr.desugar());
+  };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
   };
 };
 
@@ -162,6 +169,9 @@ function defVars(names, expr) {
     console.log("desugaring defVars is not yet implemented");
     return this;
   };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // Structure definition
@@ -175,13 +185,16 @@ function defStruct(name, fields) {
     console.log("desugaring defStruct is not yet implemented");
     return this;
   };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 function definitionName(def) {
   return isDefFunc(def) ? def.name :
-  isDefVar(def) ? def.name :
-  isDefStruct(def) ? def.name :
-  err("cond", "all questions false");
+        isDefVar(def) ? def.name :
+        isDefStruct(def) ? def.name :
+        err("cond", "all questions false");
 };
 
 ///////////////////////////////////EXPRESSIONS//////////////////////////////
@@ -193,6 +206,9 @@ function beginExpr(exprs) {
   };
   this.desugar = function(pinfo){
     return new beginExpr(desugarAll(this.exprs));
+  };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
   };
 };
 
@@ -207,6 +223,9 @@ function lambdaExpr(args, body) {
   this.desugar = function(pinfo){
     return new lambdaExpr(this.args, this.body.desugar());
   };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // Local expression TODO
@@ -219,6 +238,9 @@ function localExpr(defs, body) {
   this.desugar = function(pinfo){
     console.log("desugaring local is not yet implemented");
     return new localExpr(desugarAll(this.defs), this.body.desugar());
+  };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
   };
 };
 
@@ -233,6 +255,9 @@ function letrecExpr(bindings, body) {
     function bindingToDefn(b){return new defVar(b.first, b.second.desugar());};
     return new localExpr(this.bindings.map(bindingToDefn), this.body.desugar());
   };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // Let expression
@@ -244,8 +269,11 @@ function letExpr(bindings, body) {
   };
   this.desugar = function(pinfo){
     var ids   = this.bindings.map(coupleFirst),
-    exprs = desugarAll(this.bindings.map(coupleSecond));
+        exprs = desugarAll(this.bindings.map(coupleSecond));
     return new call(new lambdaExpr(ids, this.body.desugar()), exprs);
+  };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
   };
 };
 
@@ -265,6 +293,9 @@ function letStarExpr(bindings, body) {
     }
     return desugared;
   };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // application expression
@@ -276,6 +307,9 @@ function call(func, args) {
   };
   this.desugar = function(pinfo){
     return new call(this.func.desugar(), desugarAll(this.args));
+  };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
   };
 };
 
@@ -294,6 +328,9 @@ function condExpr(clauses) {
     }
     return desugared;
   };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // if expression
@@ -309,6 +346,9 @@ function ifExpr(predicate, consequence, alternative) {
                       ,this.consequence.desugar()
                       ,this.alternative.desugar());
   };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // and expression
@@ -322,6 +362,9 @@ function andExpr(exprs) {
       desugared = new ifExpr(exprs[i], desugared, new booleanExpr(types.symbol("false")));
     }
     return desugared;
+  };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
   };
 };
 
@@ -337,6 +380,9 @@ function orExpr(exprs) {
     }
     return desugared;
   };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // time expression TODO
@@ -344,6 +390,9 @@ function timeExpr(val) {
   this.val = val;
   this.toString = function(){ return this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // symbol expression
@@ -351,6 +400,9 @@ function symbolExpr(val) {
   this.val = val;
   this.toString = function(){ return this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // number expression
@@ -358,6 +410,9 @@ function numberExpr(val) {
   this.val = val;
   this.toString = function(){ return this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // string expression
@@ -365,6 +420,9 @@ function stringExpr(val) {
   this.val = val;
   this.toString = function(){ return "\""+this.val.toString()+"\""; };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // char expression
@@ -372,6 +430,9 @@ function charExpr(val) {
   this.val = val;
   this.toString = function(){ return "#\\"+this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // list expression
@@ -379,11 +440,17 @@ function listExpr(val) {
   this.val = val;
   this.toString = function(){ return "(list "+this.val.toString() + ")"; };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // mtList expression TODO
 function mtListExpr() {
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // boolean expression
@@ -392,6 +459,9 @@ function booleanExpr(sym) {
   this.val = (sym.val === "true" || sym.val === "#t");
   this.toString = function(){ return this.val? "#t" : "#f";};
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // quoted expression TODO
@@ -399,6 +469,9 @@ function quotedExpr(val) {
   this.val = val;
   this.toString = function(){ return "'"+this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // quasiquoted expression TODO
@@ -406,6 +479,9 @@ function quasiquotedExpr(val) {
   this.val = val;
   this.toString = function(){ return "`"+this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // image expression
@@ -419,6 +495,9 @@ function imageExpr(val, width, height, x, y) {
     return "["+this.width+"x"+this.height+"image]";
   };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // quasiquoted list expression TODO
@@ -426,10 +505,17 @@ function qqList(val) {
   this.val = val;
   this.toString = function(){ return "`"+this.val.toString();};
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
+
 function qqSplice(val) {
   this.val = val;
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 var letSlashStarSlashRecBindings = (function (x) {
@@ -461,6 +547,9 @@ function primop(val) {
   this.val = val;
   this.toString = function(){ return this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 
 // desugarAll : Listof SExps -> Listof SExps
@@ -512,37 +601,43 @@ function req(uri) {
   this.uri = uri;
   this.toString = function(){ return "(require "+this.uri+")"; };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };
 };
 function reqUri(x) {
   return x.uri;
 };
 
-var requireFileP = (function (x) {
-                    return ((isReq(x)) && (isString(reqUri(x))));
-                    });
+function requireFileP(x) {
+  return isReq(x) && isString(reqUri(x));
+};
 
-var isisSymbolred = (function (x) {
-                     return (function (y) {
-                             return ((isSymbolExpr(y)) && (isSymbolEqualTo(y, x)));
-                             });
-                     });
+function isisSymbolred(x) {
+  return (function (y) {
+          return isSymbolExpr(y) && isSymbolEqualTo(y, x);
+         });
+};
 
-var requireTypeP = (function (x, type) {
-                    return ((isReq(x)) && (isCons(reqUri(x))) && (isisSymbolred(type)(first(reqUri(x)))));
-                    });
+function isRequireType(x, type) {
+  return isReq(x) && isCons(reqUri(x)) && isSymbolred(type)(first(reqUri(x)));
+};
 
 // lib TODO
-var requireLibP = (function (x) {
-                   return requireTypeP(x, types.symbol("lib"));
-                   });
+function isRequireLib(x) {
+  return isRequireType(x, types.symbol("lib"));
+};
 // planet TODO
-var isRequirelanetP = (function (x) {
-                       return requireTypeP(x, types.symbol("planet"));
-                       });
+function isRequirePlanet(x) {
+  return isRequireType(x, types.symbol("planet"));
+};
 
 ////////////////////////////////// PROVIDE /////////////////////////////
 function provideStatement(val) {
   this.val = val;
   this.toString = function(){ return "(provide "+this.val+")" };
   this.desugar = function(pinfo){ return this; };
+  this.compile = function(env, pinfo){
+    throw "not implemented";
+  };;
 };
