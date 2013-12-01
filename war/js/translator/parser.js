@@ -1,14 +1,165 @@
 /* TODO
  - JSLint
  - parse bugs: (define 2) (cond)
+ - preserve location information during desugaring
  */
 
-//////////////////////////////////////////////////////////////////////////////
-///////////////////////////////// PARSER OBJECT //////////////////////////////
-//////////////////////////////////////////////////////////////////////////////
 (function () {
  'use strict';
+ 
+ //////////////////////////////////// INSTANCE CHECKING WRAPPERS //////////////////////////////
+ function isString(x) { return (x instanceof Constant && types.isString(x.val));}
+ function isNumber(x) {return (x instanceof Constant && types.isNumber(x.val));}
+ var isChar = types.isChar;
+ function isDefFunc(x) { return x instanceof defFunc; };
+ function isDefVar(x) { return x instanceof defVar; };
+ function isDefStruct(x) { return x instanceof defStruct; };
+ function isLambdaExpr(x) { return x instanceof lambdaExpr; };
+ function isLocalExpr(x) { return x instanceof localExpr; };
+ function isLetrecExpr(x) { return x instanceof letrecExpr; };
+ function isLetExpr(x) { return x instanceof letExpr; };
+ function isLetStarExpr(x) { return x instanceof letStarExpr; };
+ function isCall(x) { return x instanceof call; };
+ function isCondExpr(x) { return x instanceof condExpr; };
+ function isIfExpr(x) { return x instanceof ifExpr; };
+ function isAndExpr(x) { return x instanceof andExpr; };
+ function isOrExpr(x) { return x instanceof orExpr; };
+ function isTimeExpr(x) { return x instanceof timeExpr; };
+ function isSymbolExpr(x) { return x instanceof symbolExpr; };
+ function isNumberExpr(x) { return x instanceof numberExpr; };
+ function isStringExpr(x) { return x instanceof stringExpr; };
+ function isCharExpr(x) { return x instanceof charExpr; };
+ function isListExpr(x) { return x instanceof listExpr; };
+ function isMTListExpr(x) { return x instanceof mtListExpr; };
+ function isBooleanExpr(x) { return x instanceof booleanExpr; };
+ function isQuotedExpr(x) { return x instanceof quotedExpr; };
+ function isQuasiQuotedExpr(x) { return x instanceof quasiquotedExpr; };
+ function isImageExpr(x) { return x instanceof imageExpr; };
+ function isQQList(x) { return x instanceof qqList; };
+ function isQQSplice(x) { return x instanceof qqSplice; };
+ function isCouple(x) { return x instanceof couple; };
+ function isPrimop(x) { return x instanceof primop; };
+ function isChkExpect(x) { return x instanceof chkExpect; };
+ function isChkWithin(x) { return x instanceof chkWithin; };
+ function isChkError(x) { return x instanceof chkError; };
+ function isRequire(x) { return x instanceof req; };
+ function isProvide(x) { return x instanceof provideStatement; };
+ 
+  /// SYNTATIC SUGAR ////////////////////////////
+  // everything here should desugar down into compiler structures
 
+ // Structure definition
+  function defStruct(name, fields) {
+    this.name = name;
+    this.fields = fields;
+    this.toString = function(){
+      return "(define-struct "+this.name.toString()+" ("+this.fields.toString()+"))";
+    };
+    this.desugar = function(pinfo){
+      console.log("desugaring defStruct is not yet implemented");
+      return this;
+    };
+    this.compile = function(env, pinfo){ throw "IMPOSSILBE: Structs should have been desugared"; };
+  };
+
+  // Letrec expression
+  function letrecExpr(bindings, body) {
+    this.bindings = bindings;
+    this.body = body;
+    this.toString = function(){
+      return "(letrec ("+this.bindings.toString()+") ("+this.body.toString()+"))";
+    };
+    this.desugar = function(pinfo){
+      function bindingToDefn(b){return new defVar(b.first, b.second.desugar());};
+      return new localExpr(this.bindings.map(bindingToDefn), this.body.desugar());
+    };
+    this.compile = function(env, pinfo){ throw "IMPOSSIBLE: letrec should have been desugared"; };
+  };
+
+  // Let expression
+  function letExpr(bindings, body) {
+    this.bindings = bindings;
+    this.body = body;
+    this.toString = function(){
+      return "(let ("+this.bindings.toString()+") ("+this.body.toString()+"))";
+    };
+    this.desugar = function(pinfo){
+      var ids   = this.bindings.map(coupleFirst),
+          exprs = desugarAll(this.bindings.map(coupleSecond));
+      return new call(new lambdaExpr(ids, this.body.desugar()), exprs);
+    };
+    this.compile = function(env, pinfo){ throw "IMPOSSIBLE: letrec should have been desugared"; };
+  };
+
+  // Let* expressions
+  function letStarExpr(bindings, body) {
+    this.bindings = bindings;
+    this.body = body;
+    this.toString = function(){
+      return "(let* ("+this.bindings.toString()+") ("+this.body.toString()+"))";
+    };
+    this.desugar = function(pinfo){
+      var ids   = this.bindings.map(coupleFirst),
+      exprs = desugarAll(this.bindings.map(coupleSecond)),
+      desugared = this.body.desugar();
+      for(var i=0; i<this.bindings.length; i++){
+        desugared = new letExpr([new couple(ids[i], exprs[i])], desugared);
+      }
+      return desugared;
+    };
+    this.compile = function(env, pinfo){ throw "IMPOSSIBLE: letrec should have been desugared"; };
+  };
+
+  // cond expression
+  function condExpr(clauses) {
+    this.clauses = clauses;
+    this.toString = function(){
+      return "(cond\n    "+this.clauses.join("\n    ")+")";
+    };
+    this.desugar = function(pinfo){
+      var desugared = this.clauses[this.clauses.length-1].second;
+      for(var i=this.clauses.length-2; i>-1; i--){
+        desugared = new ifExpr(this.clauses[i].first.desugar(),
+                               this.clauses[i].second.desugar(),
+                               desugared);
+      }
+      return desugared;
+    };
+    this.compile = function(env, pinfo){ throw "IMPOSSIBLE: cond should have been desugared"; };
+  };
+
+  // and expression
+  function andExpr(exprs) {
+    this.exprs = exprs;
+    this.toString = function(){ return "(and "+this.exprs.join(" ")+")"; };
+    this.desugar = function(pinfo){
+      var exprs = desugarAll(this.exprs),
+      desugared = exprs[exprs.length-1]; // ASSUME length >=2!!!
+      for(var i=exprs.length-2; i>-1; i--){
+        desugared = new ifExpr(exprs[i], desugared, new booleanExpr(types.symbol("false")));
+      }
+      return desugared;
+    };
+    this.compile = function(env, pinfo){ throw "IMPOSSIBLE: and should have been desugared" };
+  };
+
+  // or expression
+  function orExpr(exprs) {
+    this.exprs = exprs;
+    this.toString = function(){ return "(or "+this.exprs.toString()+")"; };
+    this.desugar = function(pinfo){
+      var exprs = desugarAll(this.exprs),
+      desugared = exprs[exprs.length-1]; // ASSUME length >=2!!!
+      for(var i=exprs.length-2; i>-1; i--){
+        desugared = new ifExpr(exprs[i], new booleanExpr(types.symbol("true")), desugared);
+      }
+      return desugared;
+    };
+    this.compile = function(env, pinfo){ throw "IMPOSSIBLE: or should have been desugared"; };
+  };
+
+  // PARSING ///////////////////////////////////////////
+ 
   // parse : sexp -> AST
   function parse(sexp) {
     return isEmpty(sexp) ? [] :

@@ -1,3 +1,11 @@
+/* TODO
+ - JSLint
+ */
+
+//////////////////////////////////////////////////////////////////////////////
+////////////////////////////////// LEXER OBJECT //////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
 // A SExp is either:
 // - Constant x Location
 // - Symbol x Location
@@ -8,15 +16,9 @@
 // - types.Symbol
 // - types.String
 // - types.Character
-
-/* TODO
-- JSLint
-- fix out-of-order rightDelim
-- fix #\f
-*/
 (function () {
  'use strict';
- /*global Comment, Constant, Location, charVal, types, throwError, imageP, proc */
+ /*global Comment, Constant, Location, charVal, types, throwError, proc */
     /////////////////////
     /*      Data       */
     /////////////////////
@@ -93,10 +95,6 @@
 
     Array.prototype.toString = function () {return this.join(" "); };           
     function sexpToString(sexp) {
-      if(!imageP) {
-        // if it hasn't yet been defined
-        imageP = function (x) { return x instanceof imgVal; };
-      }
       var str="";
       if(sexp instanceof Array) {
         str += "(" + sexp + ")";
@@ -106,12 +104,6 @@
         str = '"' + sexp + '"';
       } else if (sexp instanceof Char) {
         str = sexp.toString();
-      } else if (imageP(sexp)) {
-        if(sexp instanceof imgVal) {
-          str = '#(struct:object:image-snip% ... ...)';
-        } else {
-          str = '#(struct:object:cache-image-snip% ... ...)';
-        }
       } else {
          str = sexp.toString();
       }
@@ -188,10 +180,12 @@
       i = chewWhiteSpace(str, i);
 
       if(i >= str.length) {
-        throwError(new types.Message(["Unexpected EOF while reading a SExp"]
-                                 ,new Location(sCol, sLine, iStart, i-iStart)));
+        throwError(new types.Message(["Unexpected EOF while reading a SExp"])
+                                 ,new Location(sCol, sLine, iStart, i-iStart));
       }
-      var sexp = res.leftListDelims.test(p) ? readList(str, i) :
+       var sexp = res.rightListDelims.test(p) ? throwError(new types.Message(["Unexpected '"+p+"'"])
+                                                          ,new Location(sCol, sLine, iStart, i-iStart)) :
+                 res.leftListDelims.test(p) ? readList(str, i) :
                  p === '"'                  ? readString(str, i) :
                  p === '#'                  ? readPoundSExp(str, i) :
                  p === ';'                  ? readLineComment(str, i) :

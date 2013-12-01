@@ -72,7 +72,7 @@ function readFromRepl(event) {
       throw Error("PARSING ERROR\n"+e);
     }
     try {
-      var AST = desugarProgram(AST);
+      var AST = desugarAll(AST);
       console.log("DESUGARING:\nraw:");
       console.log(AST);
       console.log("pretty:");
