@@ -11,7 +11,7 @@
 function isSymbolEqualTo(x, y) {
     x = (x instanceof symbolExpr)? x.val : x;
     y = (y instanceof symbolExpr)? y.val : y;
-    return x.val === y.val && isSymbolExpr(x) && isSymbolExpr(y);
+    return x.val === y.val;
   }
 
 function cons(x, y) { return [x].concat(y);}
