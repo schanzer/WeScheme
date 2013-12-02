@@ -1,8 +1,5 @@
 /*
  Functions that every Expr should have:
- - collectDefinitions
- - collectProvides
- - analyzeUses
  - export programAnalyze and programAnalyzeWithPinfo
 */
 (function () {
@@ -12,13 +9,11 @@
  Program.prototype.collectDefinitions = function(pinfo){
     return pinfo;
  };
- Program.prototype.collectProvides = function(pinfo){
-    return pinfo;
- };
  Program.prototype.analyzeUses = function(pinfo){
     return pinfo;
  };
- Program.prototype.compile = function(env, pinfo){
+ // compile: pinfo -> [bytecode, pinfo]
+ Program.prototype.compile = function(pinfo){
     return [this.val, pinfo];
  };
  
@@ -210,31 +205,16 @@
  primop.prototype.compile = function(env, pinfo){
  }
  
- // check-expect TODO
- chkExpect.prototype.compile = function(env, pinfo){
- }
-
- // check-within TODO
- chkWithin.prototype.compile = function(env, pinfo){
- }
- 
- // check-error
- chkError.prototype.compile = function(env, pinfo){
- }
- 
  // require-url
  req.prototype.collectDefinitions = function(pinfo){
  
  }
- req.prototype.compile = function(env, pinfo){
-    throw "not implemented";
+ req.prototype.compile = function(pinfo){
+    throw "compiling requires is not implemented";
  };
 
- // provide
- provideStatement.collectProvides = function(pinfo){
- };
  provideStatement.prototype.compile = function(env, pinfo){
-    throw "not implemented";
+    throw "compiling provides is not implemented";
  };
 
 /////////////////////////////////////////////////////////////
@@ -261,8 +241,12 @@
  // collectProvides: program pinfo -> pinfo
  // Walk through the program and collect all the provide statements.
  function collectProvides(programs, pinfo){
+    function collectProvide(p, pinfo){
+      return pinfo;
+    }
     return programs.reduce((function(p, pinfo){
-                            return p.collectProvides(pinfo);
+                              return (p instanceof provideStatement)?
+                                    collectProvide(p, pinfo) : pinfo;
                             })
                            , pinfo);
  }
@@ -274,8 +258,53 @@
                          })
                         , pinfo);
  }
+ 
+ // compile-compilation-top: program pinfo -> bytecode
+ function compile(program, pinfo){
+    // desugaring pass
+    var programAndPinfo = desugarAll(program, pinfo),
+        program = programAndPinfo[0],
+        pinfo = programAndPinfo[1];
+    // analysis pass
+    var pinfo = programAnalyzeWithPinfo(program, pinfo);
+
+    // The toplevel is going to include all of the defined identifiers in the pinfo
+    // The environment will refer to elements in the toplevel.
+    var toplevelPrefixAndEnv = makeModulePrefixAndEnv(pinfo),
+      toplevelPrefix = toplevelPrefixAndEnv[0],
+      env = toplevelPrefixAndEnv[1];
+   
+    // pull out separate program components for ordered compilation
+    var defns    = program.filter(isDefinition),
+        requires = program.filter((function(p){return (p instanceof req);})),
+        provides = program.filter((function(p){return (p instanceof provideStatement);})),
+        exprs    = program.filter(isExpression);
+ 
+    // Program [bytecodes, pinfo, env?] -> [bytecodes, pinfo]
+    // compile the program, and add the bytecodes and pinfo information to the acc
+    function compileAndCollect(p, acc){
+      var compiledProgramAndPinfo = p.compile(acc[1]),
+          compiledProgram = compiledProgramAndPinfo[0],
+          pinfo = compiledProgramAndPinfo[1];
+      return [[compiledProgram].concat(acc[0]), pinfo];
+    }
+ 
+    var compiledRequiresAndPinfo = requires.reduce(compileAndCollect, [[], pinfo]),
+        compiledRequires = compiledRequiresAndPinfo[0],
+        pinfo = compiledRequiresAndPinfo[1];
+    var compiledDefinitionsAndPinfo = defns.reduce(compileAndCollect, [[], pinfo]),
+        compiledDefinitions = compiledDefinitionsAndPinfo[0],
+        pinfo = compiledDefinitionsAndPinfo[1];
+    var compiledExpressionsAndPinfo = exprs.reduce(compileAndCollect, [[], pinfo]),
+        compiledExpressions = compiledExpressionsAndPinfo[0],
+        pinfo = compiledExpressionsAndPinfo[1];
+ 
+    // generate the bytecode for the program and return it, along with the program info
+    var bytecode = bcode-make-seq(compiled-requires.concat(compiledDefinitions, compiledExpressions));
+    return [bcode-make-compilation-top(0, toplevel-prefix, bytecode), pinfo];
+ }
  /////////////////////
  /* Export Bindings */
  /////////////////////
- // window.compile = compilePrograms;
+ window.compile = compile;
 })();
