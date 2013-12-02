@@ -34,6 +34,7 @@ var Location = function(sCol, sLine, offset, span, source){
   this.toString = function(){
     return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
   };
+  this.toVector = function(){new types.vector(this.source, this.offset, this.sLine, this.sCol, this.sp)};
 }
 
 // couples = pair
@@ -83,6 +84,155 @@ function throwError(msg, loc) {
   throw JSON.stringify(json);
 }
 
+// Representation of the stack environment of the mzscheme vm, so we know where
+// things live.
+
+function env(){}
+function emptyEnv() {}
+function localEnv(name, isBoxed, parentEnv){
+  this.name = name; this.isBoxed = isBoxed; this.parentEnv = parentEnv;
+}
+function globalEnv(names, parentEnv){
+  this.names = names; this.parentEnv = parentEnv;
+}
+function unnamedEnv(parentEnv){
+  this.parentEnv = parentEnv;
+}
+var EMPTYENV = new emptyEnv();
+
+// envPushGlobals: env (listof symbol) -> env
+function envPushGlobals(env, names){
+  return new globalEnv(names, env);
+}
+
+// envPushLocal: env symbol -> env
+function envPushLocal(env, name){
+  new localEnv(name, false, env);
+}
+
+// envPushLocalBoxed: env symbol -> env
+function envPushLocalBoxed(env, name){
+  new localEnv(name, true, env);
+}
+
+// envPushUnnamed: env -> env
+function envPushUnnamed(env){
+  new unnamedEnv(env);
+}
+
+// envPop: env -> env
+function envPop(env){
+  if(env instanceof emptyEnv){
+    throwError('env-pop "empty env"');
+  } else {
+    return env.parentEnv;
+  }
+}
+   
+function stackReference(){}
+function localStackReference(name, isBoxed, depth){
+  this.name = name;
+  this.isBoxed = isBoxed;
+  this.depth = depth;
+}
+function globalStackReference(name, depth, pos){
+  this.name = name;
+  this.pos = pos;
+  this.depth = depth;
+}
+function unboundStackReference(name){
+  this.name = name;
+}
+
+// position: symbol (listof symbol) -> (number || #f)
+// Find position of element in list; return false if we can't find the element.
+function position(x, L){
+  return L.indexOf(x) > -1;
+}
+// envLookup: env symbol -> stack-reference
+// given a symbol and an env, return a stack reference to that symbol's value
+function envLookup(env, name){
+  function search(env, depth){
+    if(env instanceof emptyEnv){
+      return new unboundStackReference(name);
+    } else if(env instanceof localEnv){
+      return (name===env.name)? new localStackReference(name, env.isBoxed, env.depth) :
+                                search(env.parentEnv, depth+1);
+    } else if(env instanceof globalEnv){
+      if(position(name, env.names)){
+        return (function (pos){return new globalStackReference(name, dept, pos);});
+      } else {
+        return search(env.parentEnv, depth+1);
+      }
+    } else if(env instanceof unnamedEnv){
+      search(env.parentEnv, depth+1);
+    }
+  }
+  search(env, 0);
+}
+
+// envPeek: env number -> env
+// search up the chain until we find the environment or run dry
+function envPeek(env, depth){
+  if(depth === 0){
+    return env;
+  } else if(env instanceof emptyEnv){
+    throwError("env-peek");
+  } else {
+    envPeek(env.parentEnv, depth-1);
+  }
+}
+
+// pinfo (program-info) is the "world" structure for the compilers;
+// it captures the information we get from analyzing and compiling
+// the program, and also maintains some auxillary structures.
+function pinfo(env, modules, usedBindingsHash, freeVariables, gensymCounter,
+               providedNames,definedNames, sharedExpressions,
+               withLocationEmits, allowRedefinition,
+               moduleResolver, modulePathResolver, currentModulePath,
+               declaredPermissions){
+  this.env = env;                             // env
+  this.modules = modules;                     // (listof module-binding)
+  this.usedBindingsHash = usedBindingsHash;   // (hashof symbol binding)
+  this.freeVariables = freeVariables;         // (listof symbol)
+  this.gensymCounter = gensymCounter;         // number
+  this.providedNames = providedNames;         // (hashof symbol provide-binding)
+  this.definedNames = definedNames;           // (hashof symbol binding)
+  
+  this.sharedExpressions = sharedExpressions; // (hashof expression labeled-translation)
+  // Maintains a mapping between expressions and a labeled translation.  Acts
+  // as a symbol table to avoid duplicate construction of common literal values.
+  
+  this.withLocationEmits=withLocationEmits;    // boolean
+  // If true, the compiler emits calls to plt.Kernel.setLastLoc to maintain
+  // source position during evaluation.
+  
+  this.allowRedefinition = allowRedefinition;   // boolean
+  // If true, redefinition of a value that's already defined will not raise an error.
+  
+  // For the module system.
+  this.moduleResolver = moduleResolver;         // (module-name -> (module-binding | false))
+  this.modulePathResolver = modulePathResolver; // (string module-path -> module-name)
+  this.currentModulePath = currentModulePath;   // module-path
+  
+  this.declaredPermissions = declaredPermissions;// (listof (listof symbol any/c))
+}
+
+function makeImmutableHash(){}
+function defaultModuleResolver(){}
+function defaultModulePathResolver(){}
+function defaultCurrentModulePath(){}
+var emptyPinfo = new pinfo(emptyEnv,
+                           [], makeImmutableHash(), [], 0, makeImmutableHash(), makeImmutableHash(),
+                           makeImmutableHash(),
+                           true,
+                           true,
+                           defaultModuleResolver,
+                           defaultModulePathResolver,
+                           defaultCurrentModulePath,
+                           [])
+
+
 // OBJECT HIERARCHY//////////////////////////////////////////
 // Inheritance from pg 168: Javascript, the Definitive Guide.
 var heir = function(p) {
@@ -97,7 +247,7 @@ var Program = function() {
   // -> String
   this.toString = function(){ return this.val.toString(); };
   // pinfo -> [Program, pinfo]
-  this.desugar = function(pinfo){ return this; };
+  this.desugar = function(pinfo){ return [this, pinfo]; };
 };
 
 // Function definition
