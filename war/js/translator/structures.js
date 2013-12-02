@@ -94,7 +94,9 @@ var heir = function(p) {
 // all Programs, by default, print out their values and do not desugar
 // anything that behaves differently must override these functions
 var Program = function() {
+  // -> String
   this.toString = function(){ return this.val.toString(); };
+  // pinfo -> [Program, pinfo]
   this.desugar = function(pinfo){ return this; };
 };
 
@@ -274,7 +276,7 @@ function listExpr(val) {
   Program.call(this);
   this.val = val;
   this.toString = function(){ return "(list "+this.val.toString() + ")"; };
-  this.desugar = function(pinfo){ return this.val.desugar(); };
+  this.desugar = function(pinfo){ return new listExpr(this.val.desugar()); };
 };
 listExpr.prototype = heir(Program.prototype);
 
@@ -345,12 +347,6 @@ function provideStatement(val) {
   this.toString = function(){ return "(provide "+this.val+")" };
 };
 provideStatement.prototype = heir(Program.prototype);
-
-function isSymbolred(x) {
-  return (function (y) {
-          return isSymbolExpr(y) && isSymbolEqualTo(y, x);
-         });
-};
 
 // desugarAll : Listof SExps -> Listof SExps
 function desugarAll(programs){
