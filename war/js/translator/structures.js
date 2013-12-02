@@ -346,31 +346,10 @@ function provideStatement(val) {
 };
 provideStatement.prototype = heir(Program.prototype);
 
-function reqUri(x) {
-  return x.uri;
-};
-
-function requireFileP(x) {
-  return isReq(x) && isString(reqUri(x));
-};
-
 function isSymbolred(x) {
   return (function (y) {
           return isSymbolExpr(y) && isSymbolEqualTo(y, x);
          });
-};
-
-function isRequireType(x, type) {
-  return isReq(x) && isCons(reqUri(x)) && isSymbolred(type)(first(reqUri(x)));
-};
-
-// lib TODO
-function isRequireLib(x) {
-  return isRequireType(x, types.symbol("lib"));
-};
-// planet TODO
-function isRequirePlanet(x) {
-  return isRequireType(x, types.symbol("planet"));
 };
 
 // desugarAll : Listof SExps -> Listof SExps

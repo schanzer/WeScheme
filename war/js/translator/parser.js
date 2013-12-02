@@ -10,40 +10,8 @@
  //////////////////////////////////// INSTANCE CHECKING WRAPPERS //////////////////////////////
  function isString(x) { return (x instanceof Constant && types.isString(x.val));}
  function isNumber(x) {return (x instanceof Constant && types.isNumber(x.val));}
- var isChar = types.isChar;
- function isDefFunc(x) { return x instanceof defFunc; };
- function isDefVar(x) { return x instanceof defVar; };
- function isDefStruct(x) { return x instanceof defStruct; };
- function isLambdaExpr(x) { return x instanceof lambdaExpr; };
- function isLocalExpr(x) { return x instanceof localExpr; };
- function isLetrecExpr(x) { return x instanceof letrecExpr; };
- function isLetExpr(x) { return x instanceof letExpr; };
- function isLetStarExpr(x) { return x instanceof letStarExpr; };
- function isCallExpr(x) { return x instanceof callExpr; };
- function isCondExpr(x) { return x instanceof condExpr; };
- function isIfExpr(x) { return x instanceof ifExpr; };
- function isAndExpr(x) { return x instanceof andExpr; };
- function isOrExpr(x) { return x instanceof orExpr; };
- function isTimeExpr(x) { return x instanceof timeExpr; };
  function isSymbolExpr(x) { return x instanceof symbolExpr; };
- function isNumberExpr(x) { return x instanceof numberExpr; };
- function isStringExpr(x) { return x instanceof stringExpr; };
- function isCharExpr(x) { return x instanceof charExpr; };
- function isListExpr(x) { return x instanceof listExpr; };
- function isMTListExpr(x) { return x instanceof mtListExpr; };
- function isBooleanExpr(x) { return x instanceof booleanExpr; };
- function isQuotedExpr(x) { return x instanceof quotedExpr; };
- function isQuasiQuotedExpr(x) { return x instanceof quasiquotedExpr; };
- function isImageExpr(x) { return x instanceof imageExpr; };
- function isQQList(x) { return x instanceof qqList; };
- function isQQSplice(x) { return x instanceof qqSplice; };
- function isCouple(x) { return x instanceof couple; };
- function isPrimop(x) { return x instanceof primop; };
- function isChkExpect(x) { return x instanceof chkExpect; };
- function isChkWithin(x) { return x instanceof chkWithin; };
- function isChkError(x) { return x instanceof chkError; };
- function isRequire(x) { return x instanceof req; };
- function isProvide(x) { return x instanceof provideStatement; };
+ var isChar = types.isChar;
  
   /// SYNTATIC SUGAR ////////////////////////////
   // everything here should desugar down into compiler structures
@@ -411,7 +379,6 @@
    return singleton;
   };
 
-
   function parseIdExpr(sexp) {
     return isId(sexp) ? sexp :
     throwError(new types.Message(["ID"]), sexp.location);
@@ -451,22 +418,20 @@
   };
 
   function parseRequire(sexp) {
-    return (function () { var uri = sexp[1];
-      var req = (isString(uri) || isSymbolExpr(uri)) ? new req(uri) :
-        isSymbolEqualTo(uri[0], types.symbol("lib")) ? new req(uri) :
-        new req(cons(types.symbol("planet"), cons(second(uri), [rest(third(uri))])));
-      req.location = sexp.location;
-      return req;
-   })();
+    var uri = sexp[1];
+    var require = (isString(uri) || isSymbolExpr(uri)) ? new req(uri) :
+              isSymbolEqualTo(uri[0], types.symbol("lib")) ? new req(uri) :
+              new req(cons(types.symbol("planet"), cons(second(uri), [rest(third(uri))])));
+    req.location = sexp.location;
+    return require;
   };
 
   //////////////////////////////////////// PROVIDE PARSING ////////////////////////////////
-  function isProvide(sexp) {
+ function isProvide(sexp) {
     return isCons(sexp) && isSymbolExpr(sexp[0]) && isSymbolEqualTo(sexp[0], types.symbol("provide"));
-  };
-
-  function parseProvide(sexp) {
-    var provide = new provide(isSymbolExpr(sexp[1]) ? rest(sexp) : types.symbol("all-defined-out"));
+ };
+ function parseProvide(sexp) {
+    var provide = new provideStatement(isSymbolExpr(sexp[1]) ? rest(sexp) : types.symbol("all-defined-out"));
     provide.location = sexp.location;
     return provide;
   };
