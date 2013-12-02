@@ -80,7 +80,12 @@ var heir = function(p) {
   return new f();
 };
 
-var Program = function() {};
+// all Programs, by default, print out their values and do not desugar
+// anything that behaves differently must override these functions
+var Program = function() {
+  this.toString = function(){ return this.val.toString(); };
+  this.desugar = function(pinfo){ return this; };
+};
 
 
 ///////////////////////////////////////// DEFINITIONS /////////////////////////////////
@@ -142,7 +147,6 @@ function defStruct(name, fields) {
     console.log("desugaring defStruct is not yet implemented");
     return this;
   };
-  this.compile = function(env, pinfo){ throw "IMPOSSILBE: Structs should have been desugared"; };
 };
 defStruct.prototype = heir(Program.prototype);
 
@@ -171,8 +175,6 @@ function lambdaExpr(args, body) {
   this.desugar = function(pinfo){
     return new lambdaExpr(this.args, this.body.desugar());
   };
-  // Compile a lambda expression.  The lambda must close its free variables over the
-  // environment.
 };
 lambdaExpr.prototype = heir(Program.prototype);
 
@@ -226,8 +228,6 @@ ifExpr.prototype = heir(Program.prototype);
 function timeExpr(val) {
   Program.call(this);
   this.val = val;
-  this.toString = function(){ return this.val.toString(); };
-  this.desugar = function(pinfo){ return this; };
 };
 timeExpr.prototype = heir(Program.prototype);
 
@@ -235,8 +235,6 @@ timeExpr.prototype = heir(Program.prototype);
 function symbolExpr(val) {
   Program.call(this);
   this.val = val;
-  this.toString = function(){ return this.val.toString(); };
-  this.desugar = function(pinfo){ return this; };
 };
 symbolExpr.prototype = heir(Program.prototype);
 
@@ -244,8 +242,6 @@ symbolExpr.prototype = heir(Program.prototype);
 function numberExpr(val) {
   Program.call(this);
   this.val = val;
-  this.toString = function(){ return this.val.toString(); };
-  this.desugar = function(pinfo){ return this; };
 };
 numberExpr.prototype = heir(Program.prototype);
 
@@ -254,10 +250,6 @@ function stringExpr(val) {
   Program.call(this);
   this.val = val;
   this.toString = function(){ return "\""+this.val.toString()+"\""; };
-  this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    return [this.val, pinfo];
-  };
 };
 stringExpr.prototype = heir(Program.prototype);
 
@@ -266,7 +258,6 @@ function charExpr(val) {
   Program.call(this);
   this.val = val;
   this.toString = function(){ return "#\\"+this.val.toString(); };
-  this.desugar = function(pinfo){ return this; };
 };
 charExpr.prototype = heir(Program.prototype);
 
@@ -275,14 +266,13 @@ function listExpr(val) {
   Program.call(this);
   this.val = val;
   this.toString = function(){ return "(list "+this.val.toString() + ")"; };
-  this.desugar = function(pinfo){ return this; };
+  this.desugar = function(pinfo){ return this.val.desugar(); };
 };
 listExpr.prototype = heir(Program.prototype);
 
 // mtList expression TODO
 function mtListExpr() {
   Program.call(this);
-  this.desugar = function(pinfo){ return this; };
 };
 mtListExpr.prototype = heir(Program.prototype);
 
@@ -292,7 +282,6 @@ function booleanExpr(sym) {
   sym = (sym instanceof symbolExpr)? sym.val : sym;
   this.val = (sym.val === "true" || sym.val === "#t");
   this.toString = function(){ return this.val? "#t" : "#f";};
-  this.desugar = function(pinfo){ return this; };
 };
 booleanExpr.prototype = heir(Program.prototype);
 
@@ -301,7 +290,6 @@ function quotedExpr(val) {
   Program.call(this);
   this.val = val;
   this.toString = function(){ return "'"+this.val.toString(); };
-  this.desugar = function(pinfo){ return this; };
 };
 quotedExpr.prototype = heir(Program.prototype);
 
@@ -310,10 +298,6 @@ function quasiquotedExpr(val) {
   Program.call(this);
   this.val = val;
   this.toString = function(){ return "`"+this.val.toString(); };
-  this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    return [this.val, pinfo];
-  };
 };
 quasiquotedExpr.prototype = heir(Program.prototype);
 
@@ -322,14 +306,12 @@ function qqList(val) {
   Program.call(this);
   this.val = val;
   this.toString = function(){ return "`"+this.val.toString();};
-  this.desugar = function(pinfo){ return this; };
 };
 qqList.prototype = heir(Program.prototype);
 
 function qqSplice(val) {
   Program.call(this);
   this.val = val;
-  this.desugar = function(pinfo){ return this; };
 };
 qqSplice.prototype = heir(Program.prototype);
 
@@ -348,8 +330,6 @@ function coupleSecond(x) { return x.second; };
 function primop(val) {
   Program.call(this);
   this.val = val;
-  this.toString = function(){ return this.val.toString(); };
-  this.desugar = function(pinfo){ return this; };
 };
 primop.prototype = heir(Program.prototype);
 
@@ -370,10 +350,8 @@ function chkExpect(actual, expected, sexp) {
   this.toString = function(){
     return "(check-expect "+this.sexp.toString() +" "+this.expected+")";
   };
-  this.desugar = function(pinfo){ return this; };
 };
 chkExpect.prototype = heir(Program.prototype);
-
 // check-within TODO
 function chkWithin(actual, expected, range, sexp) {
   Program.call(this);
@@ -384,7 +362,6 @@ function chkWithin(actual, expected, range, sexp) {
   this.toString = function(){
     return "(check-within "+this.sexp.toString() +" "+this.expected+")";
   };
-  this.desugar = function(pinfo){ return this; };
 };
 chkWithin.prototype = heir(Program.prototype);
 
@@ -397,7 +374,6 @@ function chkError(actual, error, sexp) {
   this.toString = function(){
     return "(check-error "+this.sexp.toString() +" "+this.error+")";
   };
-  this.desugar = function(pinfo){ return this; };
 };
 chkError.prototype = heir(Program.prototype);
 
@@ -408,10 +384,6 @@ function req(uri) {
   Program.call(this);
   this.uri = uri;
   this.toString = function(){ return "(require "+this.uri+")"; };
-  this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-  };
 };
 req.prototype = heir(Program.prototype);
 
@@ -447,9 +419,5 @@ function provideStatement(val) {
   Program.call(this);
   this.val = val;
   this.toString = function(){ return "(provide "+this.val+")" };
-  this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-  };
 };
 provideStatement.prototype = heir(Program.prototype);
