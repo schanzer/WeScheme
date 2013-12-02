@@ -1,5 +1,4 @@
 /*
- - getrid of DefName, defBindings?
  - desugaring of structs, require, provide and local. proper handling of 'else' in cond
 - preserve location information during desugaring
 - add error messages to desugaring phase for eeeeeeeverything
@@ -73,11 +72,21 @@ function throwError(msg, loc) {
   console.log(json);
   throw JSON.stringify(json);
 }
+///////////////////////////////////// PROGRAM STRUCTURES //////////////////////////////
+// Inheritance from pg 168: Javascript, the Definitive Guide.
+var heir = function(p) {
+  var f = function() {};
+  f.prototype = p;
+  return new f();
+};
+
+var Program = function() {};
 
 
 ///////////////////////////////////////// DEFINITIONS /////////////////////////////////
 // Function definition
 function defFunc(name, args, body) {
+  Program.call(this);
   this.name = name;
   this.args = args;
   this.body = body;
@@ -87,24 +96,13 @@ function defFunc(name, args, body) {
   this.desugar = function(pinfo){
     return new defFunc(this.name, this.args, this.body.desugar());
   };
-  
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-/*    var compiledNameAndPinfo = compileExpression(this.name, env, pinfo),
-        compiledName = compiledNameAndPinfo[0],
-        pinfo = compiledNameAndPinfo[1];
-    var compiledLambdaAndPinfo = compileLambda(this.name, this.args, this.body, env, pinfo),
-        compiledLambda = compiledLambdaAndPinfo[0],
-        pinfo = compiledLambdaAndPinfo[1];
-    var bytecode = bcode:make-def-values([compiledName], compiledLambda);
-    return [bytecode, pinfo];
- */
-  };
 };
+defFunc.prototype = heir(Program.prototype);
 
 
 // Variable definition
 function defVar(name, expr) {
+  Program.call(this);
   this.name = name;
   this.expr = expr;
   this.toString = function(){
@@ -113,23 +111,13 @@ function defVar(name, expr) {
   this.desugar = function(pinfo){
     return new defVar(this.name, this.expr.desugar());
   };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-/*    var compiledIdAndPinfo = compileExpression(this.name, env, pinfo),
-      compiledId = compiledExpressionAndPinfo[0],
-      pinfo = compiledExpressionAndPinfo[1];
-    var compiledBodyAndPinfo = this.body.compile(env, pinfo),
-        compiledBody = compiledBodyAndPinfo[0],
-        pinfo = compiledBodyAndPinfo[1];
-    var bytecode = bcode:make-def-values([compiledId], compiled-body);
-    return [bytecode, pinfo];
- */
-  };
 };
+defVar.prototype = heir(Program.prototype);
 
 // Variable**S** definition
 // (not yet used)
 function defVars(names, expr) {
+  Program.call(this);
   this.names = names;
   this.expr = expr;
   this.toString = function(){
@@ -139,23 +127,29 @@ function defVars(names, expr) {
     console.log("desugaring defVars is not yet implemented");
     return this;
   };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-/*    var compiledIdsAndPinfo = compileExpression(this.names, env, pinfo),
-        compiledIds = compiledIdsAndPinfo[0],
-        pinfo = compiledIdsAndPinfo[1];
-    var compiledBodyAndPinfo = this.body.compile(env, pinfo),
-        compiledBody = compiledBodyAndPinfo[0],
-        pinfo = compiledBodyAndPinfo[1];
-    var bytecode = bcode:make-def-values(compiledIds, compiled-body);
-    return [bytecode, pinfo];
- */
-  };
 };
+defVars.prototype = heir(Program.prototype);
+
+// Structure definition
+function defStruct(name, fields) {
+  Program.call(this);
+  this.name = name;
+  this.fields = fields;
+  this.toString = function(){
+    return "(define-struct "+this.name.toString()+" ("+this.fields.toString()+"))";
+  };
+  this.desugar = function(pinfo){
+    console.log("desugaring defStruct is not yet implemented");
+    return this;
+  };
+  this.compile = function(env, pinfo){ throw "IMPOSSILBE: Structs should have been desugared"; };
+};
+defStruct.prototype = heir(Program.prototype);
 
 ///////////////////////////////////EXPRESSIONS//////////////////////////////
 // Begin expression
 function beginExpr(exprs) {
+  Program.call(this);
   this.exprs = exprs;
   this.toString = function(){
     return "(begin "+this.exprs.join(" ")+")";
@@ -163,20 +157,12 @@ function beginExpr(exprs) {
   this.desugar = function(pinfo){
     return new beginExpr(desugarAll(this.exprs));
   };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-/*    var compiledExpressionsAndPinfo = compileExpressions(this.exprs, env, pinfo),
-        compiledExpressions = compiledExpressionsAndPinfo[0],
-        pinfo1 = compiledExpressionsAndPinfo[1];
-    var bytecode = bcode:make-seq(compiledExpressions);
-    return [bytecode, pinfo1];
- */
-  };
 };
-
+beginExpr.prototype = heir(Program.prototype);
 
 // Lambda expression
 function lambdaExpr(args, body) {
+  Program.call(this);
   this.args = args;
   this.body = body;
   this.toString = function(){
@@ -187,35 +173,12 @@ function lambdaExpr(args, body) {
   };
   // Compile a lambda expression.  The lambda must close its free variables over the
   // environment.
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-/*    var freeVars = freeVariables(this.body,
-                             foldl( (function(variable env){return env.push(variable)})
-                                   , emptyEnv
-                                   lambdaExpr.args));
-    var closureVectorAndEnv = getClosureVectorAndEnv(this.args, freeVars, env),
-        closureVector = closureVectorAndEnv[0],
-        extendedEnv = closureVectorAndEnv[1];
-    var compiledBodyAndPinfo = compileExpressionAndPinfo(this.body, extendedEnv, pinfo),
-        compiledBody = compiledBodyAndPinfo[0],
-        pinfo = compiledBodyAndPinfo[1];
-    var lambdaArgs = new Array(this.args.length),
-        closureArgs = new Array(closureVector.length);
-    var bytecode = bcode:make-lam(null, [], lambdaExpr.args.length
-                                  ,lambdaArgs.map((function(){return types.symbol("val");}))
-                                  ,false
-                                  ,closureVector
-                                  ,closureArgs.map((function(){return types.symbol("val/ref");}))
-                                  ,0
-                                  ,compiledBody);
- */
-    return [bytecode, pinfo];
-
-  };
 };
+lambdaExpr.prototype = heir(Program.prototype);
 
 // Local expression TODO
 function localExpr(defs, body) {
+  Program.call(this);
   this.defs = defs;
   this.body = body;
   this.toString = function(){
@@ -225,13 +188,12 @@ function localExpr(defs, body) {
     console.log("desugaring local is not yet implemented");
     return new localExpr(desugarAll(this.defs), this.body.desugar());
   };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-  };
 };
+localExpr.prototype = heir(Program.prototype);
 
 // application expression
 function call(func, args) {
+  Program.call(this);
   this.func = func;
   this.args = args;
   this.toString = function(){
@@ -240,13 +202,12 @@ function call(func, args) {
   this.desugar = function(pinfo){
     return new call(this.func.desugar(), desugarAll(this.args));
   };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-  };
 };
+call.prototype = heir(Program.prototype);
 
 // if expression
 function ifExpr(predicate, consequence, alternative) {
+  Program.call(this);
   this.predicate = predicate;
   this.consequence = consequence;
   this.alternative = alternative;
@@ -258,65 +219,39 @@ function ifExpr(predicate, consequence, alternative) {
                       ,this.consequence.desugar()
                       ,this.alternative.desugar());
   };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-/*    var compiledPredicateAndPinfo = this.predicate.compile(env, pinfo),
-        compiledPredicate = compiledPredicateAndPinfo[0],
-        pinfo = compiledPredicateAndPinfo[1];
-    var compiledConsequenceAndPinfo = this.consequence.compile(env, pinfo),
-        compiledConsequence = compiledConsequenceAndPinfo[0],
-        pinfo = compiledConsequenceAndPinfo[1];
-    var compiledAlternateAndPinfo = this.alternative.comppile(env), pinfo),
-        compiledAlternate = compiledAlternateAndPinfo[0],
-        pinfo = compiledAlternateAndPinfo[1];
-    var bytecode = bcode:make-branch(compiledPredicate, compiledConsequence, compiledAlternate);
-    return [bytecode, pinfo];
- */
-  };
 };
+ifExpr.prototype = heir(Program.prototype);
 
 // time expression TODO
 function timeExpr(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    return [this.val, pinfo];
-  };
 };
+timeExpr.prototype = heir(Program.prototype);
 
 // symbol expression (ID)
 function symbolExpr(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-/*    var stackReference = envLookup(env, expr.val), bytecode;
-    if(stackReference instanceof localStackRef){
-      bytecode = bcode:make-localref(localStackRef.boxed, localStackRef.depth, false, false, false);
-    } else if(stackReference instanceof globalStackRef){
-      bytecode = bcode:make-toplevel(globalStackRef.depth, globalStackRef.pos, false, false);
-    } else if(stackReference instanceof unboundStackRef){
-      throw "Couldn't find "+expr.val+" in the environment";
-    }
-    return [bytecode, pinfo];
- */
-  };
 };
+symbolExpr.prototype = heir(Program.prototype);
 
 // number expression
 function numberExpr(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    return [this.val, pinfo];
-  };
 };
+numberExpr.prototype = heir(Program.prototype);
 
 // string expression
 function stringExpr(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return "\""+this.val.toString()+"\""; };
   this.desugar = function(pinfo){ return this; };
@@ -324,59 +259,55 @@ function stringExpr(val) {
     return [this.val, pinfo];
   };
 };
+stringExpr.prototype = heir(Program.prototype);
 
 // char expression
 function charExpr(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return "#\\"+this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    return [this.val, pinfo];
-  };
 };
+charExpr.prototype = heir(Program.prototype);
 
 // list expression
 function listExpr(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return "(list "+this.val.toString() + ")"; };
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-  };
 };
+listExpr.prototype = heir(Program.prototype);
 
 // mtList expression TODO
 function mtListExpr() {
+  Program.call(this);
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-  };
 };
+mtListExpr.prototype = heir(Program.prototype);
 
 // boolean expression
 function booleanExpr(sym) {
+  Program.call(this);
   sym = (sym instanceof symbolExpr)? sym.val : sym;
   this.val = (sym.val === "true" || sym.val === "#t");
   this.toString = function(){ return this.val? "#t" : "#f";};
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    return [this.val, pinfo];
-  };
 };
+booleanExpr.prototype = heir(Program.prototype);
 
 // quoted expression TODO
 function quotedExpr(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return "'"+this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-    return [this.val, pinfo];
-  };
 };
+quotedExpr.prototype = heir(Program.prototype);
 
 // quasiquoted expression TODO
 function quasiquotedExpr(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return "`"+this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
@@ -384,41 +315,23 @@ function quasiquotedExpr(val) {
     return [this.val, pinfo];
   };
 };
-
-// image expression
-function imageExpr(val, width, height, x, y) {
-  this.val = val;
-  this.width = width;
-  this.height = height;
-  this.x = x;
-  this.y = y;
-  this.toString = function(){
-    return "["+this.width+"x"+this.height+"image]";
-  };
-  this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    return [this.val, pinfo];
-  };
-};
+quasiquotedExpr.prototype = heir(Program.prototype);
 
 // quasiquoted list expression TODO
 function qqList(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return "`"+this.val.toString();};
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    return [this.val, pinfo];
-  };
 };
+qqList.prototype = heir(Program.prototype);
 
 function qqSplice(val) {
+  Program.call(this);
   this.val = val;
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    return [this.val, pinfo];
-  };
 };
-
+qqSplice.prototype = heir(Program.prototype);
 
 // couples = pair
 function couple(first, second) {
@@ -433,13 +346,12 @@ function coupleSecond(x) { return x.second; };
 
 // primop expression
 function primop(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return this.val.toString(); };
   this.desugar = function(pinfo){ return this; };
-  this.compile = function(env, pinfo){
-    throw "not implemented";
-  };
 };
+primop.prototype = heir(Program.prototype);
 
 // desugarAll : Listof SExps -> Listof SExps
 function desugarAll(programs){
@@ -451,6 +363,7 @@ function desugarAll(programs){
 ////////////////////// CHECK-EXPECTS ////////////////////////
 // check-expect TODO
 function chkExpect(actual, expected, sexp) {
+  Program.call(this);
   this.actual = actual;
   this.expected = expected;
   this.sexp = sexp;
@@ -459,9 +372,11 @@ function chkExpect(actual, expected, sexp) {
   };
   this.desugar = function(pinfo){ return this; };
 };
+chkExpect.prototype = heir(Program.prototype);
 
 // check-within TODO
 function chkWithin(actual, expected, range, sexp) {
+  Program.call(this);
   this.actual = actual;
   this.expected = expected;
   this.range = range;
@@ -471,9 +386,11 @@ function chkWithin(actual, expected, range, sexp) {
   };
   this.desugar = function(pinfo){ return this; };
 };
+chkWithin.prototype = heir(Program.prototype);
 
 // check-error
 function chkError(actual, error, sexp) {
+  Program.call(this);
   this.actual = actual;
   this.error = error;
   this.sexp = sexp;
@@ -482,11 +399,13 @@ function chkError(actual, error, sexp) {
   };
   this.desugar = function(pinfo){ return this; };
 };
+chkError.prototype = heir(Program.prototype);
 
 
 ///////////////////////////////// REQUIRE ///////////////////////////
 // require-url
 function req(uri) {
+  Program.call(this);
   this.uri = uri;
   this.toString = function(){ return "(require "+this.uri+")"; };
   this.desugar = function(pinfo){ return this; };
@@ -494,6 +413,8 @@ function req(uri) {
     throw "not implemented";
   };
 };
+req.prototype = heir(Program.prototype);
+
 function reqUri(x) {
   return x.uri;
 };
@@ -502,7 +423,7 @@ function requireFileP(x) {
   return isReq(x) && isString(reqUri(x));
 };
 
-function isisSymbolred(x) {
+function isSymbolred(x) {
   return (function (y) {
           return isSymbolExpr(y) && isSymbolEqualTo(y, x);
          });
@@ -523,6 +444,7 @@ function isRequirePlanet(x) {
 
 ////////////////////////////////// PROVIDE /////////////////////////////
 function provideStatement(val) {
+  Program.call(this);
   this.val = val;
   this.toString = function(){ return "(provide "+this.val+")" };
   this.desugar = function(pinfo){ return this; };
@@ -530,3 +452,4 @@ function provideStatement(val) {
     throw "not implemented";
   };
 };
+provideStatement.prototype = heir(Program.prototype);
