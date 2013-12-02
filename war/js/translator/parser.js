@@ -19,7 +19,7 @@
  function isLetrecExpr(x) { return x instanceof letrecExpr; };
  function isLetExpr(x) { return x instanceof letExpr; };
  function isLetStarExpr(x) { return x instanceof letStarExpr; };
- function isCall(x) { return x instanceof call; };
+ function isCallExpr(x) { return x instanceof callExpr; };
  function isCondExpr(x) { return x instanceof condExpr; };
  function isIfExpr(x) { return x instanceof ifExpr; };
  function isAndExpr(x) { return x instanceof andExpr; };
@@ -48,20 +48,6 @@
   /// SYNTATIC SUGAR ////////////////////////////
   // everything here should desugar down into compiler structures
 
- // Structure definition
-  function defStruct(name, fields) {
-    this.name = name;
-    this.fields = fields;
-    this.toString = function(){
-      return "(define-struct "+this.name.toString()+" ("+this.fields.toString()+"))";
-    };
-    this.desugar = function(pinfo){
-      console.log("desugaring defStruct is not yet implemented");
-      return this;
-    };
-    this.compile = function(env, pinfo){ throw "IMPOSSILBE: Structs should have been desugared"; };
-  };
-
   // Letrec expression
   function letrecExpr(bindings, body) {
     this.bindings = bindings;
@@ -86,7 +72,7 @@
     this.desugar = function(pinfo){
       var ids   = this.bindings.map(coupleFirst),
           exprs = desugarAll(this.bindings.map(coupleSecond));
-      return new call(new lambdaExpr(ids, this.body.desugar()), exprs);
+      return new callExpr(new lambdaExpr(ids, this.body.desugar()), exprs);
     };
     this.compile = function(env, pinfo){ throw "IMPOSSIBLE: letrec should have been desugared"; };
   };
@@ -173,10 +159,9 @@
    function parseSExp(sexp) {
      return isDefinition(sexp) ? parseDefinition(sexp) :
      isExpr(sexp) ? parseExpr(sexp) :
-     isTestCase(sexp) ? parseTestCase(sexp) :
      isRequire(sexp) ? parseRequire(sexp) :
      isProvide(sexp) ? parseProvide(sexp) :
-     throwError(new types.Message(["Not a Definition, Expression, Test Case, Library Require, or Provide"]),
+     throwError(new types.Message(["Not a Definition, Expression, Library Require, or Provide"]),
                                   sexp.location);
    };
     return sexps.map(parseSExp);
@@ -240,7 +225,7 @@
 
   //////////////////////////////////////// EXPRESSION PARSING ////////////////////////////////
   function isExpr(sexp) {
-    return ((!(isDefinition(sexp))) && (!(isTestCase(sexp))) && (!(isRequire(sexp))) && (!(isProvide(sexp))));
+    return ((!(isDefinition(sexp))) && (!(isRequire(sexp))) && (!(isProvide(sexp))));
   };
 
   function parseExpr(sexp) {
@@ -282,7 +267,7 @@
       return isTupleStartingWithOfLength(sexp, types.symbol("time"), 2);
     }
     function parseFuncCall(sexp) {
-      return isCons(sexp)? new call(parseExpr(sexp[0]), rest(sexp).map(parseExpr)) :
+      return isCons(sexp)? new callExpr(parseExpr(sexp[0]), rest(sexp).map(parseExpr)) :
                           throwError(new types.Message(["function call sexp"]), sexp.location);
     }
     function parseLambdaExpr(sexp) {
@@ -328,8 +313,8 @@
       throwError(new types.Message(["time expression sexp"]), sexp.location);
     }
     function parseQuotedExpr(sexp) {
-      return new quotedExpr(isEmpty(sexp) ?   new call(new primop(types.symbol("list")), []) :
-                            isCons(sexp) ?    new call(new primop(types.symbol("list")), sexp.map(parseQuotedExpr)) :
+      return new quotedExpr(isEmpty(sexp) ?   new callExpr(new primop(types.symbol("list")), []) :
+                            isCons(sexp) ?    new callExpr(new primop(types.symbol("list")), sexp.map(parseQuotedExpr)) :
                             isNumber(sexp) ?  new numberExpr(sexp) :
                             isString(sexp) ?  new stringExpr(sexp) :
                             isChar(sexp) ?    new charExpr(sexp.val) :
@@ -418,7 +403,7 @@
                     isSymbolEqualTo(types.symbol("quote"), sexp) ? new quotedExpr(sexp) :
                     isChar(sexp) ? new charExpr(sexp.val) :
                     ((isSymbolEqualTo(types.symbol("true"), sexp)) || (isSymbolEqualTo(types.symbol("false"), sexp))) ? new booleanExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("empty"), sexp) ? new call(new primop(types.symbol("list")), []) :
+                    isSymbolEqualTo(types.symbol("empty"), sexp) ? new callExpr(new primop(types.symbol("list")), []) :
                     isSymbolExpr(sexp) ? sexpIsisPrimop(sexp) ? new primop(sexp) : sexp :
                     imageP(sexp) ? parseImage(sexp) :
       throwError(new types.Message([sexp+"expected a function, but nothing's there"]), sexp.location);
@@ -458,55 +443,6 @@
 
   function isId(sexp) {
     return isSymbolExpr(sexp);
-  };
-
-  //////////////////////////////////////// TEST-CASE PARSING ////////////////////////////////
-  function isTestCase(sexp) {
-    return ((isCons(sexp)) &&
-            (isSymbolExpr(sexp[0])) &&
-            (((isSymbolEqualTo(sexp[0], types.symbol("check-expect"))) ||
-              (isSymbolEqualTo(sexp[0], types.symbol("check-within"))) ||
-              (isSymbolEqualTo(sexp[0], types.symbol("EXAMPLE"))) ||
-              (isSymbolEqualTo(sexp[0], types.symbol("check-error")))
-                                                         )));
-  };
-
-  function isCheckExpect(sexp) {
-    return isTripleWithFirstEqualTo(sexp, types.symbol("check-expect")) ||
-           isTripleWithFirstEqualTo(sexp, types.symbol("EXAMPLE"));
-  };
-
-  function isCheckError(sexp) {
-    return isTripleWithFirstEqualTo(sexp, types.symbol("check-error"));
-  };
-
-  function isCheckWithin(sexp) {
-    return isQuadWithFirstEqualTo(sexp, types.symbol("check-within"));
-  };
-
-  // parseTestCase : SExp -> AST
-  function parseTestCase(sexp) {
-    function parseCheckExpect(sexp) {
-      return isCheckExpect(sexp) ? new chkExpect(parseExpr(sexp[1]), parseExpr(sexp[2]), sexp) :
-      throwError(new types.Message(["check expect sexp"]), sexp.location);
-    };
-    function parseCheckError(sexp) {
-      return isCheckError(sexp) ? new chkError(parseExpr(sexp[1]), parseExpr(sexp[2]), sexp) :
-      throwError(new types.Message(["check error sexp"]), sexp.location);
-    };
-    function parseCheckWithin(sexp) {
-      return isCheckWithin(sexp) ? new chkWithin(parseExpr(sexp[1]), parseExpr(sexp[2]), parseExpr(sexp[3]), sexp) :
-      throwError(new types.Message(["check within sexp"]), sexp.location);
-    };
-
-    var testCase = isCons(sexp) ? isSymbolEqualTo(sexp[0], types.symbol("check-expect")) ? parseCheckExpect(sexp) :
-        isSymbolEqualTo(sexp[0], types.symbol("EXAMPLE")) ? parseCheckExpect(sexp) :
-        isSymbolEqualTo(sexp[0], types.symbol("check-error")) ? parseCheckError(sexp) :
-        isSymbolEqualTo(sexp[0], types.symbol("check-within")) ? parseCheckWithin(sexp) :
-        error(types.symbol("parse-test-case"), "Expected a test case but instead found: "+sexp) :
-        throwError(new types.Message(["test-case sexp"]), sexp.location);
-    testCase.location = sexp.location;
-    return testCase;
   };
 
   //////////////////////////////////////// REQUIRE PARSING ////////////////////////////////

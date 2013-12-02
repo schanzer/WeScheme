@@ -6,8 +6,8 @@
 - Get plain error messages working, complete desugaring, write analyzer
 */
 
-// COMMON STRUCTURES ////////////////////////////////////////
-// everything here is used by multiple phases of the compiler
+// COMMON FUNCTIONS AND STRUCTURES ////////////////////////////////////////
+// used by multiple phases of the compiler
 
 // isSymbolEqualTo : (types.symbol || symbolExpr) x 2 -> Boolean
 // are these all symbols of the same value?
@@ -24,8 +24,6 @@ function first(ls)  { return ls[0]; }
 function rest(ls)   { return ls.slice(1); }
 
 
-////////////////////////////////////// ERROR MESSAGES ////////////////
-
 // the location struct
 var Location = function(sCol, sLine, offset, span, source){
   this.sCol   = sCol;   // starting index into the line
@@ -37,6 +35,18 @@ var Location = function(sCol, sLine, offset, span, source){
     return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
   };
 }
+
+// couples = pair
+function couple(first, second) {
+  this.first = first;
+  this.second = second;
+  this.toString = function(){
+    return "("+this.first.toString() +" "+this.second.toString()+")";
+  };
+};
+function coupleFirst(x) { return x.first; };
+function coupleSecond(x) { return x.second; };
+
 // the constant struct
 var Constant = function(val, loc){
   this.val = val;
@@ -72,7 +82,8 @@ function throwError(msg, loc) {
   console.log(json);
   throw JSON.stringify(json);
 }
-///////////////////////////////////// PROGRAM STRUCTURES //////////////////////////////
+
+// OBJECT HIERARCHY//////////////////////////////////////////
 // Inheritance from pg 168: Javascript, the Definitive Guide.
 var heir = function(p) {
   var f = function() {};
@@ -87,8 +98,6 @@ var Program = function() {
   this.desugar = function(pinfo){ return this; };
 };
 
-
-///////////////////////////////////////// DEFINITIONS /////////////////////////////////
 // Function definition
 function defFunc(name, args, body) {
   Program.call(this);
@@ -150,7 +159,6 @@ function defStruct(name, fields) {
 };
 defStruct.prototype = heir(Program.prototype);
 
-///////////////////////////////////EXPRESSIONS//////////////////////////////
 // Begin expression
 function beginExpr(exprs) {
   Program.call(this);
@@ -194,7 +202,7 @@ function localExpr(defs, body) {
 localExpr.prototype = heir(Program.prototype);
 
 // application expression
-function call(func, args) {
+function callExpr(func, args) {
   Program.call(this);
   this.func = func;
   this.args = args;
@@ -202,10 +210,10 @@ function call(func, args) {
     return "("+this.func.toString()+" "+this.args.join(" ")+")";
   };
   this.desugar = function(pinfo){
-    return new call(this.func.desugar(), desugarAll(this.args));
+    return new callExpr(this.func.desugar(), desugarAll(this.args));
   };
 };
-call.prototype = heir(Program.prototype);
+callExpr.prototype = heir(Program.prototype);
 
 // if expression
 function ifExpr(predicate, consequence, alternative) {
@@ -315,17 +323,6 @@ function qqSplice(val) {
 };
 qqSplice.prototype = heir(Program.prototype);
 
-// couples = pair
-function couple(first, second) {
-  this.first = first;
-  this.second = second;
-  this.toString = function(){
-    return "("+this.first.toString() +" "+this.second.toString()+")";
-  };
-};
-function coupleFirst(x) { return x.first; };
-function coupleSecond(x) { return x.second; };
-
 // primop expression
 function primop(val) {
   Program.call(this);
@@ -333,52 +330,6 @@ function primop(val) {
 };
 primop.prototype = heir(Program.prototype);
 
-// desugarAll : Listof SExps -> Listof SExps
-function desugarAll(programs){
-  var desugared = [];
-  for(var i=0; i<programs.length; i++) desugared.push(programs[i].desugar());
-  return desugared;
-}
-
-////////////////////// CHECK-EXPECTS ////////////////////////
-// check-expect TODO
-function chkExpect(actual, expected, sexp) {
-  Program.call(this);
-  this.actual = actual;
-  this.expected = expected;
-  this.sexp = sexp;
-  this.toString = function(){
-    return "(check-expect "+this.sexp.toString() +" "+this.expected+")";
-  };
-};
-chkExpect.prototype = heir(Program.prototype);
-// check-within TODO
-function chkWithin(actual, expected, range, sexp) {
-  Program.call(this);
-  this.actual = actual;
-  this.expected = expected;
-  this.range = range;
-  this.sexp = sexp;
-  this.toString = function(){
-    return "(check-within "+this.sexp.toString() +" "+this.expected+")";
-  };
-};
-chkWithin.prototype = heir(Program.prototype);
-
-// check-error
-function chkError(actual, error, sexp) {
-  Program.call(this);
-  this.actual = actual;
-  this.error = error;
-  this.sexp = sexp;
-  this.toString = function(){
-    return "(check-error "+this.sexp.toString() +" "+this.error+")";
-  };
-};
-chkError.prototype = heir(Program.prototype);
-
-
-///////////////////////////////// REQUIRE ///////////////////////////
 // require-url
 function req(uri) {
   Program.call(this);
@@ -386,6 +337,14 @@ function req(uri) {
   this.toString = function(){ return "(require "+this.uri+")"; };
 };
 req.prototype = heir(Program.prototype);
+
+// provide
+function provideStatement(val) {
+  Program.call(this);
+  this.val = val;
+  this.toString = function(){ return "(provide "+this.val+")" };
+};
+provideStatement.prototype = heir(Program.prototype);
 
 function reqUri(x) {
   return x.uri;
@@ -414,10 +373,9 @@ function isRequirePlanet(x) {
   return isRequireType(x, types.symbol("planet"));
 };
 
-////////////////////////////////// PROVIDE /////////////////////////////
-function provideStatement(val) {
-  Program.call(this);
-  this.val = val;
-  this.toString = function(){ return "(provide "+this.val+")" };
-};
-provideStatement.prototype = heir(Program.prototype);
+// desugarAll : Listof SExps -> Listof SExps
+function desugarAll(programs){
+  var desugared = [];
+  for(var i=0; i<programs.length; i++) desugared.push(programs[i].desugar());
+  return desugared;
+}
