@@ -5,24 +5,61 @@
 (function () {
  'use strict';
  
- // extend the Program class to include defaults for analysis and compilation
+ // extend the Program class to collect definitions
+ // Program.collectDefnitions: pinfo -> pinfo
  Program.prototype.collectDefinitions = function(pinfo){
     return pinfo;
  };
+ defFunc.prototype.collectDefinitions = function(pinfo){
+ };
+ defVar.prototype.collectDefinitions = function(pinfo){
+ };
+ defVars.prototype.collectDefinitions = function(pinfo){
+ };
+ req.prototype.collectDefinitions = function(pinfo){
+ }
+ 
+ 
+ // extend the Program class to analyzing uses
+ // Program.analyzeUses: pinfo -> pinfo
  Program.prototype.analyzeUses = function(pinfo){
     return pinfo;
  };
+ defFunc.prototype.analyzeUses = function(pinfo){
+ };
+ defVar.prototype.analyzeUses = function(pinfo){
+ };
+ defVars.prototype.analyzeUses = function(pinfo){
+ };
+ beginExpr.prototype.analyzeUses = function(pinfo){
+ };
+ lambdaExpr.prototype.analyzeUses = function(pinfo){
+ };
+ localExpr.prototype.analyzeUses = function(pinfo){
+ };
+ callExpr.prototype.analyzeUses = function(pinfo){
+ }
+ ifExpr.prototype.analyzeUses = function(pinfo){
+ };
+ symbolExpr.prototype.analyzeUses = function(pinfo){
+ };
+ listExpr.prototype.analyzeUses = function(pinfo){
+ }
+ quasiquotedExpr.prototype.analyzeUses = function(pinfo){
+ }
+ qqList.prototype.analyzeUses = function(pinfo){
+ }
+ primop.prototype.analyzeUses = function(pinfo){
+ }
+
+ 
+ // extend the Program class to include compilation
  // compile: pinfo -> [bytecode, pinfo]
  Program.prototype.compile = function(pinfo){
     return [this.val, pinfo];
  };
  
  // override these functions for Programs that require it
- // Function definition
- defFunc.prototype.collectDefinitions = function(pinfo){
- };
- defFunc.prototype.analyzeUses = function(pinfo){
- };
  defFunc.prototype.compile = function(env, pinfo){
     throw "not implemented";
   /*    var compiledNameAndPinfo = compileExpression(this.name, env, pinfo),
@@ -36,11 +73,6 @@
    */
  };
  
- // Variable definition
- defVar.prototype.collectDefinitions = function(pinfo){
- };
- defVar.prototype.analyzeUses = function(pinfo){
- };
  defVar.prototype.compile = function(env, pinfo){
    throw "not implemented";
    /*    var compiledIdAndPinfo = compileExpression(this.name, env, pinfo),
@@ -54,12 +86,6 @@
     */
  };
 
- // Variable**S** definition
- // (not yet used)
- defVars.prototype.collectDefinitions = function(pinfo){
- };
- defVars.prototype.analyzeUses = function(pinfo){
- };
  defVars.prototype.compile = function(env, pinfo){
     throw "not implemented";
   /*    var compiledIdsAndPinfo = compileExpression(this.names, env, pinfo),
@@ -73,7 +99,6 @@
    */
  };
  
- // Structure definition
  defStruct.prototype.collectDefinitions = function(pinfo){
  };
  defStruct.prototype.analyzeUses = function(pinfo){
@@ -81,9 +106,6 @@
  defStruct.prototype.compile = function(env, pinfo){
  };
  
- // Begin expression
- beginExpr.prototype.analyzeUses = function(pinfo){
- };
  beginExpr.prototype.compile = function(env, pinfo){
     throw "not implemented";
   /*    var compiledExpressionsAndPinfo = compileExpressions(this.exprs, env, pinfo),
@@ -94,10 +116,6 @@
    */
  };
  
- // Lambda expression
- lambdaExpr.prototype.analyzeUses = function(pinfo){
- };
- // Lambda expression
  // Compile a lambda expression.  The lambda must close its free variables over the
  // environment.
  lambdaExpr.prototype.compile = function(env, pinfo){
@@ -125,25 +143,14 @@
     return [bytecode, pinfo];
  };
  
- // Local expression TODO
- localExpr.prototype.analyzeUses = function(pinfo){
- };
- // Local expression TODO
  localExpr.prototype.compile = function(env, pinfo){
     throw "compiling locals is not implemented";
  };
  
- // application expression
- callExpr.prototype.analyzeUses = function(pinfo){
- }
- // application expression
  callExpr.prototype.compile = function(env, pinfo){
     throw "compiling calls is not implemented";
  };
  
- // if expression
- ifExpr.prototype.analyzeUses = function(pinfo){
- };
  ifExpr.prototype.compile = function(env, pinfo){
     throw "not implemented";
   /*    var compiledPredicateAndPinfo = this.predicate.compile(env, pinfo),
@@ -160,9 +167,6 @@
    */
  };
  
- // symbol expression (ID)
- symbolExpr.prototype.analyzeUses = function(pinfo){
- };
  symbolExpr.prototype.compile = function(env, pinfo){
     throw "not implemented";
   /*    var stackReference = envLookup(env, expr.val), bytecode;
@@ -177,86 +181,64 @@
    */
  };
  
- // list expression
- listExpr.prototype.analyzeUses = function(pinfo){
- }
  listExpr.prototype.compile = function(env, pinfo){
  }
- 
- // quoted expression TODO
  quotedExpr.prototype.compile = function(env, pinfo){
- }
- 
- // quasiquoted expression TODO
- quasiquotedExpr.prototype.analyzeUses = function(pinfo){
- }
- quasiquotedExpr.prototype.compile = function(env, pinfo){
- }
- 
- // quasiquoted list expression TODO
- qqList.prototype.analyzeUses = function(pinfo){
  }
  qqList.prototype.compile = function(env, pinfo){
  }
- 
- // primop expression
- primop.prototype.analyzeUses = function(pinfo){
- }
  primop.prototype.compile = function(env, pinfo){
  }
- 
- // require-url
- req.prototype.collectDefinitions = function(pinfo){
- 
+ quasiquotedExpr.prototype.compile = function(env, pinfo){
  }
  req.prototype.compile = function(pinfo){
-    throw "compiling requires is not implemented";
  };
-
  provideStatement.prototype.compile = function(env, pinfo){
-    throw "compiling provides is not implemented";
  };
 
 /////////////////////////////////////////////////////////////
- function programAnalyze(programs){
-    programAnalyzeWithPinfo(programs, (getBasePinfo("base")));
+ function analyze(programs){
+    programAnalyzeWithPinfo(programs, getBasePinfo("base"));
  }
  
+ // programAnalyzerWithPinfo : [listof Programs], pinfo -> pinfo
+ // build up pinfo by looking at definitions, provides and uses
  function programAnalyzerWithPinfo(programs, pinfo){
+
+  // collectDefinitions: [listof Programs] pinfo -> pinfo
+   // Collects the definitions either imported or defined by this program.
+   function collectDefinitions(programs, pinfo){
+     // FIXME: this does not yet say anything if a definition is introduced twice
+     // in the same lexical scope.  We must do this error check!
+     return programs.reduce((function(p, pinfo){
+                             return p.collectDefinitions(pinfo);
+                             })
+                            , pinfo);
+   }
+   // collectProvides: [listof Programs] pinfo -> pinfo
+   // Walk through the program and collect all the provide statements.
+   function collectProvides(programs, pinfo){
+      function collectProvide(p, pinfo){
+        return pinfo;
+      }
+      return programs.reduce((function(p, pinfo){
+                                return (p instanceof provideStatement)?
+                                  collectProvide(p, pinfo) : pinfo;
+                              })
+                             , pinfo);
+   }
+   // analyzeUses: [listof Programs] pinfo -> pinfo
+   // Collects the uses of bindings that this program uses.
+    function analyzeUses(programs, pinfo){
+      return programs.reduce((function(p, pinfo){
+                                return p.analyzeUses(pinfo);
+                              })
+                             , pinfo);
+    }
+
     var pinfo1 = collectDefinitions(programs, pinfo),
         pinfo2 = collectProvides(programs, pinfo1);
     return analyzeUses(programs, pinfo2);
- }
- 
- // collectDefinitions: program pinfo -> pinfo
- // Collects the definitions either imported or defined by this program.
- function collectDefinitions(programs, pinfo){
-    // FIXME: this does not yet say anything if a definition is introduced twice
-    // in the same lexical scope.  We must do this error check!
-    return programs.reduce((function(p, pinfo){
-                            return p.collectDefinitions(pinfo);
-                            })
-                           , pinfo);
- }
- // collectProvides: program pinfo -> pinfo
- // Walk through the program and collect all the provide statements.
- function collectProvides(programs, pinfo){
-    function collectProvide(p, pinfo){
-      return pinfo;
-    }
-    return programs.reduce((function(p, pinfo){
-                              return (p instanceof provideStatement)?
-                                    collectProvide(p, pinfo) : pinfo;
-                            })
-                           , pinfo);
- }
- // analyzeUses: program pinfo -> pinfo
- // Collects the uses of bindings that this program uses.
- function analyzeUses(programs, pinfo){
-    return programs.reduce((function(p, pinfo){
-                         return p.analyzeUses(pinfo);
-                         })
-                        , pinfo);
  }
  
  // compile-compilation-top: program pinfo -> bytecode
@@ -281,7 +263,7 @@
         exprs    = program.filter(isExpression);
  
     // Program [bytecodes, pinfo, env?] -> [bytecodes, pinfo]
-    // compile the program, and add the bytecodes and pinfo information to the acc
+    // compile the program, then add the bytecodes and pinfo information to the acc
     function compileAndCollect(p, acc){
       var compiledProgramAndPinfo = p.compile(acc[1]),
           compiledProgram = compiledProgramAndPinfo[0],
@@ -306,5 +288,6 @@
  /////////////////////
  /* Export Bindings */
  /////////////////////
+ window.analyze = analyze;
  window.compile = compile;
 })();
