@@ -15,7 +15,7 @@ function isSymbolEqualTo(x, y) {
     x = (x instanceof symbolExpr)? x.val : x;
     y = (y instanceof symbolExpr)? y.val : y;
     return x.val === y.val;
-  }
+}
 
 function cons(x, y) { return [x].concat(y);}
 function isCons(x)  { return x instanceof Array && x.length>=1;}
@@ -23,7 +23,18 @@ function isEmpty(x) { return x instanceof Array && x.length===0;}
 function first(ls)  { return ls[0]; }
 function rest(ls)   { return ls.slice(1); }
 
-
+// uniqueSymbols : [listof SymbolExprs] -> Boolean
+// sort the array, and return true unless a duplicate is found
+function uniqueSymbols(lst){
+  var sorted_arr = list.sort(); // You can define the comparing function here.
+  var results = [];
+  for (var i = 0; i < arr.length - 1; i++) {
+    if (sorted_arr[i + 1] == sorted_arr[i]) {
+      return false;
+    }
+  }
+  return true;
+}
 // the location struct
 var Location = function(sCol, sLine, offset, span, source){
   this.sCol   = sCol;   // starting index into the line
@@ -84,155 +95,6 @@ function throwError(msg, loc) {
   throw JSON.stringify(json);
 }
 
-// Representation of the stack environment of the mzscheme vm, so we know where
-// things live.
-
-function env(){}
-function emptyEnv() {}
-function localEnv(name, isBoxed, parentEnv){
-  this.name = name; this.isBoxed = isBoxed; this.parentEnv = parentEnv;
-}
-function globalEnv(names, parentEnv){
-  this.names = names; this.parentEnv = parentEnv;
-}
-function unnamedEnv(parentEnv){
-  this.parentEnv = parentEnv;
-}
-var EMPTYENV = new emptyEnv();
-
-// envPushGlobals: env (listof symbol) -> env
-function envPushGlobals(env, names){
-  return new globalEnv(names, env);
-}
-
-// envPushLocal: env symbol -> env
-function envPushLocal(env, name){
-  new localEnv(name, false, env);
-}
-
-// envPushLocalBoxed: env symbol -> env
-function envPushLocalBoxed(env, name){
-  new localEnv(name, true, env);
-}
-
-// envPushUnnamed: env -> env
-function envPushUnnamed(env){
-  new unnamedEnv(env);
-}
-
-// envPop: env -> env
-function envPop(env){
-  if(env instanceof emptyEnv){
-    throwError('env-pop "empty env"');
-  } else {
-    return env.parentEnv;
-  }
-}
-   
-function stackReference(){}
-function localStackReference(name, isBoxed, depth){
-  this.name = name;
-  this.isBoxed = isBoxed;
-  this.depth = depth;
-}
-function globalStackReference(name, depth, pos){
-  this.name = name;
-  this.pos = pos;
-  this.depth = depth;
-}
-function unboundStackReference(name){
-  this.name = name;
-}
-
-// position: symbol (listof symbol) -> (number || #f)
-// Find position of element in list; return false if we can't find the element.
-function position(x, L){
-  return L.indexOf(x) > -1;
-}
-// envLookup: env symbol -> stack-reference
-// given a symbol and an env, return a stack reference to that symbol's value
-function envLookup(env, name){
-  function search(env, depth){
-    if(env instanceof emptyEnv){
-      return new unboundStackReference(name);
-    } else if(env instanceof localEnv){
-      return (name===env.name)? new localStackReference(name, env.isBoxed, env.depth) :
-                                search(env.parentEnv, depth+1);
-    } else if(env instanceof globalEnv){
-      if(position(name, env.names)){
-        return (function (pos){return new globalStackReference(name, dept, pos);});
-      } else {
-        return search(env.parentEnv, depth+1);
-      }
-    } else if(env instanceof unnamedEnv){
-      search(env.parentEnv, depth+1);
-    }
-  }
-  search(env, 0);
-}
-
-// envPeek: env number -> env
-// search up the chain until we find the environment or run dry
-function envPeek(env, depth){
-  if(depth === 0){
-    return env;
-  } else if(env instanceof emptyEnv){
-    throwError("env-peek");
-  } else {
-    envPeek(env.parentEnv, depth-1);
-  }
-}
-
-// pinfo (program-info) is the "world" structure for the compilers;
-// it captures the information we get from analyzing and compiling
-// the program, and also maintains some auxillary structures.
-function pinfo(env, modules, usedBindingsHash, freeVariables, gensymCounter,
-               providedNames,definedNames, sharedExpressions,
-               withLocationEmits, allowRedefinition,
-               moduleResolver, modulePathResolver, currentModulePath,
-               declaredPermissions){
-  this.env = env;                             // env
-  this.modules = modules;                     // (listof module-binding)
-  this.usedBindingsHash = usedBindingsHash;   // (hashof symbol binding)
-  this.freeVariables = freeVariables;         // (listof symbol)
-  this.gensymCounter = gensymCounter;         // number
-  this.providedNames = providedNames;         // (hashof symbol provide-binding)
-  this.definedNames = definedNames;           // (hashof symbol binding)
-  
-  this.sharedExpressions = sharedExpressions; // (hashof expression labeled-translation)
-  // Maintains a mapping between expressions and a labeled translation.  Acts
-  // as a symbol table to avoid duplicate construction of common literal values.
-  
-  this.withLocationEmits=withLocationEmits;    // boolean
-  // If true, the compiler emits calls to plt.Kernel.setLastLoc to maintain
-  // source position during evaluation.
-  
-  this.allowRedefinition = allowRedefinition;   // boolean
-  // If true, redefinition of a value that's already defined will not raise an error.
-  
-  // For the module system.
-  this.moduleResolver = moduleResolver;         // (module-name -> (module-binding | false))
-  this.modulePathResolver = modulePathResolver; // (string module-path -> module-name)
-  this.currentModulePath = currentModulePath;   // module-path
-  
-  this.declaredPermissions = declaredPermissions;// (listof (listof symbol any/c))
-}
-
-function makeImmutableHash(){}
-function defaultModuleResolver(){}
-function defaultModulePathResolver(){}
-function defaultCurrentModulePath(){}
-var emptyPinfo = new pinfo(emptyEnv,
-                           [], makeImmutableHash(), [], 0, makeImmutableHash(), makeImmutableHash(),
-                           makeImmutableHash(),
-                           true,
-                           true,
-                           defaultModuleResolver,
-                           defaultModulePathResolver,
-                           defaultCurrentModulePath,
-                           [])
-
-
 // OBJECT HIERARCHY//////////////////////////////////////////
 // Inheritance from pg 168: Javascript, the Definitive Guide.
 var heir = function(p) {
@@ -246,8 +108,6 @@ var heir = function(p) {
 var Program = function() {
   // -> String
   this.toString = function(){ return this.val.toString(); };
-  // pinfo -> [Program, pinfo]
-  this.desugar = function(pinfo){ return [this, pinfo]; };
 };
 
 // Function definition
@@ -258,9 +118,6 @@ function defFunc(name, args, body) {
   this.body = body;
   this.toString = function(){
     return "(define ("+this.name.toString()+" "+this.args.join(" ")+")\n    "+this.body.toString()+")";
-  };
-  this.desugar = function(pinfo){
-    return new defFunc(this.name, this.args, this.body.desugar());
   };
 };
 defFunc.prototype = heir(Program.prototype);
@@ -274,9 +131,6 @@ function defVar(name, expr) {
   this.toString = function(){
     return "(define "+this.name.toString()+" "+this.expr.toString()+")";
   };
-  this.desugar = function(pinfo){
-    return new defVar(this.name, this.expr.desugar());
-  };
 };
 defVar.prototype = heir(Program.prototype);
 
@@ -289,10 +143,6 @@ function defVars(names, expr) {
   this.toString = function(){
     return "(define ("+this.names.join(" ")+") "+this.expr.toString()+")";
   };
-  this.desugar = function(pinfo){
-    console.log("desugaring defVars is not yet implemented");
-    return this;
-  };
 };
 defVars.prototype = heir(Program.prototype);
 
@@ -304,10 +154,6 @@ function defStruct(name, fields) {
   this.toString = function(){
     return "(define-struct "+this.name.toString()+" ("+this.fields.toString()+"))";
   };
-  this.desugar = function(pinfo){
-    console.log("desugaring defStruct is not yet implemented");
-    return this;
-  };
 };
 defStruct.prototype = heir(Program.prototype);
 
@@ -317,9 +163,6 @@ function beginExpr(exprs) {
   this.exprs = exprs;
   this.toString = function(){
     return "(begin "+this.exprs.join(" ")+")";
-  };
-  this.desugar = function(pinfo){
-    return new beginExpr(desugarAll(this.exprs));
   };
 };
 beginExpr.prototype = heir(Program.prototype);
@@ -332,9 +175,6 @@ function lambdaExpr(args, body) {
   this.toString = function(){
     return "(lambda ("+this.args.join(" ")+") ("+this.body.toString()+"))";
   };
-  this.desugar = function(pinfo){
-    return new lambdaExpr(this.args, this.body.desugar());
-  };
 };
 lambdaExpr.prototype = heir(Program.prototype);
 
@@ -346,12 +186,55 @@ function localExpr(defs, body) {
   this.toString = function(){
     return "(local ("+this.defs.toString()+") ("+this.body.toString()+"))";
   };
-  this.desugar = function(pinfo){
-    console.log("desugaring local is not yet implemented");
-    return new localExpr(desugarAll(this.defs), this.body.desugar());
-  };
 };
 localExpr.prototype = heir(Program.prototype);
+
+// Letrec expression
+function letrecExpr(bindings, body) {
+  this.bindings = bindings;
+  this.body = body;
+  this.toString = function(){
+    return "(letrec ("+this.bindings.toString()+") ("+this.body.toString()+"))";
+  };
+};
+
+// Let expression
+function letExpr(bindings, body) {
+  this.bindings = bindings;
+  this.body = body;
+  this.toString = function(){
+    return "(let ("+this.bindings.toString()+") ("+this.body.toString()+"))";
+  };
+};
+
+// Let* expressions
+function letStarExpr(bindings, body) {
+  this.bindings = bindings;
+  this.body = body;
+  this.toString = function(){
+    return "(let* ("+this.bindings.toString()+") ("+this.body.toString()+"))";
+  };
+};
+
+// cond expression
+function condExpr(clauses) {
+  this.clauses = clauses;
+  this.toString = function(){
+    return "(cond\n    "+this.clauses.join("\n    ")+")";
+  };
+};
+
+// and expression
+function andExpr(exprs) {
+  this.exprs = exprs;
+  this.toString = function(){ return "(and "+this.exprs.join(" ")+")"; };
+};
+
+// or expression
+function orExpr(exprs) {
+  this.exprs = exprs;
+  this.toString = function(){ return "(or "+this.exprs.toString()+")"; };
+};
 
 // application expression
 function callExpr(func, args) {
@@ -360,9 +243,6 @@ function callExpr(func, args) {
   this.args = args;
   this.toString = function(){
     return "("+this.func.toString()+" "+this.args.join(" ")+")";
-  };
-  this.desugar = function(pinfo){
-    return new callExpr(this.func.desugar(), desugarAll(this.args));
   };
 };
 callExpr.prototype = heir(Program.prototype);
@@ -375,11 +255,6 @@ function ifExpr(predicate, consequence, alternative) {
   this.alternative = alternative;
   this.toString = function(){
     return "(if "+this.predicate.toString()+" "+this.consequence.toString()+" "+this.alternative.toString()+")";
-  };
-  this.desugar = function(pinfo){
-    return new ifExpr(this.predicate.desugar()
-                      ,this.consequence.desugar()
-                      ,this.alternative.desugar());
   };
 };
 ifExpr.prototype = heir(Program.prototype);
@@ -426,7 +301,6 @@ function listExpr(val) {
   Program.call(this);
   this.val = val;
   this.toString = function(){ return "(list "+this.val.toString() + ")"; };
-  this.desugar = function(pinfo){ return new listExpr(this.val.desugar()); };
 };
 listExpr.prototype = heir(Program.prototype);
 
@@ -497,10 +371,3 @@ function provideStatement(val) {
   this.toString = function(){ return "(provide "+this.val+")" };
 };
 provideStatement.prototype = heir(Program.prototype);
-
-// desugarAll : Listof SExps -> Listof SExps
-function desugarAll(programs){
-  var desugared = [];
-  for(var i=0; i<programs.length; i++) desugared.push(programs[i].desugar());
-  return desugared;
-}

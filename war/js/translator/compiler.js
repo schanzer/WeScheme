@@ -1,9 +1,512 @@
 /*
- Functions that every Expr should have:
- - export programAnalyze and programAnalyzeWithPinfo
+ TODO
+ - desugar defvars, defstruct and local
+ - gensym for or?
+ - collectDefinitions
+ - analyzeUses
 */
 (function () {
  'use strict';
+
+  var keywords = ["cond", "else", "let", "case", "let*", "letrec", "quote",
+                  "quasiquote", "unquote","unquote-splicing","local","begin",
+                  "if","or","and","when","unless","lambda","λ","define",
+                  "define-struct", "define-values"];
+
+  // ENVIRONMENT STRUCTS ////////////////////////////////////////////////////////////////
+  // Representation of the stack environment of the mzscheme vm, so we know where
+  // things live.
+  function env(){
+    // pushGlobals: (listof symbol) -> env
+    function pushGlobals(names){ return new globalEnv(names, this); }
+
+    // pushLocal: symbol -> env
+    function pushLocal(name){ return new localEnv(name, false, this); };
+
+    // pushLocalBoxed: symbol -> env
+    function pushLocalBoxed(name){ return new localEnv(name, true, this); };
+
+    // pushUnnamed: -> env
+    function pushUnnamed(){ return new unnamedEnv(this); };
+
+    // pop: -> env
+    function pop(){ return this.parentEnv; };
+ 
+    // lookup: symbol -> stack-reference
+    // given a symbol, return a stack reference to that symbol's value in this environment
+    function lookup(name){ this.search(this, 0); }
+
+    // peek: number -> env
+    // search up the chain until we find the environment or run dry
+    function peek(depth){
+      if(depth === 0){ return env; }
+      else { this.peek(this.parentEnv, depth-1); }
+    }
+  }
+
+  function emptyEnv(){
+    env.call(this);
+    this.pop = function(){throwError('env-pop "empty env"');};
+    this.search = function(name, depth){return new unboundStackReference(name);};
+    this.peek = function(depth){throwError("env-peek");};
+  }
+  emptyEnv.prototype = heir(env.prototype);
+  function localEnv(name, isBoxed, parentEnv){
+    env.call(this);
+    this.name = name; this.isBoxed = isBoxed; this.parentEnv = parentEnv;
+    this.search = function(name, depth){
+      return (name===this.name)? (function (pos){return new globalStackReference(name, dept, pos);}) :
+                                this.parentEnv.lookup(name, depth+1);
+
+    };
+  }
+  localEnv.prototype = heir(env.prototype);
+
+  function globalEnv(names, parentEnv){
+    env.call(this);
+    this.names = names; this.parentEnv = parentEnv;
+    this.search = function(name, depth){
+      return (position(name, this.names))? new localStackReference(name, this.isBoxed, this.depth) :
+                                this.parentEnv.lookup(name, depth);
+
+    };
+  }
+  globalEnv.prototype = heir(env.prototype);
+
+ function unnamedEnv(parentEnv){
+    env.call(this);
+    this.parentEnv = parentEnv;
+    this.search = function(name, depth){return this.parentEnv.lookup(name, depth-1);};
+  }
+  unnamedEnv.prototype = heir(env.prototype);
+
+ // STACKREF STRUCTS ////////////////////////////////////////////////////////////////
+  function stackReference(){}
+  function localStackReference(name, isBoxed, depth){
+    stackReference.call(this);
+    this.name = name;
+    this.isBoxed = isBoxed;
+    this.depth = depth;
+  }
+  localStackReference.prototype = heir(stackReference.prototype);
+  function globalStackReference(name, depth, pos){
+    stackReference.call(this);
+    this.name = name;
+    this.pos = pos;
+    this.depth = depth;
+  }
+  globalStackReference.prototype = heir(stackReference.prototype);
+  function unboundStackReference(name){
+    stackReference.call(this);
+    this.name = name;
+  }
+  unboundStackReference.prototype = heir(stackReference.prototype);
+
+  // position: symbol (listof symbol) -> (number || #f)
+  // Find position of element in list; return false if we can't find the element.
+  function position(x, lst){
+    return (lst.indexOf(x) > -1)? lst.indexOf(x) : false;
+  }
+ 
+  // PINFO STRUCTS ////////////////////////////////////////////////////////////////
+  var defaultCurrentModulePath = "";
+  function defaultModuleResolver(){}
+  function defaultModulePathResolver(){}
+
+  // pinfo (program-info) is the "world" structure for the compilers;
+  // it captures the information we get from analyzing and compiling
+  // the program, and also maintains some auxillary structures.
+  function pinfo(env, modules, usedBindingsHash, freeVariables, gensymCounter,
+                 providedNames,definedNames, sharedExpressions,
+                 withLocationEmits, allowRedefinition,
+                 moduleResolver, modulePathResolver, currentModulePath,
+                 declaredPermissions){
+    this.env = env;                             // env
+    this.modules = modules;                     // (listof module-binding)
+    this.usedBindingsHash = usedBindingsHash;   // (hashof symbol binding)
+    this.freeVariables = freeVariables;         // (listof symbol)
+    this.gensymCounter = gensymCounter;         // number
+    this.providedNames = providedNames;         // (hashof symbol provide-binding)
+    this.definedNames = definedNames;           // (hashof symbol binding)
+    
+    this.sharedExpressions = sharedExpressions; // (hashof expression labeled-translation)
+    // Maintains a mapping between expressions and a labeled translation.  Acts
+    // as a symbol table to avoid duplicate construction of common literal values.
+    
+    this.withLocationEmits = withLocationEmits;  // boolean
+    // If true, the compiler emits calls to plt.Kernel.setLastLoc to maintain
+    // source position during evaluation.
+    
+    this.allowRedefinition = allowRedefinition;   // boolean
+    // If true, redefinition of a value that's already defined will not raise an error.
+    
+    // For the module system.
+    this.moduleResolver = moduleResolver;         // (module-name -> (module-binding | false))
+    this.modulePathResolver = modulePathResolver; // (string module-path -> module-name)
+    this.currentModulePath = currentModulePath;   // module-path
+    
+    this.declaredPermissions = declaredPermissions;// (listof (listof symbol any/c))
+ 
+    /////////////////////////////////////////////////
+    // functions for manipulating pinfo objects
+    this.isRedefinition = function(name){ return this.env.lookup(name); };
+ 
+    // usedBindings: -> (listof binding)
+    // Returns the list of used bindings computed from the program analysis.
+    this.usedBindings = function(){ return this.usedBindingsHash.values(); };
+ 
+    this.accumulateDeclaredPermission = function(name, permission){
+      return new pinfo(this.env, this.modules, this.usedBindingsHash, this.freeVariables,
+                       this.gensymCounter+1, this.providedNames, this.definedNames,
+                       this.sharedExpressions, this.withLocationEmits,
+                       this.allowRedefinition,
+                       this.moduleResolver, this.modulePathResolver, this.currentModulePath,
+                       [[name, position]].concat(this.declaredPermissions));
+    };
+ 
+    this.accumulateSharedExpression = function(expression, translation){
+      var labeledTranslation = makeLabeledTranslation(this.gensymCounter, translation);
+      new pinfo(this.env, this.modules, this.usedBindingsHash, this.freeVariables,
+                this.gensymCounter+1, this.providedNames, this.definedNames,
+                this.sharedExpressions.put(labeledTranslation, expression),
+                this.moduleResolver, this.modulePathResolver, this.currentModulePath,
+                this.declaredPermissions);
+    };
+ 
+    // accumulateDefinedBinding: binding loc -> pinfo
+    // Adds a new defined binding to a pinfo's set.
+    this.accumulateDefinedBinding = function(binding, loc){
+      if(keywords.indexOf(binding.id)>-1){
+        throwError(types.Message([new ColoredPart(binding.id, loc),
+                                  ": this is a reserved keyword and cannot be used"+
+                                  "as a variable or function name"]));
+      } else if(!this.allowRedefinition && isRedefinition(binding.id)){
+        var prevBinding = this.env.lookup(binding.id);
+        if(binding.loc){
+          throwError(types.Message([new ColoredPart(binding.id, binding.loc),
+                                    ": this name has a ",
+                                    new ColoredPart("previous definition", prevBinding.loc),
+                                    " and cannot be re-defined"]));
+ 
+        } else {
+          throwError(types.Message([new ColoredPart(binding.id, binding.loc),
+                                    ": this name has a ",
+                                    "previous definition",
+                                    " and cannot be re-defined"]));
+
+        }
+      } else {
+        return new pinfo(envExtend(this.env, binding), this.modules,
+                         this.usedBindingsHash, this.freeVariables,
+                         this.gensymCounter, this.providedNames,
+                         this.definedNames.put(binding.id, binding),
+                         this.sharedExpressions, this.withLocationEmits,
+                         this.allowRedefinition, this.moduleResolver,
+                         this.modulePathResolver, this.currentModulePath,
+                         this.declaredPermissions);
+      }
+    };
+ 
+    // accumulateBindings: (listof binding) Loc -> pinfo
+    // Adds a list of defined bindings to the pinfo's set.
+    this.accumulateDefinedBindings = function(bindings, loc){
+      return bindings.reduce((function(pinfo, b){
+          return this.accumulateDefinedBinding(b, loc);
+          }), this);
+    };
+ 
+ 
+    // accumuldateModuleBindings: (listof binding) -> pinfo
+    // Adds a list of module-imported bindings to the pinfo's known set of bindings, without
+    // including them within the set of defined names.
+    this.accumulateModuleBindings = function(bindings){
+      return bindings.reduce((function(pinfo, binding){
+        return new pinfo(envExtend(this.env, binding), this.modules,
+                         this.usedBindingsHash, this.freeVariables,
+                         this.gensymCounter, this.providedNames,
+                         this.definedNames.put(binding.id, binding),
+                         this.sharedExpressions, this.withLocationEmits,
+                         this.allowRedefinition, this.moduleResolver,
+                         this.modulePathResolver, this.currentModulePath,
+                         this.declaredPermissions);
+        }), this);
+    };
+   
+    // accumulateModule: module-binding -> pinfo
+    // Adds a module to the pinfo's set.
+    this.accumulateModule = function(module){
+      return new pinfo(this.env, [module].concat(this.modules),
+                       this.usedBindingsHash, this.freeVariables,
+                       this.gensymCounter, this.providedNames,
+                       this.definedNames, this.sharedExpressions,
+                       this.withLocationEmits, this.allowRedefinition,
+                       this.moduleResolver, this.modulePathResolver,
+                       this.declaredPermissions);
+    };
+
+    // accumulateBindingUse: binding -> pinfo
+    // Adds a binding's use to a pinfo's set.
+    this.accumulateBindingUse = function(binding){
+      return new pinfo(this.env, this.modules,
+                       this.usedBindingsHash.put(binding.id,binding),
+                       this.freeVariables, this.gensymCounter,
+                       this.providedNames, this.definedNames,
+                       this.sharedExpressions, this.withLocationEmits,
+                       this.allowRedefinition, this.moduleResolver,
+                       this.modulePathResolver, this.currentModulePath,
+                       this.declaredPermissions);
+    };
+   
+    // accumulateFreeVariableUse: symbol -> pinfo
+    // Mark a free variable usage.
+    this.accumulateFreeVariableUse = function(sym){
+      return new pinfo(this.env, this.modules, this.usedBindingsHash,
+                       ((this.freeVariables.indexOf(sym) > -1)?
+                        this.freeVariables : [sym].concat(this.freeVariables)),
+                       this.gensymCounter,
+                       this.providedNames, this.definedNames,
+                       this.sharedExpressions, this.withLocationEmits,
+                       this.allowRedefinition, this.moduleResolver,
+                       this.modulePathResolver, this.currentModulePath,
+                       this.declaredPermissions);
+    };
+   
+    // gensym: symbol -> [pinfo, symbol]
+    // Generates a unique symbol.
+    this.gensym = function(label){
+      return [new pinfo(this.env, this.modules, this.usedBindingsHash,
+                        this.freeVariables, this.gensymCounter+1,
+                        this.providedNames, this.definedNames,
+                        this.sharedExpressions, this.withLocationEmits,
+                        this.allowRedefinition, this.moduleResolver,
+                        this.modulePathResolver, this.currentModulePath,
+                        this.declaredPermissions),
+              
+              label+this.gensymCounter];
+    };
+ 
+    // permissions: -> (listof permission)
+    // Given a pinfo, collect the list of permissions.
+    this.permissions = function(){
+      // unique : listof X -> listof X
+      function unique(lst){
+        if(lst.length === 0) return lst;
+        else if(lst.slice(1).indexOf(lst[0]) > -1) return unique.slice(1)
+        else return [lst[0]].concat(unique.slice(1));
+      }
+      function reducePermissions(permissions, binding){
+        if(binding.isFunction) return binding.functionPermissions.concat(permissions);
+        else if(binding.isConstant) return binding.constantPermissions.concat(permissions);
+      }
+      return unique(this.usedBindings().reduce(reducePermissions, []));
+    }
+
+    // getBasePinfo: symbol -> pinfo
+    // Returns a pinfo that knows the base definitions. Language can be one of the following:
+    // 'base
+    // 'moby
+    this.getBasePinfo = function(language){
+      var pinfo = makeEmptyPinfo();
+      if(Language === "moby"){
+        pinfo.env = extendEnv_ModuleBinding(getTopLevelEnv(language),
+                                            mobyModuleBinding);
+      } else if(Language === "base"){
+        pinfo.env = getTopLevelEnv(language);
+      }
+      return pinfo;
+    };
+ }
+ 
+ function makeEmptyPinfo(){
+  return new pinfo(new emptyEnv(),
+                   [], types.makeLowLevelEqHash(), [], 0,
+                   types.makeLowLevelEqHash(),
+                   types.makeLowLevelEqHash(),
+                   types.makeLowLevelEqHash(),
+                   true, true,
+                   new defaultModuleResolver,
+                   new defaultModulePathResolver,
+                   defaultCurrentModulePath,
+                   []);
+ };
+
+ // BINDING STRUCTS ///////////////////////////////////////////////////////
+ function provideBindingId(stx){ this.stx = stx;}
+ function provideBindingStructId(stx){ this.stx = stx;}
+ 
+/*
+       // pinfo-get-exposed-bindings: pinfo -> (listof binding)
+       // Extract the list of the defined bindings that are exposed by provide.
+       (define (pinfo-get-exposed-bindings a-pinfo)
+        (local [;; lookup-provide-binding-in-definition-bindings: provide-binding compiled-program -> (listof binding)
+                ;; Lookup the provided bindings.
+                (define (lookup-provide-binding-in-definition-bindings binding)
+                 (local [(define the-binding
+                          (cond
+                           [(hash-has-key? (pinfo-defined-names a-pinfo)
+                             (stx-e binding.stx))
+                            (check-binding-compatibility binding
+                             (hash-ref (pinfo-defined-names a-pinfo)
+                              (stx-e binding.stx)))]
+                           [else
+                            (raise (make-moby-error (stx-loc binding.stx)
+                                    (make-moby-error-type:provided-name-not-defined
+                                     (stx-e binding.stx))))]))
+                         
+                         // ref: symbol -> binding
+                         // Lookup the binding, given the symbolic identifier.
+                         (define (ref id)
+                          (hash-ref (pinfo-defined-names a-pinfo) id))]
+                  (cond
+                   [(provide-binding:struct-id? binding)
+                    (append (list the-binding
+                             (ref (binding:structure-constructor the-binding))
+                             (ref (binding:structure-predicate the-binding)))
+                     (map ref (binding:structure-accessors the-binding))
+                     (map ref (binding:structure-mutators the-binding))
+                     )]
+                   [else
+                    (list the-binding)])))
+                
+                
+                // decorate-with-permissions: binding -> binding
+                // HACK!
+                (define (decorate-with-permissions a-binding)
+                 (binding-update-permissions a-binding
+                  (map second
+                   (filter (lambda (entry)
+                            (symbol=? (first entry)
+                             (binding-id a-binding)))
+                    (pinfo-declared-permissions a-pinfo)))))
+                
+                
+                // Make sure that if the provide says "struct-out ...", that the exported binding
+                // is really a structure.
+                (define (check-binding-compatibility binding a-binding)
+                 (cond
+                  [(provide-binding:struct-id? binding)
+                   (cond [(binding:structure? a-binding)
+                          a-binding]
+                    [else
+                     (raise (make-moby-error
+                             (stx-loc binding.stx)
+                             (make-moby-error-type:provided-structure-not-structure
+                              (stx-e binding.stx))))])]
+                  [else
+                   a-binding]))]
+         (for/fold ([acc '()])
+                     ([(id binding) (in-hash (pinfo-provided-names a-pinfo))])
+                     (append (map decorate-with-permissions
+                              (lookup-provide-binding-in-definition-bindings binding))
+                      acc))))
+  */
+
+ // DESUGARING ////////////////////////////////////////////////////////////////
+ 
+ // desugarProgram : Listof Programs null/pinfo -> [Listof Programs, pinfo]
+ function desugarProgram(programs, pinfo){
+    var acc = [ [], (pinfo || makeEmptyPinfo())];
+    return programs.reduce((function(acc, p){
+                              var desugaredAndPinfo = p.desugar(acc[1]);
+                              acc[0].push(desugaredAndPinfo[0]);
+                              return [acc[0], desugaredAndPinfo[1]];
+                            }), acc);
+ }
+ 
+ // Program.prototype.desugar: pinfo -> [Program, pinfo]
+ Program.prototype.desugar = function(pinfo){ return [this, pinfo]; };
+ defFunc.prototype.desugar = function(pinfo){
+    var bodyAndPinfo = this.body.desugar(pinfo);
+    return [new defFunc(this.name, this.args, bodyAndPinfo[0]), bodyAndPinfo[1]];
+ };
+ defVar.prototype.desugar = function(pinfo){
+    var exprAndPinfo = this.expr.desugar(pinfo);
+    return [new defVar(this.name, exprAndPinfo[1]), exprAndPinfo[1]];
+ };
+ defVars.prototype.desugar = function(pinfo){
+    throw "desugaring defVars is not yet implemented";
+    return this;
+ };
+ defStruct.prototype.desugar = function(pinfo){
+    throw "desugaring defStruct is not yet implemented";
+    return this;
+ };
+ beginExpr.prototype.desugar = function(pinfo){
+    var exprsAndPinfo = desugarProgram(this.exprs, pinfo);
+    return [new beginExpr(exprsAndPinfo[0]), exprsAndPinfo[1]];
+ };
+ lambdaExpr.prototype.desugar = function(pinfo){
+    var bodyAndPinfo = this.body.desugar(pinfo);
+    return [new lambdaExpr(this.args, bodyAndPinfo[0]), bodyAndPinfo[1]];
+ };
+ localExpr.prototype.desugar = function(pinfo){
+    var defnsAndPinfo = desugarProgram(this.defs, pinfo),
+        exprAndPinfo = this.body.desugar(pinfo);
+    throw "desugaring defStruct is not yet implemented";
+    return new localExpr(desugar(this.defs), this.body.desugar());
+ };
+ callExpr.prototype.desugar = function(pinfo){
+    var exprsAndPinfo = desugarProgram([this.func].concat[this.args], pinfo);
+    return [new callExpr(exprsAndPinfo[0][0], exprsAndPinfo[0].slice(1)),
+            exprsAndPinfo[1]];
+ };
+ ifExpr.prototype.desugar = function(pinfo){
+    var exprsAndPinfo = desugarProgram([this.predicate,
+                                        this.consequence,
+                                        this.alternative],
+                                       pinfo);
+    return [new ifExpr(exprsAndPinfo[0][0], exprsAndPinfo[0][1], exprsAndPinfo[0][2]),
+            exprsAndPinfo[1]];
+ };
+
+ // convert all these to simpler forms, then desugar those forms
+ // letrecs become locals
+ letrecExpr.prototype.desugar = function(pinfo){
+    function bindingToDefn(b){return new defVar(b.first, b.second.desugar());};
+    return [new localExpr(this.bindings.map(bindingToDefn), this.body.desugar()), pinfo];
+ };
+ // lets become calls
+ letExpr.desugar = function(pinfo){
+    var ids   = this.bindings.map(coupleFirst),
+        exprs = this.bindings.map(coupleSecond);
+    return (new callExpr(new lambdaExpr(ids, this.body), exprs)).desugar(pinfo);
+ };
+ // let*s become nested calls
+ letStarExpr.prototype.desugar = function(pinfo){
+    var ids   = this.bindings.map(coupleFirst),
+        exprs = this.bindings.map(coupleSecond),
+        body = this.body;
+    for(var i=0; i<this.bindings.length; i++){
+      body = new callExpr(new lambdaExpr(ids[i], body), exprs[i]);
+    }
+    return body.desugar(pinfo);
+ };
+ // conds become nested ifs
+ condExpr.prototype.desugar = function(pinfo){
+    var expr = this.clauses[this.clauses.length-1].second;
+    for(var i=this.clauses.length-2; i>-1; i--){
+      expr = new ifExpr(this.clauses[i].first,
+                        this.clauses[i].second,
+                        expr);
+    }
+    return expr.desugar(pinfo);
+ };
+ // ands become nested ifs
+ andExpr.prototype.desugar = function(pinfo){
+    var expr = this.exprs[exprs.length-1]; // ASSUME length >=2!!!
+    for(var i=this.exprs.length-2; i>-1; i--){
+      expr = new ifExpr(this.exprs[i], expr, new booleanExpr(types.symbol("false")));
+    }
+    return expr.desugar(pinfo);
+ };
+ // ors become nested
+ orExpr.prototype.desugar = function(pinfo){
+    var expr = exprs[exprs.length-1]; // ASSUME length >=2!!!
+    for(var i=this.exprs.length-2; i>-1; i--){
+      expr = new ifExpr(this.exprs[i], new booleanExpr(types.symbol("true")), expr);
+    }
+    return expr.desugar(pinfo);
+ };
  
  // extend the Program class to collect definitions
  // Program.collectDefnitions: pinfo -> pinfo
@@ -16,8 +519,19 @@
  };
  defVars.prototype.collectDefinitions = function(pinfo){
  };
+ defStruct.prototype.collectDefinitions = function(pinfo){
+ };
  req.prototype.collectDefinitions = function(pinfo){
  }
+ // extend the Program class to collect provides
+ // Program.collectProvides: pinfo -> pinfo
+ Program.prototype.collectProvides = function(pinfo){
+    return pinfo;
+ };
+ provideStatement.prototype.collectProvides = function(pinfo){
+    // TODO do some work here
+    return pinfo;
+ };
  
  
  // extend the Program class to analyzing uses
@@ -30,6 +544,8 @@
  defVar.prototype.analyzeUses = function(pinfo){
  };
  defVars.prototype.analyzeUses = function(pinfo){
+ };
+ defStruct.prototype.analyzeUses = function(pinfo){
  };
  beginExpr.prototype.analyzeUses = function(pinfo){
  };
@@ -97,13 +613,6 @@
       var bytecode = bcode:make-def-values(compiledIds, compiled-body);
       return [bytecode, pinfo];
    */
- };
- 
- defStruct.prototype.collectDefinitions = function(pinfo){
- };
- defStruct.prototype.analyzeUses = function(pinfo){
- };
- defStruct.prototype.compile = function(env, pinfo){
  };
  
  beginExpr.prototype.compile = function(env, pinfo){
@@ -181,20 +690,20 @@
    */
  };
  
- listExpr.prototype.compile = function(env, pinfo){
- }
- quotedExpr.prototype.compile = function(env, pinfo){
- }
- qqList.prototype.compile = function(env, pinfo){
- }
- primop.prototype.compile = function(env, pinfo){
- }
- quasiquotedExpr.prototype.compile = function(env, pinfo){
- }
- req.prototype.compile = function(pinfo){
- };
- provideStatement.prototype.compile = function(env, pinfo){
- };
+ listExpr.prototype.compile = function(env, pinfo){}
+ quotedExpr.prototype.compile = function(env, pinfo){}
+ qqList.prototype.compile = function(env, pinfo){}
+ primop.prototype.compile = function(env, pinfo){}
+ quasiquotedExpr.prototype.compile = function(env, pinfo){}
+ req.prototype.compile = function(pinfo){};
+ provideStatement.prototype.compile = function(env, pinfo){};
+ defStruct.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: define-struct should have been desugared"; };
+ letStarExpr.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: letrec should have been desugared"; };
+ letExpr.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: let should have been desugared"; };
+ letStarExpr.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: let* should have been desugared"; };
+ letStarExpr.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: cond should have been desugared"; };
+ andExpr.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: and should have been desugared" };
+ orExpr.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: or should have been desugared"; };
 
 /////////////////////////////////////////////////////////////
  function analyze(programs){
@@ -205,12 +714,12 @@
  // build up pinfo by looking at definitions, provides and uses
  function programAnalyzerWithPinfo(programs, pinfo){
 
-  // collectDefinitions: [listof Programs] pinfo -> pinfo
+   // collectDefinitions: [listof Programs] pinfo -> pinfo
    // Collects the definitions either imported or defined by this program.
    function collectDefinitions(programs, pinfo){
      // FIXME: this does not yet say anything if a definition is introduced twice
      // in the same lexical scope.  We must do this error check!
-     return programs.reduce((function(p, pinfo){
+     return programs.reduce((function(pinfo, p){
                              return p.collectDefinitions(pinfo);
                              })
                             , pinfo);
@@ -218,19 +727,15 @@
    // collectProvides: [listof Programs] pinfo -> pinfo
    // Walk through the program and collect all the provide statements.
    function collectProvides(programs, pinfo){
-      function collectProvide(p, pinfo){
-        return pinfo;
-      }
-      return programs.reduce((function(p, pinfo){
-                                return (p instanceof provideStatement)?
-                                  collectProvide(p, pinfo) : pinfo;
+      return programs.reduce((function(pinfo, p){
+                                return p.collectProvides(pinfo)
                               })
                              , pinfo);
    }
    // analyzeUses: [listof Programs] pinfo -> pinfo
    // Collects the uses of bindings that this program uses.
     function analyzeUses(programs, pinfo){
-      return programs.reduce((function(p, pinfo){
+      return programs.reduce((function(pinfo, p){
                                 return p.analyzeUses(pinfo);
                               })
                              , pinfo);
@@ -244,7 +749,7 @@
  // compile-compilation-top: program pinfo -> bytecode
  function compile(program, pinfo){
     // desugaring pass
-    var programAndPinfo = desugarAll(program, pinfo),
+    var programAndPinfo = desugar(program, pinfo),
         program = programAndPinfo[0],
         pinfo = programAndPinfo[1];
     // analysis pass
@@ -264,7 +769,7 @@
  
     // Program [bytecodes, pinfo, env?] -> [bytecodes, pinfo]
     // compile the program, then add the bytecodes and pinfo information to the acc
-    function compileAndCollect(p, acc){
+    function compileAndCollect(acc, p){
       var compiledProgramAndPinfo = p.compile(acc[1]),
           compiledProgram = compiledProgramAndPinfo[0],
           pinfo = compiledProgramAndPinfo[1];
@@ -290,4 +795,5 @@
  /////////////////////
  window.analyze = analyze;
  window.compile = compile;
+ window.desugar = desugarProgram;
 })();
