@@ -72,11 +72,11 @@ function readFromRepl(event) {
       throw Error("PARSING ERROR\n"+e);
     }
     try {
-      var AST = desugar(AST);
-      console.log("DESUGARING:\nraw:");
-      console.log(AST);
-      console.log("pretty:");
-      console.log(AST.join("\n"));
+      var ASTandPinfo = desugar(AST);
+      console.log("DESUGARING:\nraw");
+      console.log(ASTandPinfo[0]);
+      console.log("pinfo:");
+      console.log(ASTandPinfo[1]);
     } catch (e) {
       throw Error("DESUGARING ERROR\n"+e);
     }

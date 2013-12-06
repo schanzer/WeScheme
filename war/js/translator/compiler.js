@@ -446,7 +446,7 @@
     return new localExpr(desugar(this.defs), this.body.desugar());
  };
  callExpr.prototype.desugar = function(pinfo){
-    var exprsAndPinfo = desugarProgram([this.func].concat[this.args], pinfo);
+    var exprsAndPinfo = desugarProgram([this.func].concat(this.args), pinfo);
     return [new callExpr(exprsAndPinfo[0][0], exprsAndPinfo[0].slice(1)),
             exprsAndPinfo[1]];
  };
@@ -466,18 +466,16 @@
     return [new localExpr(this.bindings.map(bindingToDefn), this.body.desugar()), pinfo];
  };
  // lets become calls
- letExpr.desugar = function(pinfo){
+ letExpr.prototype.desugar = function(pinfo){
     var ids   = this.bindings.map(coupleFirst),
         exprs = this.bindings.map(coupleSecond);
-    return (new callExpr(new lambdaExpr(ids, this.body), exprs)).desugar(pinfo);
+    return new callExpr(new lambdaExpr(ids, this.body), exprs).desugar(pinfo);
  };
- // let*s become nested calls
+ // let*s become nested lets
  letStarExpr.prototype.desugar = function(pinfo){
-    var ids   = this.bindings.map(coupleFirst),
-        exprs = this.bindings.map(coupleSecond),
-        body = this.body;
+    var body = this.body;
     for(var i=0; i<this.bindings.length; i++){
-      body = new callExpr(new lambdaExpr(ids[i], body), exprs[i]);
+      body = new letExpr([this.bindings[i]], body);
     }
     return body.desugar(pinfo);
  };
