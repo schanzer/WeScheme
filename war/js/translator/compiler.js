@@ -1,5 +1,6 @@
 /*
  TODO
+ - desugaring of structs, require, provide and local. proper handling of 'else' in cond
  - desugar defvars, defstruct and local
  - gensym for or?
  - collectDefinitions
@@ -8,6 +9,7 @@
 (function () {
  'use strict';
 
+  var makeHash = types.makeLowLevelEqHash;
   var keywords = ["cond", "else", "let", "case", "let*", "letrec", "quote",
                   "quasiquote", "unquote","unquote-splicing","local","begin",
                   "if","or","and","when","unless","lambda","λ","define",
@@ -121,31 +123,34 @@
                  withLocationEmits, allowRedefinition,
                  moduleResolver, modulePathResolver, currentModulePath,
                  declaredPermissions){
-    this.env = env;                             // env
-    this.modules = modules;                     // (listof module-binding)
-    this.usedBindingsHash = usedBindingsHash;   // (hashof symbol binding)
-    this.freeVariables = freeVariables;         // (listof symbol)
-    this.gensymCounter = gensymCounter;         // number
-    this.providedNames = providedNames;         // (hashof symbol provide-binding)
-    this.definedNames = definedNames;           // (hashof symbol binding)
-    
-    this.sharedExpressions = sharedExpressions; // (hashof expression labeled-translation)
+    this.env = env || new emptyEnv();                       // env
+    this.modules = modules || [];                           // (listof module-binding)
+    this.usedBindingsHash = usedBindingsHash || makeHash(); // (hashof symbol binding)
+    this.freeVariables = freeVariables || [];               // (listof symbol)
+    this.gensymCounter = gensymCounter || 0;                // number
+    this.providedNames = providedNames || makeHash();       // (hashof symbol provide-binding)
+    this.definedNames = definedNames || makeHash();         // (hashof symbol binding)
+ 
+    this.sharedExpressions = sharedExpressions || makeHash();// (hashof expression labeled-translation)
     // Maintains a mapping between expressions and a labeled translation.  Acts
     // as a symbol table to avoid duplicate construction of common literal values.
-    
-    this.withLocationEmits = withLocationEmits;  // boolean
+
+    this.withLocationEmits = withLocationEmits || true;     // boolean
     // If true, the compiler emits calls to plt.Kernel.setLastLoc to maintain
     // source position during evaluation.
-    
-    this.allowRedefinition = allowRedefinition;   // boolean
+
+    this.allowRedefinition = allowRedefinition || true;     // boolean
     // If true, redefinition of a value that's already defined will not raise an error.
-    
+ 
     // For the module system.
-    this.moduleResolver = moduleResolver;         // (module-name -> (module-binding | false))
-    this.modulePathResolver = modulePathResolver; // (string module-path -> module-name)
-    this.currentModulePath = currentModulePath;   // module-path
-    
-    this.declaredPermissions = declaredPermissions;// (listof (listof symbol any/c))
+    // (module-name -> (module-binding | false))
+    this.moduleResolver = moduleResolver || new defaultModuleResolver();
+    // (string module-path -> module-name)
+    this.modulePathResolver = modulePathResolver || defaultModulePathResolver();
+    // module-path
+    this.currentModulePath = currentModulePath || defaultCurrentModulePath;
+ 
+    this.declaredPermissions = declaredPermissions || [];   // (listof (listof symbol any/c))
  
     /////////////////////////////////////////////////
     // functions for manipulating pinfo objects
@@ -306,7 +311,7 @@
     // 'base
     // 'moby
     this.getBasePinfo = function(language){
-      var pinfo = makeEmptyPinfo();
+      var pinfo = new pinfo();
       if(Language === "moby"){
         pinfo.env = extendEnv_ModuleBinding(getTopLevelEnv(language),
                                             mobyModuleBinding);
@@ -315,97 +320,76 @@
       }
       return pinfo;
     };
- }
  
- function makeEmptyPinfo(){
-  return new pinfo(new emptyEnv(),
-                   [], types.makeLowLevelEqHash(), [], 0,
-                   types.makeLowLevelEqHash(),
-                   types.makeLowLevelEqHash(),
-                   types.makeLowLevelEqHash(),
-                   true, true,
-                   new defaultModuleResolver,
-                   new defaultModulePathResolver,
-                   defaultCurrentModulePath,
-                   []);
- };
+    // getExposedBindings:  -> (listof binding)
+    // Extract the list of the defined bindings that are exposed by provide.
+    this.getExposedBindings = function(){
+      // lookupProvideBindingInDefinitionBindings: provide-binding compiled-program -> (listof binding)
+      // Lookup the provided bindings.
+      function lookupProvideBindingInDefinitionBindings(provideBinding){
+        var binding;
+        if(this.definedNames.containsKey(provideBinding.stx)){
+          binding = checkBindingCompatibility(binding, this.definedNames.get(provideBinding.stx));
+        } else {
+          throwError(types.Message(["provided-name-not-defined: ", provideBinding.stx]));
+        }
+
+        // ref: symbol -> binding
+        // Lookup the binding, given the symbolic identifier.
+        function ref(id){ return this.definedNames.get(id); }
+ 
+        // if it's a struct provide, return a list containing the constructor and predicate,
+        // along with all the accessor and mutator functions
+        if(provideBinding instanceof structId){
+          [binding, ref(binding.structureConstructor), ref(binding.structurePredicate)].concat(
+              binding.structureAccessors.map(ref), binding.structureMutators.map(ref));
+        } else {
+          return [binding];
+        }
+      }
+ 
+      // decorateWithPermissions: binding -> binding
+      // HACK!
+      function decorateWithPermissions(binding){
+        var bindingEntry = function(entry){return entry[0]===binding.id;},
+            filteredPermissions = this.declaredPermissions.filter(bindingEntry);
+        binding.updatePermissions(filteredPermissions.map(function(p){return p[1];}));
+        return binding;
+      }
+
+      // Make sure that if the provide says "struct-out ...", that the exported binding
+      // is really a structure.
+      function checkBindingCompatibility(binding, exportedBinding){
+        if(binding instanceof structureId){
+          if(exportedBinding instanceof structure){
+            return exportedBinding;
+          } else {
+            throwError(types.Message(["provided-structure-not-structure: ", exportedBinding.stx]));
+          }
+        } else {
+          return exportedBinding;
+        }
+      }
+ 
+      var keys = this.providedNames.keys, bindings = this.providedNames.values;
+      // for each provide binding, ensure it's defined and then decorate with permissions
+      // concat all the permissions and bindings together, and return
+      return bindings.reduce(function(acc, b){
+         acc.concat(decorateWithPermissions(lookupProvideBindingInDefinitionBindings(b)));
+        }, []);
+ 
+    }
+ }
 
  // BINDING STRUCTS ///////////////////////////////////////////////////////
  function provideBindingId(stx){ this.stx = stx;}
  function provideBindingStructId(stx){ this.stx = stx;}
  
-/*
-       // pinfo-get-exposed-bindings: pinfo -> (listof binding)
-       // Extract the list of the defined bindings that are exposed by provide.
-       (define (pinfo-get-exposed-bindings a-pinfo)
-        (local [;; lookup-provide-binding-in-definition-bindings: provide-binding compiled-program -> (listof binding)
-                ;; Lookup the provided bindings.
-                (define (lookup-provide-binding-in-definition-bindings binding)
-                 (local [(define the-binding
-                          (cond
-                           [(hash-has-key? (pinfo-defined-names a-pinfo)
-                             (stx-e binding.stx))
-                            (check-binding-compatibility binding
-                             (hash-ref (pinfo-defined-names a-pinfo)
-                              (stx-e binding.stx)))]
-                           [else
-                            (raise (make-moby-error (stx-loc binding.stx)
-                                    (make-moby-error-type:provided-name-not-defined
-                                     (stx-e binding.stx))))]))
-                         
-                         // ref: symbol -> binding
-                         // Lookup the binding, given the symbolic identifier.
-                         (define (ref id)
-                          (hash-ref (pinfo-defined-names a-pinfo) id))]
-                  (cond
-                   [(provide-binding:struct-id? binding)
-                    (append (list the-binding
-                             (ref (binding:structure-constructor the-binding))
-                             (ref (binding:structure-predicate the-binding)))
-                     (map ref (binding:structure-accessors the-binding))
-                     (map ref (binding:structure-mutators the-binding))
-                     )]
-                   [else
-                    (list the-binding)])))
-                
-                
-                // decorate-with-permissions: binding -> binding
-                // HACK!
-                (define (decorate-with-permissions a-binding)
-                 (binding-update-permissions a-binding
-                  (map second
-                   (filter (lambda (entry)
-                            (symbol=? (first entry)
-                             (binding-id a-binding)))
-                    (pinfo-declared-permissions a-pinfo)))))
-                
-                
-                // Make sure that if the provide says "struct-out ...", that the exported binding
-                // is really a structure.
-                (define (check-binding-compatibility binding a-binding)
-                 (cond
-                  [(provide-binding:struct-id? binding)
-                   (cond [(binding:structure? a-binding)
-                          a-binding]
-                    [else
-                     (raise (make-moby-error
-                             (stx-loc binding.stx)
-                             (make-moby-error-type:provided-structure-not-structure
-                              (stx-e binding.stx))))])]
-                  [else
-                   a-binding]))]
-         (for/fold ([acc '()])
-                     ([(id binding) (in-hash (pinfo-provided-names a-pinfo))])
-                     (append (map decorate-with-permissions
-                              (lookup-provide-binding-in-definition-bindings binding))
-                      acc))))
-  */
-
  // DESUGARING ////////////////////////////////////////////////////////////////
  
  // desugarProgram : Listof Programs null/pinfo -> [Listof Programs, pinfo]
  function desugarProgram(programs, pinfo){
-    var acc = [ [], (pinfo || makeEmptyPinfo())];
+    var acc = [ [], (pinfo || new pinfo())];
     return programs.reduce((function(acc, p){
                               var desugaredAndPinfo = p.desugar(acc[1]);
                               acc[0].push(desugaredAndPinfo[0]);
