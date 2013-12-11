@@ -382,6 +382,7 @@ function bindingConstant(name, moduleSource, permissions, loc){
   this.moduleSource = moduleSource;
   this.permissions = permissions;
   this.loc = loc;
+  this.toString = function(){return this.name;};
   return this;
 }
 
@@ -394,6 +395,7 @@ function bindingFunction(name, moduleSource, minArity, isVarArity, permissions, 
   this.permissions = permissions;
   this.isCps = isCps;
   this.loc = loc;
+  this.toString = function(){return this.name;};
   return this;
 }
 
@@ -410,6 +412,7 @@ function bindingStructure(name, moduleSource, fields, constructor,
   this.mutators = mutators;
   this.permissions = permissions;
   this.loc = loc;
+  this.toString = function(){return this.name;};
   return this;
 }
 
@@ -847,6 +850,11 @@ function getTopLevelEnv(lang){
         return this.contains(id)? this.lookup(id) : false;
       }
     };
+ 
+    this.toString = function(){
+      return this.bindings.values().reduce(function(s, b){
+        return s+"\n  |---"+b.name;}, "");
+    };
   }
 
   function emptyEnv(){ return new env(types.makeLowLevelEqHash());}
@@ -930,7 +938,7 @@ function getTopLevelEnv(lang){
  
     // usedBindings: -> (listof binding)
     // Returns the list of used bindings computed from the program analysis.
-    this.usedBindings = function(){ return this.usedBindingsHash.values(); };
+    this.usedBindings =  this.usedBindingsHash.values;
  
     this.accumulateDeclaredPermission = function(name, permission){
  console.log('saw a declared permission');
@@ -950,7 +958,7 @@ function getTopLevelEnv(lang){
     this.accumulateDefinedBinding = function(binding, loc){
  console.log('saw a defined binding: \n');
  console.log(binding);
-      if(compilerStructs.keywords.indexOf(binding.id)>-1){
+      if(compilerStructs.keywords.indexOf(binding.id) > -1){
         throwError(types.Message([new ColoredPart(binding.id, loc),
                                   ": this is a reserved keyword and cannot be used"+
                                   "as a variable or function name"]));
@@ -971,6 +979,7 @@ function getTopLevelEnv(lang){
         }
       } else {
         this.env.extend(binding);
+        this.definedNames.put(binding.name, binding);
         return this;
       }
     };
@@ -1020,6 +1029,7 @@ function getTopLevelEnv(lang){
     // gensym: symbol -> [pinfo, symbol]
     // Generates a unique symbol.
     this.gensym = function(label){
+ console.log('gensyming');
       this.gensymCounter++;
       return [this, label+this.gensymCounter];
     };
@@ -1097,7 +1107,19 @@ function getTopLevelEnv(lang){
          acc.concat(decorateWithPermissions(lookupProvideBindingInDefinitionBindings(b)));
         }, []);
  
-    }
+    };
+ 
+    this.toString = function(){
+      var s = "pinfo-------------";
+ s+= "\nenv: "+this.env.toString();
+ s+= "\nmodules: "+this.modules.join(",");
+ s+= "\nused bindings: "+this.usedBindings();
+ s+= "\nfree variables: "+this.freeVariables.join(",");
+ s+= "\ngensym counter: "+this.gensymCounter;
+ s+= "\nprovided names: "+this.providedNames.values();
+ s+= "\ndefined names: "+this.definedNames.values();
+ return s;
+    };
  }
  
  // getBasePinfo: symbol -> pinfo

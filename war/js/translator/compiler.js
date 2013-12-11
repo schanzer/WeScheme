@@ -156,7 +156,9 @@
                                           pinfo, this.location);
  };
  defVar.prototype.collectDefinitions = function(pinfo){
-    return pinfo.accumulateDefinedBinding(new bindingConstant(this, false,
+    var id = this.name.val;
+ console.log(this.name.val);
+    return pinfo.accumulateDefinedBinding(new bindingConstant(id, false,
                                                               [],this.location),
                                           pinfo, this.location);
  };
@@ -270,7 +272,7 @@
     if(env.lookup_context(this)){
       return pinfo.accumulateBindingUse(env.lookup_context(this), pinfo);
     } else {
-      return pinfo.accumulateBindingUse(this, pinfo);
+      return pinfo.accumulateFreeVariableUse(this, pinfo);
     }
  };
 

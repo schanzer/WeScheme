@@ -83,10 +83,9 @@ function readFromRepl(event) {
       throw Error("DESUGARING ERROR\n"+e);
     }
     try {
-      window.pinfo = analyze(AST);
+      window.pinfo = analyze(program);
       console.log("// ANALYSIS: //////////////////////////////\nraw");
       console.log("pinfo (bound to window.pinfo):");
-      console.log(window.pinfo);
     } catch (e) {
       throw Error("ANALYSIS ERROR\n"+e);
     }
