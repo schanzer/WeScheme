@@ -1,385 +1,11 @@
 /*
  TODO
- - desugaring of structs, require, provide and local. proper handling of 'else' in cond
- - desugar defvars, defstruct and local
- - gensym for or?
+ - proper handling of 'else' in cond
  - collectDefinitions
  - analyzeUses
 */
 (function () {
  'use strict';
-
-  var makeHash = types.makeLowLevelEqHash;
-  var keywords = ["cond", "else", "let", "case", "let*", "letrec", "quote",
-                  "quasiquote", "unquote","unquote-splicing","local","begin",
-                  "if","or","and","when","unless","lambda","λ","define",
-                  "define-struct", "define-values"];
-
-  // ENVIRONMENT STRUCTS ////////////////////////////////////////////////////////////////
-  // Representation of the stack environment of the mzscheme vm, so we know where
-  // things live.
-  function env(){
-    // pushGlobals: (listof symbol) -> env
-    function pushGlobals(names){ return new globalEnv(names, this); }
-
-    // pushLocal: symbol -> env
-    function pushLocal(name){ return new localEnv(name, false, this); };
-
-    // pushLocalBoxed: symbol -> env
-    function pushLocalBoxed(name){ return new localEnv(name, true, this); };
-
-    // pushUnnamed: -> env
-    function pushUnnamed(){ return new unnamedEnv(this); };
-
-    // pop: -> env
-    function pop(){ return this.parentEnv; };
- 
-    // lookup: symbol -> stack-reference
-    // given a symbol, return a stack reference to that symbol's value in this environment
-    function lookup(name){ this.search(this, 0); }
-
-    // peek: number -> env
-    // search up the chain until we find the environment or run dry
-    function peek(depth){
-      if(depth === 0){ return env; }
-      else { this.peek(this.parentEnv, depth-1); }
-    }
-  }
-
-  function emptyEnv(){
-    env.call(this);
-    this.pop = function(){throwError('env-pop "empty env"');};
-    this.search = function(name, depth){return new unboundStackReference(name);};
-    this.peek = function(depth){throwError("env-peek");};
-  }
-  emptyEnv.prototype = heir(env.prototype);
-  function localEnv(name, isBoxed, parentEnv){
-    env.call(this);
-    this.name = name; this.isBoxed = isBoxed; this.parentEnv = parentEnv;
-    this.search = function(name, depth){
-      return (name===this.name)? (function (pos){return new globalStackReference(name, dept, pos);}) :
-                                this.parentEnv.lookup(name, depth+1);
-
-    };
-  }
-  localEnv.prototype = heir(env.prototype);
-
-  function globalEnv(names, parentEnv){
-    env.call(this);
-    this.names = names; this.parentEnv = parentEnv;
-    this.search = function(name, depth){
-      return (position(name, this.names))? new localStackReference(name, this.isBoxed, this.depth) :
-                                this.parentEnv.lookup(name, depth);
-
-    };
-  }
-  globalEnv.prototype = heir(env.prototype);
-
- function unnamedEnv(parentEnv){
-    env.call(this);
-    this.parentEnv = parentEnv;
-    this.search = function(name, depth){return this.parentEnv.lookup(name, depth-1);};
-  }
-  unnamedEnv.prototype = heir(env.prototype);
-
- // STACKREF STRUCTS ////////////////////////////////////////////////////////////////
-  function stackReference(){}
-  function localStackReference(name, isBoxed, depth){
-    stackReference.call(this);
-    this.name = name;
-    this.isBoxed = isBoxed;
-    this.depth = depth;
-  }
-  localStackReference.prototype = heir(stackReference.prototype);
-  function globalStackReference(name, depth, pos){
-    stackReference.call(this);
-    this.name = name;
-    this.pos = pos;
-    this.depth = depth;
-  }
-  globalStackReference.prototype = heir(stackReference.prototype);
-  function unboundStackReference(name){
-    stackReference.call(this);
-    this.name = name;
-  }
-  unboundStackReference.prototype = heir(stackReference.prototype);
-
-  // position: symbol (listof symbol) -> (number || #f)
-  // Find position of element in list; return false if we can't find the element.
-  function position(x, lst){
-    return (lst.indexOf(x) > -1)? lst.indexOf(x) : false;
-  }
- 
-  // PINFO STRUCTS ////////////////////////////////////////////////////////////////
-  var defaultCurrentModulePath = "";
-  function defaultModuleResolver(){}
-  function defaultModulePathResolver(){}
-
-  // pinfo (program-info) is the "world" structure for the compilers;
-  // it captures the information we get from analyzing and compiling
-  // the program, and also maintains some auxillary structures.
-  function pinfo(env, modules, usedBindingsHash, freeVariables, gensymCounter,
-                 providedNames,definedNames, sharedExpressions,
-                 withLocationEmits, allowRedefinition,
-                 moduleResolver, modulePathResolver, currentModulePath,
-                 declaredPermissions){
-    this.env = env || new emptyEnv();                       // env
-    this.modules = modules || [];                           // (listof module-binding)
-    this.usedBindingsHash = usedBindingsHash || makeHash(); // (hashof symbol binding)
-    this.freeVariables = freeVariables || [];               // (listof symbol)
-    this.gensymCounter = gensymCounter || 0;                // number
-    this.providedNames = providedNames || makeHash();       // (hashof symbol provide-binding)
-    this.definedNames = definedNames || makeHash();         // (hashof symbol binding)
- 
-    this.sharedExpressions = sharedExpressions || makeHash();// (hashof expression labeled-translation)
-    // Maintains a mapping between expressions and a labeled translation.  Acts
-    // as a symbol table to avoid duplicate construction of common literal values.
-
-    this.withLocationEmits = withLocationEmits || true;     // boolean
-    // If true, the compiler emits calls to plt.Kernel.setLastLoc to maintain
-    // source position during evaluation.
-
-    this.allowRedefinition = allowRedefinition || true;     // boolean
-    // If true, redefinition of a value that's already defined will not raise an error.
- 
-    // For the module system.
-    // (module-name -> (module-binding | false))
-    this.moduleResolver = moduleResolver || new defaultModuleResolver();
-    // (string module-path -> module-name)
-    this.modulePathResolver = modulePathResolver || defaultModulePathResolver();
-    // module-path
-    this.currentModulePath = currentModulePath || defaultCurrentModulePath;
- 
-    this.declaredPermissions = declaredPermissions || [];   // (listof (listof symbol any/c))
- 
-    /////////////////////////////////////////////////
-    // functions for manipulating pinfo objects
-    this.isRedefinition = function(name){ return this.env.lookup(name); };
- 
-    // usedBindings: -> (listof binding)
-    // Returns the list of used bindings computed from the program analysis.
-    this.usedBindings = function(){ return this.usedBindingsHash.values(); };
- 
-    this.accumulateDeclaredPermission = function(name, permission){
-      return new pinfo(this.env, this.modules, this.usedBindingsHash, this.freeVariables,
-                       this.gensymCounter+1, this.providedNames, this.definedNames,
-                       this.sharedExpressions, this.withLocationEmits,
-                       this.allowRedefinition,
-                       this.moduleResolver, this.modulePathResolver, this.currentModulePath,
-                       [[name, position]].concat(this.declaredPermissions));
-    };
- 
-    this.accumulateSharedExpression = function(expression, translation){
-      var labeledTranslation = makeLabeledTranslation(this.gensymCounter, translation);
-      new pinfo(this.env, this.modules, this.usedBindingsHash, this.freeVariables,
-                this.gensymCounter+1, this.providedNames, this.definedNames,
-                this.sharedExpressions.put(labeledTranslation, expression),
-                this.moduleResolver, this.modulePathResolver, this.currentModulePath,
-                this.declaredPermissions);
-    };
- 
-    // accumulateDefinedBinding: binding loc -> pinfo
-    // Adds a new defined binding to a pinfo's set.
-    this.accumulateDefinedBinding = function(binding, loc){
-      if(keywords.indexOf(binding.id)>-1){
-        throwError(types.Message([new ColoredPart(binding.id, loc),
-                                  ": this is a reserved keyword and cannot be used"+
-                                  "as a variable or function name"]));
-      } else if(!this.allowRedefinition && isRedefinition(binding.id)){
-        var prevBinding = this.env.lookup(binding.id);
-        if(binding.loc){
-          throwError(types.Message([new ColoredPart(binding.id, binding.loc),
-                                    ": this name has a ",
-                                    new ColoredPart("previous definition", prevBinding.loc),
-                                    " and cannot be re-defined"]));
- 
-        } else {
-          throwError(types.Message([new ColoredPart(binding.id, binding.loc),
-                                    ": this name has a ",
-                                    "previous definition",
-                                    " and cannot be re-defined"]));
-
-        }
-      } else {
-        return new pinfo(envExtend(this.env, binding), this.modules,
-                         this.usedBindingsHash, this.freeVariables,
-                         this.gensymCounter, this.providedNames,
-                         this.definedNames.put(binding.id, binding),
-                         this.sharedExpressions, this.withLocationEmits,
-                         this.allowRedefinition, this.moduleResolver,
-                         this.modulePathResolver, this.currentModulePath,
-                         this.declaredPermissions);
-      }
-    };
- 
-    // accumulateBindings: (listof binding) Loc -> pinfo
-    // Adds a list of defined bindings to the pinfo's set.
-    this.accumulateDefinedBindings = function(bindings, loc){
-      return bindings.reduce((function(pinfo, b){
-          return this.accumulateDefinedBinding(b, loc);
-          }), this);
-    };
- 
- 
-    // accumuldateModuleBindings: (listof binding) -> pinfo
-    // Adds a list of module-imported bindings to the pinfo's known set of bindings, without
-    // including them within the set of defined names.
-    this.accumulateModuleBindings = function(bindings){
-      return bindings.reduce((function(pinfo, binding){
-        return new pinfo(envExtend(this.env, binding), this.modules,
-                         this.usedBindingsHash, this.freeVariables,
-                         this.gensymCounter, this.providedNames,
-                         this.definedNames.put(binding.id, binding),
-                         this.sharedExpressions, this.withLocationEmits,
-                         this.allowRedefinition, this.moduleResolver,
-                         this.modulePathResolver, this.currentModulePath,
-                         this.declaredPermissions);
-        }), this);
-    };
-   
-    // accumulateModule: module-binding -> pinfo
-    // Adds a module to the pinfo's set.
-    this.accumulateModule = function(module){
-      return new pinfo(this.env, [module].concat(this.modules),
-                       this.usedBindingsHash, this.freeVariables,
-                       this.gensymCounter, this.providedNames,
-                       this.definedNames, this.sharedExpressions,
-                       this.withLocationEmits, this.allowRedefinition,
-                       this.moduleResolver, this.modulePathResolver,
-                       this.declaredPermissions);
-    };
-
-    // accumulateBindingUse: binding -> pinfo
-    // Adds a binding's use to a pinfo's set.
-    this.accumulateBindingUse = function(binding){
-      return new pinfo(this.env, this.modules,
-                       this.usedBindingsHash.put(binding.id,binding),
-                       this.freeVariables, this.gensymCounter,
-                       this.providedNames, this.definedNames,
-                       this.sharedExpressions, this.withLocationEmits,
-                       this.allowRedefinition, this.moduleResolver,
-                       this.modulePathResolver, this.currentModulePath,
-                       this.declaredPermissions);
-    };
-   
-    // accumulateFreeVariableUse: symbol -> pinfo
-    // Mark a free variable usage.
-    this.accumulateFreeVariableUse = function(sym){
-      return new pinfo(this.env, this.modules, this.usedBindingsHash,
-                       ((this.freeVariables.indexOf(sym) > -1)?
-                        this.freeVariables : [sym].concat(this.freeVariables)),
-                       this.gensymCounter,
-                       this.providedNames, this.definedNames,
-                       this.sharedExpressions, this.withLocationEmits,
-                       this.allowRedefinition, this.moduleResolver,
-                       this.modulePathResolver, this.currentModulePath,
-                       this.declaredPermissions);
-    };
-   
-    // gensym: symbol -> [pinfo, symbol]
-    // Generates a unique symbol.
-    this.gensym = function(label){
-      return [new pinfo(this.env, this.modules, this.usedBindingsHash,
-                        this.freeVariables, this.gensymCounter+1,
-                        this.providedNames, this.definedNames,
-                        this.sharedExpressions, this.withLocationEmits,
-                        this.allowRedefinition, this.moduleResolver,
-                        this.modulePathResolver, this.currentModulePath,
-                        this.declaredPermissions),
-              
-              label+this.gensymCounter];
-    };
- 
-    // permissions: -> (listof permission)
-    // Given a pinfo, collect the list of permissions.
-    this.permissions = function(){
-      // unique : listof X -> listof X
-      function unique(lst){
-        if(lst.length === 0) return lst;
-        else if(lst.slice(1).indexOf(lst[0]) > -1) return unique.slice(1)
-        else return [lst[0]].concat(unique.slice(1));
-      }
-      function reducePermissions(permissions, binding){
-        if(binding.isFunction) return binding.functionPermissions.concat(permissions);
-        else if(binding.isConstant) return binding.constantPermissions.concat(permissions);
-      }
-      return unique(this.usedBindings().reduce(reducePermissions, []));
-    }
-
-    // getBasePinfo: symbol -> pinfo
-    // Returns a pinfo that knows the base definitions. Language can be one of the following:
-    // 'base
-    // 'moby
-    this.getBasePinfo = function(language){
-      var pinfo = new pinfo();
-      if(Language === "moby"){
-        pinfo.env = extendEnv_ModuleBinding(getTopLevelEnv(language),
-                                            mobyModuleBinding);
-      } else if(Language === "base"){
-        pinfo.env = getTopLevelEnv(language);
-      }
-      return pinfo;
-    };
- 
-    // getExposedBindings:  -> (listof binding)
-    // Extract the list of the defined bindings that are exposed by provide.
-    this.getExposedBindings = function(){
-      // lookupProvideBindingInDefinitionBindings: provide-binding compiled-program -> (listof binding)
-      // Lookup the provided bindings.
-      function lookupProvideBindingInDefinitionBindings(provideBinding){
-        var binding;
-        if(this.definedNames.containsKey(provideBinding.stx)){
-          binding = checkBindingCompatibility(binding, this.definedNames.get(provideBinding.stx));
-        } else {
-          throwError(types.Message(["provided-name-not-defined: ", provideBinding.stx]));
-        }
-
-        // ref: symbol -> binding
-        // Lookup the binding, given the symbolic identifier.
-        function ref(id){ return this.definedNames.get(id); }
- 
-        // if it's a struct provide, return a list containing the constructor and predicate,
-        // along with all the accessor and mutator functions
-        if(provideBinding instanceof structId){
-          [binding, ref(binding.structureConstructor), ref(binding.structurePredicate)].concat(
-              binding.structureAccessors.map(ref), binding.structureMutators.map(ref));
-        } else {
-          return [binding];
-        }
-      }
- 
-      // decorateWithPermissions: binding -> binding
-      // HACK!
-      function decorateWithPermissions(binding){
-        var bindingEntry = function(entry){return entry[0]===binding.id;},
-            filteredPermissions = this.declaredPermissions.filter(bindingEntry);
-        binding.updatePermissions(filteredPermissions.map(function(p){return p[1];}));
-        return binding;
-      }
-
-      // Make sure that if the provide says "struct-out ...", that the exported binding
-      // is really a structure.
-      function checkBindingCompatibility(binding, exportedBinding){
-        if(binding instanceof structureId){
-          if(exportedBinding instanceof structure){
-            return exportedBinding;
-          } else {
-            throwError(types.Message(["provided-structure-not-structure: ", exportedBinding.stx]));
-          }
-        } else {
-          return exportedBinding;
-        }
-      }
- 
-      var keys = this.providedNames.keys, bindings = this.providedNames.values;
-      // for each provide binding, ensure it's defined and then decorate with permissions
-      // concat all the permissions and bindings together, and return
-      return bindings.reduce(function(acc, b){
-         acc.concat(decorateWithPermissions(lookupProvideBindingInDefinitionBindings(b)));
-        }, []);
- 
-    }
- }
 
  // BINDING STRUCTS ///////////////////////////////////////////////////////
  function provideBindingId(stx){ this.stx = stx;}
@@ -389,7 +15,7 @@
  
  // desugarProgram : Listof Programs null/pinfo -> [Listof Programs, pinfo]
  function desugarProgram(programs, pinfo){
-    var acc = [ [], (pinfo || new pinfo())];
+    var acc = [ [], (pinfo || new compilerStructs.pinfo())];
     return programs.reduce((function(acc, p){
                               var desugaredAndPinfo = p.desugar(acc[1]);
                               acc[0].push(desugaredAndPinfo[0]);
@@ -408,12 +34,29 @@
     return [new defVar(this.name, exprAndPinfo[1]), exprAndPinfo[1]];
  };
  defVars.prototype.desugar = function(pinfo){
-    throw "desugaring defVars is not yet implemented";
-    return this;
+    var exprAndPinfo = this.expr.desugar(pinfo);
+    return [new defVars(this.names, exprAndPinfo[0]), exprAndPinfo[1]];
  };
  defStruct.prototype.desugar = function(pinfo){
-    throw "desugaring defStruct is not yet implemented";
-    return this;
+    var name = this.name.toString(),
+        fields = this.fields.map(function(f){return f.toString();}),
+        location = this.location,
+        mutatorIds = fields.map(function(field){return name+'-'+field+'-set!';}),
+        ids = ['make-'+name, name+'?'].concat(mutatorIds),
+        call = new callExpr(new primop(types.symbol('make-struct-type')),
+                            [new quotedExpr(name), false, fields.length, 0]);
+    var defineValuesStx = [new defVars(ids, call)],
+        selectorStx = [];
+    // given a field, make a definition that binds struct-field to the result of
+    // a make-struct-field accessor call in the runtime
+    function makeAccessorDefn(f, i){
+      selectorStx.push(new defVar(name+'-'+f,
+                                  new callExpr(new primop(types.symbol('make-struct-field-accessor')),
+                                               [location, i, f])));
+                                                     
+    }
+    fields.forEach(makeAccessorDefn);
+    return [defineValuesStx.concat(selectorStx), pinfo];
  };
  beginExpr.prototype.desugar = function(pinfo){
     var exprsAndPinfo = desugarProgram(this.exprs, pinfo);
@@ -425,9 +68,8 @@
  };
  localExpr.prototype.desugar = function(pinfo){
     var defnsAndPinfo = desugarProgram(this.defs, pinfo),
-        exprAndPinfo = this.body.desugar(pinfo);
-    throw "desugaring defStruct is not yet implemented";
-    return new localExpr(desugar(this.defs), this.body.desugar());
+        exprAndPinfo = this.body.desugar(defnsAndPinfo[1]);
+    return [new localExpr(defnsAndPinfo[0], exprAndPinfo[0]), exprAndPinfo[1]];
  };
  callExpr.prototype.desugar = function(pinfo){
     var exprsAndPinfo = desugarProgram([this.func].concat(this.args), pinfo);
@@ -475,7 +117,7 @@
  };
  // ands become nested ifs
  andExpr.prototype.desugar = function(pinfo){
-    var expr = this.exprs[exprs.length-1]; // ASSUME length >=2!!!
+    var expr = this.exprs[this.exprs.length-1]; // ASSUME length >=2!!!
     for(var i=this.exprs.length-2; i>-1; i--){
       expr = new ifExpr(this.exprs[i], expr, new booleanExpr(types.symbol("false")));
     }
@@ -483,7 +125,7 @@
  };
  // ors become nested
  orExpr.prototype.desugar = function(pinfo){
-    var expr = exprs[exprs.length-1]; // ASSUME length >=2!!!
+    var expr = this.exprs[this.exprs.length-1]; // ASSUME length >=2!!!
     for(var i=this.exprs.length-2; i>-1; i--){
       expr = new ifExpr(this.exprs[i], new booleanExpr(types.symbol("true")), expr);
     }
@@ -492,63 +134,145 @@
  
  // extend the Program class to collect definitions
  // Program.collectDefnitions: pinfo -> pinfo
- Program.prototype.collectDefinitions = function(pinfo){
-    return pinfo;
- };
+ Program.prototype.collectDefinitions = function(pinfo){ return pinfo; };
+
+ // bf: symbol path number boolean string -> binding:function
+ // Helper function.
+ function bf(name, modulePath, arity, vararity, loc){
+    return new bindingFunction(name, modulePath, arity, vararity, [], false, loc);
+ }
+
+ 
+ // collectDefinitions : Listof Programs pinfo -> pinfo
+ function collectDefinitions(programs, pinfo){
+    return programs.reduce((function(pinfo, p){
+                              return p.collectDefinitions(pinfo);
+                            }), pinfo);
+ }
+
  defFunc.prototype.collectDefinitions = function(pinfo){
+    return pinfo.accumulateDefinedBinding(bf(this.name, false, this.args.length,
+                                             false, this.location),
+                                          pinfo, this.location);
  };
  defVar.prototype.collectDefinitions = function(pinfo){
+    return pinfo.accumulateDefinedBinding(new bindingConstant(this, false,
+                                                              [],this.location),
+                                          pinfo, this.location);
  };
  defVars.prototype.collectDefinitions = function(pinfo){
+    this.names.reduce(function(pinfo, id){
+      return pinfo.accumulateDefinedBinding(new bindingConstant(id, false, [], this.location),
+                                            pinfo, this.location);
+    }, pinfo);
  };
  defStruct.prototype.collectDefinitions = function(pinfo){
+    var id = this.id.toString(),
+        fields = this.fields.map(function(f){return f.toString();}),
+        loc = id.location,
+        // build all the struct IDs
+        constructorId = 'make-'+id,
+        predicateId = id+'?',
+        selectorIds = fields.map(function(f){return id+'-'+f;}),
+        mutatorIds  = fields.map(function(f){return id+'-'+f+'-set!';}),
+        // build all the bindings
+        constructor = bf(constructorId, false, fields.length, false, loc),
+        predicate = bf(predicateId, false, 1, false, loc),
+        selectors = selectorIds.map(function(id){return bf(id, false, 1, false, loc);}),
+        mutators  = mutatorIds.map(function(id){return bf(id, false, 2, false, loc);}),
+        structure = new bindingStructure(id, false, fields, constructorId,
+                                                predicateId, selectorIds, mutatorIds, loc),
+        bindings = [structure, constructor, predicate].concat(selectors, mutators);
+    return pinfo.accumulateDefinedBindings(bindings, pinfo, this.location);
  };
  req.prototype.collectDefinitions = function(pinfo){
  }
+ 
  // extend the Program class to collect provides
  // Program.collectProvides: pinfo -> pinfo
  Program.prototype.collectProvides = function(pinfo){
     return pinfo;
  };
  provideStatement.prototype.collectProvides = function(pinfo){
-    // TODO do some work here
-    return pinfo;
- };
+    // collectProvidesFromClause : clause pinfo -> pinfo
+    function collectProvidesFromClause(clause, pinfo){
+      // if it's a symbol, make sure it's defined (otherwise error)
+      if (clause instanceof symbolExpr){
+        if(pinfo.definedNames.containsKey(clause.val)){
+          pinfo.updateProvidedNames(pinfo.providedNames.put(clause.val, makeProvideBindingId(clause)));
+        } else {
+          throwError(types.Message([new ColoredPart(clause.val, clause.location),
+                                    ": provided name not defined"]));
+        }
+      // if it's a struct provide and the format is valid, make sure it's defined (otherwise error)
+      } else if(clause[0] === "struct-out" && clause.length === 2 && clause[1] instanceof symbolExpr){
+          if(pinfo.definedNames.containsKey(clause[1].val) &&
+             isBindingStructure(pinfo.definedNames.containsKey(clause[1].val))){
+              var b = makeProvideBindingStructId(clause[1]);
+              pinfo.updateProvidedNames(pinfo.providedNames.put(clause.val, b));
+          } else {
+              throwError(types.Message([new ColoredPart(clause.val, clause[1].location),
+                                        ": provided struct not defined"]));
+          }
+      // anything with a different format throws an error
+      } else {
+        throwError(types.Message(["provide doesn't recognize the syntax of the clause: ",
+                                  new ColoredPart(clause.val, clause.location)]));
+      }
+    }
+    return this.clauses.reduce(collectProvidesFromClause, pinfo);
+  };
  
  
  // extend the Program class to analyzing uses
  // Program.analyzeUses: pinfo -> pinfo
- Program.prototype.analyzeUses = function(pinfo){
+ Program.prototype.analyzeUses = function(pinfo, env){
     return pinfo;
  };
  defFunc.prototype.analyzeUses = function(pinfo){
+    var env1 = pinfo.env,
+        env2 = env1.extend(bf(this, false, this.args.length, false, this.location)),
+        lambda = new lambdaExpr(this.args, this.body);
+    return lambda.analyzeUses(pinfo.updateEnv(env2));
  };
  defVar.prototype.analyzeUses = function(pinfo){
+    return this.expr.analyzeUses(pinfo, pinfo.env);
  };
  defVars.prototype.analyzeUses = function(pinfo){
+    return this.expr.analyzeUses(pinfo, pinfo.env);
  };
- defStruct.prototype.analyzeUses = function(pinfo){
- };
- beginExpr.prototype.analyzeUses = function(pinfo){
+ beginExpr.prototype.analyzeUses = function(pinfo, env){
+    return this.exprs.reduce(function(p, expr){return expr.analyzeUses(p, env);}, pinfo);
  };
  lambdaExpr.prototype.analyzeUses = function(pinfo){
+    var env1 = pinfo.env,
+        env2 = this.args.reduce(function(env, arg){
+          return env.extend(new bindingConstant(arg, false, [], arg.location));
+        }, env1);
+    return this.body.analyzeUses(pinfo, env2);
  };
  localExpr.prototype.analyzeUses = function(pinfo){
+    var nestedPinfo = this.defns.reduce(function(p, d){return d.analyzeUses(p);}, pinfo);
+    return this.body.analyzeUses(nested, pinfo.env);
  };
- callExpr.prototype.analyzeUses = function(pinfo){
+ callExpr.prototype.analyzeUses = function(pinfo, env){
+    return this.args.reduce(function(p, arg){
+                            return arg.analyzeUses(p, env);
+                            }, pinfo);
  }
  ifExpr.prototype.analyzeUses = function(pinfo){
+    var exps = [this.test, this.consequence, this.alternative];
+    return exps.reduce(function(p, exp){
+                            return exp.analyzeUses(p,env);
+                            }, pinfo);
  };
- symbolExpr.prototype.analyzeUses = function(pinfo){
+ symbolExpr.prototype.analyzeUses = function(pinfo, env){
+    if(env.lookup_context(this)){
+      return pinfo.accumulateBindingUse(env.lookup_context(this), pinfo);
+    } else {
+      return pinfo.accumulateBindingUse(this, pinfo);
+    }
  };
- listExpr.prototype.analyzeUses = function(pinfo){
- }
- quasiquotedExpr.prototype.analyzeUses = function(pinfo){
- }
- qqList.prototype.analyzeUses = function(pinfo){
- }
- primop.prototype.analyzeUses = function(pinfo){
- }
 
  
  // extend the Program class to include compilation
@@ -689,13 +413,12 @@
 
 /////////////////////////////////////////////////////////////
  function analyze(programs){
-    programAnalyzeWithPinfo(programs, getBasePinfo("base"));
+    return programAnalyzeWithPinfo(programs, compilerStructs.getBasePinfo("base"));
  }
  
  // programAnalyzerWithPinfo : [listof Programs], pinfo -> pinfo
  // build up pinfo by looking at definitions, provides and uses
- function programAnalyzerWithPinfo(programs, pinfo){
-
+ function programAnalyzeWithPinfo(programs, pinfo){
    // collectDefinitions: [listof Programs] pinfo -> pinfo
    // Collects the definitions either imported or defined by this program.
    function collectDefinitions(programs, pinfo){
@@ -718,7 +441,7 @@
    // Collects the uses of bindings that this program uses.
     function analyzeUses(programs, pinfo){
       return programs.reduce((function(pinfo, p){
-                                return p.analyzeUses(pinfo);
+                                return p.analyzeUses(pinfo, pinfo.env);
                               })
                              , pinfo);
     }
