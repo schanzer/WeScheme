@@ -32,14 +32,14 @@
      isProvide(sexp) ? parseProvide(sexp) :
      throwError(new types.Message(["Not a Definition, Expression, Library Require, or Provide"]),
                                   sexp.location);
-   };
+    };
     return sexps.map(parseSExp);
   };
 
 
   //////////////////////////////////////// DEFINITION PARSING ////////////////////////////////
   function isDefinition(sexp) {
-    return ((isStructDefinition(sexp)) || (isFunctionDefinition(sexp)) || (isVariableDefinition(sexp)));
+    return (isStructDefinition(sexp) || isFunctionDefinition(sexp) || isVariableDefinition(sexp));
   };
 
   // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define-struct'
@@ -47,7 +47,7 @@
     return ((isCons(sexp))
             && (sexp.length === 3)
             && (isSymbolExpr(sexp[0]))
-            && (isSymbolEqualTo(types.symbol("define-struct"), sexp[0])));
+            && (isSymbolEqualTo("define-struct", sexp[0])));
   };
 
   // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define' and rest is a Cons
@@ -55,7 +55,7 @@
     return ((isCons(sexp))
             && (sexp.length === 3)
             && (isSymbolExpr(sexp[0]))
-            && (isSymbolEqualTo(types.symbol("define"), sexp[0]))
+            && (isSymbolEqualTo("define", sexp[0]))
             && (isCons(sexp[1])));
   };
 
@@ -64,7 +64,7 @@
     return ((isCons(sexp))
             && (sexp.length === 3)
             && (isSymbolExpr(sexp[0]))
-            && (isSymbolEqualTo(types.symbol("define"), sexp[0]))
+            && (isSymbolEqualTo("define", sexp[0]))
             && (!(isCons(sexp[1]))));
   };
 
@@ -81,7 +81,6 @@
     function parseDef(sexp) {
       return new defVar(parseIdExpr(sexp[1]), parseExpr(sexp[2]));
     }
-   
     var def = isStructDefinition(sexp) ? parseDefStruct(sexp) :
               isFunctionDefinition(sexp) ? parseDefFunc(sexp) :
               isVariableDefinition(sexp) ? parseDef(sexp) :
@@ -106,34 +105,34 @@
   // predicates and parsers for call, lambda, local, letrec, let, let*, if, and, or, time, quote and quasiquote exprs
   function parseExprList(sexp) {
     function isLambda(sexp) {
-      return isTripleWithFirstEqualTo(sexp, types.symbol("lambda"));
+      return isTripleWithFirstEqualTo(sexp, "lambda");
     }
     function isLocal(sexp) {
-      return isTripleWithFirstEqualTo(sexp, types.symbol("local"));
+      return isTripleWithFirstEqualTo(sexp, "local");
     }
     function isLetrec(sexp) {
-      return isTripleWithFirstEqualTo(sexp, types.symbol("letrec"));
+      return isTripleWithFirstEqualTo(sexp, "letrec");
     }
     function isLet(sexp) {
-      return isTripleWithFirstEqualTo(sexp, types.symbol("let"));
+      return isTripleWithFirstEqualTo(sexp, "let");
     }
     function isLetStar(sexp) {
-      return isTripleWithFirstEqualTo(sexp, types.symbol("let*"));
+      return isTripleWithFirstEqualTo(sexp, "let*");
     }
     function isIf(sexp) {
-      return isQuadWithFirstEqualTo(sexp, types.symbol("if"));
+      return isQuadWithFirstEqualTo(sexp, "if");
     }
     function isBegin(sexp) {
-      return ((isCons(sexp)) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], types.symbol("begin"))));
+      return ((isCons(sexp)) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], "begin")));
     }
     function isAnd(sexp) {
-      return ((isCons(sexp)) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], types.symbol("and"))));
+      return ((isCons(sexp)) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], "and")));
     }
     function isOr(sexp) {
-      return ((isCons(sexp)) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], types.symbol("or"))));
+      return ((isCons(sexp)) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], "or")));
     }
     function isTime(sexp) {
-      return isTupleStartingWithOfLength(sexp, types.symbol("time"), 2);
+      return isTupleStartingWithOfLength(sexp, "time", 2);
     }
     function parseFuncCall(sexp) {
       return isCons(sexp)? new callExpr(parseExpr(sexp[0]), rest(sexp).map(parseExpr)) :
@@ -182,8 +181,8 @@
       throwError(new types.Message(["time expression sexp"]), sexp.location);
     }
     function parseQuotedExpr(sexp) {
-      return new quotedExpr(isEmpty(sexp) ?   new callExpr(new primop(types.symbol("list")), []) :
-                            isCons(sexp) ?    new callExpr(new primop(types.symbol("list")), sexp.map(parseQuotedExpr)) :
+      return new quotedExpr(isEmpty(sexp) ?   new callExpr(new primop("list"), []) :
+                            isCons(sexp) ?    new callExpr(new primop("list"), sexp.map(parseQuotedExpr)) :
                             isNumber(sexp) ?  new numberExpr(sexp) :
                             isString(sexp) ?  new stringExpr(sexp) :
                             isChar(sexp) ?    new charExpr(sexp.val) :
@@ -193,19 +192,19 @@
     return (function () {
         var peek = sexp[0];
         var expr = !(isSymbolExpr(peek)) ? parseFuncCall(sexp) :
-                    isSymbolEqualTo(types.symbol("lambda"), peek)  ? parseLambdaExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("local"), peek)   ? parseLocalExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("letrec"), peek)  ? parseLetrecExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("let"), peek)     ? parseLetExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("let*"), peek)    ? parseLetStarExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("cond"), peek)    ? parseCondExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("if"), peek)      ? parseIfExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("begin"), peek)   ? parseBeginExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("and"), peek)     ? parseAndExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("or"), peek)      ? parseOrExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("time"), peek)    ? parseTimeExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("quote"), peek)   ? parseQuotedExpr(sexp[1]) :
-                    isSymbolEqualTo(types.symbol("quasiquote"), peek) ? parseQuasiQuotedExpr(sexp[1], false) :
+                    isSymbolEqualTo("lambda", peek)  ? parseLambdaExpr(sexp) :
+                    isSymbolEqualTo("local", peek)   ? parseLocalExpr(sexp) :
+                    isSymbolEqualTo("letrec", peek)  ? parseLetrecExpr(sexp) :
+                    isSymbolEqualTo("let", peek)     ? parseLetExpr(sexp) :
+                    isSymbolEqualTo("let*", peek)    ? parseLetStarExpr(sexp) :
+                    isSymbolEqualTo("cond", peek)    ? parseCondExpr(sexp) :
+                    isSymbolEqualTo("if", peek)      ? parseIfExpr(sexp) :
+                    isSymbolEqualTo("begin", peek)   ? parseBeginExpr(sexp) :
+                    isSymbolEqualTo("and", peek)     ? parseAndExpr(sexp) :
+                    isSymbolEqualTo("or", peek)      ? parseOrExpr(sexp) :
+                    isSymbolEqualTo("time", peek)    ? parseTimeExpr(sexp) :
+                    isSymbolEqualTo("quote", peek)   ? parseQuotedExpr(sexp[1]) :
+                    isSymbolEqualTo("quasiquote", peek) ? parseQuasiQuotedExpr(sexp[1], false) :
                     parseFuncCall(sexp);
           expr.location = sexp.location;
           return expr;
@@ -215,7 +214,7 @@
   function parseCondExpr(sexp) {
    if(sexpIsCondListP(sexp)){
       return new condExpr(rest(sexp).reduceRight((function (rst, couple) {
-                                 if((isSymbolExpr(couple[0])) && (isSymbolEqualTo(couple[0], types.symbol("else"))) && (!(isEmpty(rst)))){
+                                 if((isSymbolExpr(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (!(isEmpty(rst)))){
                                  return throwError(new types.Message(["found an `else' clause that isn't the last clause in its `cond' expression"]), couple.location);
                                  } else {
                                    return cons(parseCondCouple(couple), rst);
@@ -252,8 +251,8 @@
   };
 
   function parseQqList(sexp, inlist) {
-    return isSymbolExpr(sexp[0]) ? isSymbolEqualTo(sexp[0], types.symbol("unquote")) ? parseExpr(sexp[1]) :
-    isSymbolEqualTo(sexp[0], types.symbol("unquote-splicing")) ? inlist ? new qqSplice(parseExpr(sexp[1])) :
+    return isSymbolExpr(sexp[0]) ? isSymbolEqualTo(sexp[0], "unquote") ? parseExpr(sexp[1]) :
+    isSymbolEqualTo(sexp[0], "unquote-splicing") ? inlist ? new qqSplice(parseExpr(sexp[1])) :
     throwError(new types.Message(["misuse of ,@ or `unquote-splicing' within a quasiquoting backquote"]), sexp.location) :
     new qqList(sexp.map((function (x) {
     return parseQuasiQuotedExpr(x, true);
@@ -269,10 +268,10 @@
     };
     var singleton = isString(sexp) ? new stringExpr(sexp) :
                     isNumber(sexp) ? new numberExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("quote"), sexp) ? new quotedExpr(sexp) :
+                    isSymbolEqualTo("quote", sexp) ? new quotedExpr(sexp) :
                     isChar(sexp) ? new charExpr(sexp.val) :
-                    ((isSymbolEqualTo(types.symbol("true"), sexp)) || (isSymbolEqualTo(types.symbol("false"), sexp))) ? new booleanExpr(sexp) :
-                    isSymbolEqualTo(types.symbol("empty"), sexp) ? new callExpr(new primop(types.symbol("list")), []) :
+                    ((isSymbolEqualTo("true", sexp)) || (isSymbolEqualTo("false", sexp))) ? new booleanExpr(sexp) :
+                    isSymbolEqualTo("empty", sexp) ? new callExpr(new primop("list"), []) :
                     isSymbolExpr(sexp) ? sexpIsisPrimop(sexp) ? new primop(sexp) : sexp :
                     imageP(sexp) ? parseImage(sexp) :
       throwError(new types.Message([sexp+"expected a function, but nothing's there"]), sexp.location);
@@ -306,7 +305,7 @@
   };
 
   function sexpIsCondListP(sexp) {
-    return ((isCons(sexp)) && (sexp.length >= 2) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], types.symbol("cond"))));
+    return ((isCons(sexp)) && (sexp.length >= 2) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], "cond")));
   };
 
   function isId(sexp) {
@@ -315,24 +314,24 @@
 
   //////////////////////////////////////// REQUIRE PARSING ////////////////////////////////
   function isRequire(sexp) {
-    return isCons(sexp) && isSymbolExpr(sexp[0]) && isSymbolEqualTo(sexp[0], types.symbol("require"));
+    return isCons(sexp) && isSymbolExpr(sexp[0]) && isSymbolEqualTo(sexp[0], "require");
   };
 
   function parseRequire(sexp) {
     var uri = sexp[1];
     var require = (isString(uri) || isSymbolExpr(uri)) ? new req(uri) :
-              isSymbolEqualTo(uri[0], types.symbol("lib")) ? new req(uri) :
-              new req(cons(types.symbol("planet"), cons(second(uri), [rest(third(uri))])));
+              isSymbolEqualTo(uri[0], "lib") ? new req(uri) :
+              new req(cons("planet", cons(second(uri), [rest(third(uri))])));
     req.location = sexp.location;
     return require;
   };
 
   //////////////////////////////////////// PROVIDE PARSING ////////////////////////////////
  function isProvide(sexp) {
-    return isCons(sexp) && isSymbolExpr(sexp[0]) && isSymbolEqualTo(sexp[0], types.symbol("provide"));
+    return isCons(sexp) && isSymbolExpr(sexp[0]) && isSymbolEqualTo(sexp[0], "provide");
  };
  function parseProvide(sexp) {
-    var provide = new provideStatement(isSymbolExpr(sexp[1]) ? rest(sexp) : types.symbol("all-defined-out"));
+    var provide = new provideStatement(isSymbolExpr(sexp[1]) ? rest(sexp) : "all-defined-out");
     provide.location = sexp.location;
     return provide;
   };

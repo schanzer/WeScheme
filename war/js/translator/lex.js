@@ -13,7 +13,7 @@
 //
 // A Constant is either:
 // - types.Number
-// - types.Symbol
+// - symbolExpr
 // - types.String
 // - types.Character
 (function () {
@@ -299,9 +299,9 @@
         var p = str.charAt(i);
         switch(p){
           case 't':  // test for both forms of true
-          case 'T':  datum = types.symbol("true"); i++; break;
+          case 'T':  datum = new symbolExpr("true"); i++; break;
           case 'f':  // test for both forms of false
-          case 'F':  datum = types.symbol("false"); i++; break;
+          case 'F':  datum = new symbolExpr("false"); i++; break;
           // for all others, back up a character and keep reading
           case '\\': datum = readChar(str, i-1);
                      i+= datum.location.span-1; break;
@@ -415,22 +415,22 @@
     //               console.log("readQuote");
       var sCol = column, sLine = line, iStart = i;
       var p = str.charAt(i);
-      var symbol = p === "'" ? types.symbol("quote") :
-                   p === "`" ? types.symbol("quasiquote") :
+      var symbol = p == "'" ? new symbolExpr("quote") :
+                   p == "`" ? new symbolExpr("quasiquote") :
                    "";
-      if(p === ',') {
+      if(p == ',') {
         if(i+1 >= str.length) {
-          throwError(new types.Message(["read: Unexpected EOF when reading a quoted expression"])
-                     ,new Location(sCol, sLine, iStart, i-iStart));
+          throwError("read: Unexpected EOF when reading a quoted expression at "
+                     + new Location(sCol, sLine, iStart, i-iStart));
         }
-        if(str.charAt(i+1) === '#') {
-          symbol = types.symbol("unquote-splicing");
+        if(str.charAt(i+1) == '#') {
+          symbol = new symbolExpr("unquote-splicing");
         } else {
-          symbol = types.symbol("unquote");
+          symbol = new symbolExpr("unquote");
         }
       }
       var sexp = readSExpByIndex(str, i+1);
-      var quotedSexp = [new symbolExpr(symbol), sexp];
+      var quotedSexp = [symbol, sexp];
       quotedSexp.location = sexp.location;
       return quotedSexp;
     }
@@ -486,7 +486,7 @@
           throwError(new types.Message(["read: Unexpected EOF while reading a symbol"])
                      ,new Location(sCol, sLine, iStart, i-iStart));
         } else {
-          symbl = new symbolExpr(types.symbol(datum));
+          symbl = new symbolExpr(datum);
           symbl.location = new Location(sCol, sLine, iStart, i-iStart);
           return symbl;
         }
@@ -494,12 +494,12 @@
 
       var p = str.charAt(i);
 
-      symbl = new symbolExpr(types.symbol(datum));
+      symbl = new symbolExpr(datum);
       symbl.location = new Location(sCol, sLine, iStart, i-iStart);
       return symbl;
     }
 
-    // readVerbatimSymbol : String Number String -> types.Symbol
+    // readVerbatimSymbol : String Number String -> symbolExpr
     // reads the next couple characters as is without any restraint until it reads
     // a |.  It ignores both the closing | and the opening |.
     function readVerbatimSymbol(str, i, datum) {
@@ -519,7 +519,7 @@
       }
 
       i++; // skip over the closing |
-      var symbl = types.symbol(datum);
+      var symbl = new symbolExpr(datum);
       symbl.location = new Location(sCol, sLine, iStart, i-iStart);
       return symbl;
     }
