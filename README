@@ -1,7 +1,7 @@
 
 The source to WeScheme can be found at github:
 
-   https://github.com/dyoo/WeScheme
+   https://github.com/bootstrapworld/wescheme2012
 
 The user-level documentation for the project is maintained in:
 
@@ -11,15 +11,10 @@ The user-level documentation for the project is maintained in:
 ----------------------------------------------------------------------
 Build dependencies:
 
-Java 1.6 SDK should be installed, as should Apache Ant.  Racket 5.3.1 is
+Java 1.7 SDK should be installed, as should Apache Ant.  Racket 5.3.1 is
 also a dependency.  All these should be accessible from $PATH.
 Finally, our current build tools assume a Unix-like environment to run
 shell commands, including 'unzip' and 'git'.
-
-Note: do NOT use Java 1.7.  It has a known incompatibility with the
-underlying Google Appengine software.
-(http://stackoverflow.com/questions/11006281/java-7-support-for-google-app-engine-java)
-
 
 ----------------------------------------------------------------------
 
@@ -28,7 +23,7 @@ Installing WeScheme for local development
 
 1.  First, check out the WeScheme repository from Github.
 
-   $ git clone git://github.com/dyoo/WeScheme.git
+   $ git clone git://github.com/bootstrapworld/wescheme2012
 
 Don't forget: we're using git submodules, so also make sure to:
 
