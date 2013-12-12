@@ -157,14 +157,13 @@
  };
  defVar.prototype.collectDefinitions = function(pinfo){
     var id = this.name.val;
- console.log(this.name.val);
-    return pinfo.accumulateDefinedBinding(new bindingConstant(id, false,
+    return pinfo.accumulateDefinedBinding(new bindingConstant(this.name.val, false,
                                                               [],this.location),
                                           pinfo, this.location);
  };
  defVars.prototype.collectDefinitions = function(pinfo){
     this.names.reduce(function(pinfo, id){
-      return pinfo.accumulateDefinedBinding(new bindingConstant(id, false, [], this.location),
+      return pinfo.accumulateDefinedBinding(new bindingConstant(id.val, false, [], this.location),
                                             pinfo, this.location);
     }, pinfo);
  };
@@ -249,7 +248,7 @@
  lambdaExpr.prototype.analyzeUses = function(pinfo){
     var env1 = pinfo.env,
         env2 = this.args.reduce(function(env, arg){
-          return env.extend(new bindingConstant(arg, false, [], arg.location));
+          return env.extend(new bindingConstant(arg.val, false, [], arg.location));
         }, env1);
     return this.body.analyzeUses(pinfo, env2);
  };
@@ -258,7 +257,7 @@
     return this.body.analyzeUses(nested, pinfo.env);
  };
  callExpr.prototype.analyzeUses = function(pinfo, env){
-    return this.args.reduce(function(p, arg){
+    return [this.func].concat(this.args).reduce(function(p, arg){
                             return arg.analyzeUses(p, env);
                             }, pinfo);
  }
@@ -269,10 +268,10 @@
                             }, pinfo);
  };
  symbolExpr.prototype.analyzeUses = function(pinfo, env){
-    if(env.lookup_context(this)){
-      return pinfo.accumulateBindingUse(env.lookup_context(this), pinfo);
+    if(env.lookup_context(this.val)){
+      return pinfo.accumulateBindingUse(env.lookup_context(this.val), pinfo);
     } else {
-      return pinfo.accumulateFreeVariableUse(this, pinfo);
+      return pinfo.accumulateFreeVariableUse(this.val, pinfo);
     }
  };
 

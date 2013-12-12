@@ -478,7 +478,7 @@ function getTopLevelEnv(lang){
                      ,["integer-sqrt", 1]         // *
                      ,["integer?", 1]
                      ,["lcm", 1, true]
-                     ,["log", 1,]
+                     ,["log", 1]
                      ,["magnitude", 1]
                      ,["make-polar", 2]           // *
                      ,["make-rectangular", 2]     // *
@@ -835,7 +835,7 @@ function getTopLevelEnv(lang){
       return this.extend(new bindingFunction(id, moduleSource, minArity, isVarArity, [], false, loc));
     };
  
-    // extendConstant : symbol (modulePath || false) Loc -> env
+    // extendConstant : string (modulePath || false) Loc -> env
     this.extendConstant = function(id, moduleSource, loc){
       return this.extend(new bindingConstant(id, moduleSource, [], loc));
     };
@@ -1013,7 +1013,7 @@ function getTopLevelEnv(lang){
     // Adds a binding's use to a pinfo's set.
     this.accumulateBindingUse = function(binding){
  console.log('saw a binding use');
-      this.usedBindingsHash.put(binding.val, binding);
+      this.usedBindingsHash.put(binding.id, binding);
       return this;
     };
    

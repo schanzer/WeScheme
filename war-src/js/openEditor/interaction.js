@@ -131,10 +131,6 @@ WeSchemeInteractions = (function () {
         this.div = jQuery("<div><span class='top-aligned-inline-block'>&gt;&nbsp;</span><span class='top-aligned-inline-block' style='width: 90%'/></div>");
         parentDiv.append(this.div);
                         
-        // LOCAL TRANSLATOR STATE
-        this.__nenv = this.__nenv ? this.__nenv : initNenv;
-        this.__venv = this.__venv ? this.__venv : initVenv;
-
         var innerDivElt = this.div.find("span").get(1);
         new plt.wescheme.WeSchemeTextContainer(
             innerDivElt,
@@ -401,7 +397,7 @@ WeSchemeInteractions = (function () {
 
     var silenceCurrentEvaluator = function(that) {
         that.evaluator.write = function(thing) {};
-        that.evaluator.transformDom = function(thing) {};
+        that.evaluator.transformDom = function(thing) {return thing;};
         that.evaluator.requestBreak();
     };
 

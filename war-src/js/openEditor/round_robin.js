@@ -57,7 +57,7 @@ goog.provide("plt.wescheme.RoundRobin");
     };
 
 
-    var liveServers = [];
+    var liveServers = [1];
 
     var AT_LEAST_ONE_SERVER_READY = false;
     var initialize = function(compilation_servers, afterInitialize, onFailure) {
@@ -109,6 +109,7 @@ goog.provide("plt.wescheme.RoundRobin");
     var tryServerN = function(n, countFailures, 
                               programName, code, 
                               onDone, onDoneError) {
+ /*
        // try client-side parsing first, to see if we can avoid hitting the server altogether
        try{
           var sexp, AST, progres, result;
@@ -131,20 +132,28 @@ goog.provide("plt.wescheme.RoundRobin");
           console.log(AST);
           console.log(AST.join("\n"));
           try { ////////////////// DESUGAR /////////////////////
-            var AST = desugarProgram(AST);
-            console.log("DESUGARING:\nraw:");
-            console.log(AST);
-            console.log("pretty:");
-            console.log(AST.join("\n"));
+            var ASTandPinfo = desugar(AST),
+                program = ASTandPinfo[0],
+                pinfo = ASTandPinfo[1];
+            console.log("// DESUGARING: //////////////////////////////\nraw");
+            console.log(program);
+            console.log("pinfo:");
+            console.log(pinfo);
           } catch (e) {
-            console.log("DESUGARING ERROR\n"+e);
-            throw e;
+            throw Error("DESUGARING ERROR\n"+e);
+          }
+          try {
+            window.pinfo = analyze(program);
+            console.log("// ANALYSIS: //////////////////////////////\nraw");
+            console.log("pinfo (bound to window.pinfo):");
+          } catch (e) {
+            throw Error("ANALYSIS ERROR\n"+e);
           }
         } catch (e) {
-           return onDoneError(e);
+          return onDoneError(e);
         }
-                   
-
+ */
+        // if all systems are go, hit the server
         if (n < liveServers.length) {
             liveServers[n].xhr.compileProgram(
                 programName,
