@@ -1,7 +1,7 @@
 /*
  TODO
  - proper handling of 'else' in cond
- - gensym when desugaring or and and
+ - gensym when desugaring and
 */
 (function () {
  'use strict';
@@ -239,36 +239,35 @@
  Program.prototype.analyzeUses = function(pinfo, env){
     return pinfo;
  };
- defFunc.prototype.analyzeUses = function(pinfo){
+ defFunc.prototype.analyzeUses = function(pinfo, env){
     // extend the environment with the function, then analyze as a lambda
     pinfo.env.extend(bf(this.name.val, false, this.args.length, false, this.location));
     var lambda = new lambdaExpr(this.args, this.body);
     return lambda.analyzeUses(pinfo);
  };
- defVar.prototype.analyzeUses = function(pinfo){
+ defVar.prototype.analyzeUses = function(pinfo, env){
     return this.expr.analyzeUses(pinfo, pinfo.env);
  };
- defVars.prototype.analyzeUses = function(pinfo){
+ defVars.prototype.analyzeUses = function(pinfo, env){
     return this.expr.analyzeUses(pinfo, pinfo.env);
  };
  beginExpr.prototype.analyzeUses = function(pinfo, env){
     return this.exprs.reduce(function(p, expr){return expr.analyzeUses(p, env);}, pinfo);
  };
- lambdaExpr.prototype.analyzeUses = function(pinfo){
+ lambdaExpr.prototype.analyzeUses = function(pinfo, env){
     var env1 = pinfo.env,
         env2 = this.args.reduce(function(env, arg){
           return env.extend(new bindingConstant(arg.val, false, [], arg.location));
         }, env1);
     return this.body.analyzeUses(pinfo, env2);
  };
- localExpr.prototype.analyzeUses = function(pinfo){
-    var nestedPinfo = this.defs.reduce(function(p, d){return d.analyzeUses(p);}, pinfo);
-    pinfo.env = this.body.analyzeUses(nestedPinfo, nestedPinfo.env);
-    return pinfo;
+ localExpr.prototype.analyzeUses = function(pinfo, env){
+    var nestedPinfo = this.defs.reduce(function(p, d){return d.analyzeUses(p);}, pinfo),
+        body_pinfo = this.body.analyzeUses(nestedPinfo, nestedPinfo.env);
+    body_pinfo.env = pinfo.env;
+    return body_pinfo;
  };
  callExpr.prototype.analyzeUses = function(pinfo, env){
- console.log('analyzing uses');
- console.log(this.args);
     return [this.func].concat(this.args).reduce(function(p, arg){
                             return arg.analyzeUses(p, env);
                             }, pinfo);
