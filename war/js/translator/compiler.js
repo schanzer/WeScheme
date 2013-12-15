@@ -13,13 +13,18 @@
  // DESUGARING ////////////////////////////////////////////////////////////////
  
  // desugarProgram : Listof Programs null/pinfo -> [Listof Programs, pinfo]
+ // desugar each program, appending those that desugar to multiple programs
  function desugarProgram(programs, pinfo){
-    var acc = [ [], (pinfo || new compilerStructs.pinfo())];
-    return programs.reduce((function(acc, p){
-                              var desugaredAndPinfo = p.desugar(acc[1]);
-                              acc[0].push(desugaredAndPinfo[0]);
-                              return [acc[0], desugaredAndPinfo[1]];
-                            }), acc);
+      var acc = [ [], (pinfo || new compilerStructs.pinfo())];
+      return programs.reduce((function(acc, p){
+            var desugaredAndPinfo = p.desugar(acc[1]);
+            if(desugaredAndPinfo[0].length){
+              acc[0] = acc[0].concat(desugaredAndPinfo[0]);
+            } else {
+              acc[0].push(desugaredAndPinfo[0]);
+            }
+            return [acc[0], desugaredAndPinfo[1]];
+        }), acc);
  }
  
  // Program.prototype.desugar: pinfo -> [Program, pinfo]
@@ -39,20 +44,24 @@
  defStruct.prototype.desugar = function(pinfo){
     var name = this.name.toString(),
         fields = this.fields.map(function(f){return f.toString();}),
-        location = this.location,
         mutatorIds = fields.map(function(field){return name+'-'+field+'-set!';}),
-        ids = ['make-'+name, name+'?'].concat(mutatorIds),
-        call = new callExpr(new primop(types.symbol('make-struct-type')),
-                            [new quotedExpr(name), false, fields.length, 0]);
-    var defineValuesStx = [new defVars(ids, call)],
+        ids = [name, 'make-'+name, name+'?', name+'-ref', , name+'-set!'].concat(mutatorIds),
+        idSymbols = ids.map(function(id){return new symbolExpr(id);}),
+        call = new callExpr(new primop(new symbolExpr('make-struct-type')),
+                            [new symbolExpr(name),
+                             new booleanExpr("false"),
+                             new numberExpr(fields.length),
+                             new numberExpr(0)]);
+    var defineValuesStx = [new defVars(idSymbols, call)],
         selectorStx = [];
     // given a field, make a definition that binds struct-field to the result of
     // a make-struct-field accessor call in the runtime
     function makeAccessorDefn(f, i){
-      selectorStx.push(new defVar(name+'-'+f,
-                                  new callExpr(new primop(types.symbol('make-struct-field-accessor')),
-                                               [location, i, f])));
-                                                     
+      var runtimeOp = new primop(new symbolExpr('make-struct-field-accessor')),
+          runtimeArgs = [new symbolExpr(name+'-ref'), new numberExpr(i), new booleanExpr("false")],
+          runtimeCall = new callExpr(runtimeOp, runtimeArgs),
+          defineVar = new defVar(new symbolExpr(name+'-'+f), runtimeCall);
+      selectorStx.push(defineVar);
     }
     fields.forEach(makeAccessorDefn);
     return [defineValuesStx.concat(selectorStx), pinfo];
@@ -117,7 +126,7 @@
  andExpr.prototype.desugar = function(pinfo){
     var expr = this.exprs[this.exprs.length-1]; // ASSUME length >=2!!!
     for(var i=this.exprs.length-2; i>-1; i--){
-      expr = new ifExpr(this.exprs[i], expr, new booleanExpr(types.symbol("false")));
+      expr = new ifExpr(this.exprs[i], expr, new booleanExpr(new symbolExpr("false")));
     }
     return expr.desugar(pinfo);
  };
@@ -152,29 +161,19 @@
  function bf(name, modulePath, arity, vararity, loc){
     return new bindingFunction(name, modulePath, arity, vararity, [], false, loc);
  }
-
- 
- // collectDefinitions : Listof Programs pinfo -> pinfo
- function collectDefinitions(programs, pinfo){
-    return programs.reduce((function(pinfo, p){
-                              return p.collectDefinitions(pinfo);
-                            }), pinfo);
- }
-
  defFunc.prototype.collectDefinitions = function(pinfo){
-    return pinfo.accumulateDefinedBinding(bf(this.name.val, false, this.args.length,
-                                             false, this.location),
-                                          pinfo, this.location);
+    var binding = bf(this.name.val, false, this.args.length, false, this.location);
+    return pinfo.accumulateDefinedBinding(binding, pinfo, this.location);
  };
  defVar.prototype.collectDefinitions = function(pinfo){
-    return pinfo.accumulateDefinedBinding(new bindingConstant(this.name.val, false,
-                                                              [],this.location),
-                                          pinfo, this.location);
+    var binding = new bindingConstant(this.name.val, false, [],this.location)
+    return pinfo.accumulateDefinedBinding(binding, pinfo, this.location);
  };
  defVars.prototype.collectDefinitions = function(pinfo){
-    this.names.reduce(function(pinfo, id){
-      return pinfo.accumulateDefinedBinding(new bindingConstant(id.val, false, [], this.location),
-                                            pinfo, this.location);
+    var that = this;
+    return this.names.reduce(function(pinfo, id){
+      var binding = new bindingConstant(id.val, false, [], id.location);
+      return pinfo.accumulateDefinedBinding(binding, pinfo, that.location);
     }, pinfo);
  };
  defStruct.prototype.collectDefinitions = function(pinfo){
@@ -268,6 +267,8 @@
     return pinfo;
  };
  callExpr.prototype.analyzeUses = function(pinfo, env){
+ console.log('analyzing uses');
+ console.log(this.args);
     return [this.func].concat(this.args).reduce(function(p, arg){
                             return arg.analyzeUses(p, env);
                             }, pinfo);
@@ -360,10 +361,10 @@
       var lambdaArgs = new Array(this.args.length),
           closureArgs = new Array(closureVector.length);
       var bytecode = bcode:make-lam(null, [], lambdaExpr.args.length
-                                    ,lambdaArgs.map((function(){return types.symbol("val");}))
+                                    ,lambdaArgs.map((function(){return new symbolExpr("val");}))
                                     ,false
                                     ,closureVector
-                                    ,closureArgs.map((function(){return types.symbol("val/ref");}))
+                                    ,closureArgs.map((function(){return new symbolExpr("val/ref");}))
                                     ,0
                                     ,compiledBody);
    */
