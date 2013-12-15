@@ -1,8 +1,7 @@
 /*
  TODO
  - proper handling of 'else' in cond
- - collectDefinitions
- - analyzeUses
+ - gensym when desugaring or and and
 */
 (function () {
  'use strict';
@@ -31,7 +30,7 @@
  };
  defVar.prototype.desugar = function(pinfo){
     var exprAndPinfo = this.expr.desugar(pinfo);
-    return [new defVar(this.name, exprAndPinfo[1]), exprAndPinfo[1]];
+    return [new defVar(this.name, exprAndPinfo[0]), exprAndPinfo[1]];
  };
  defVars.prototype.desugar = function(pinfo){
     var exprAndPinfo = this.expr.desugar(pinfo);
@@ -125,11 +124,24 @@
  };
  // ors become nested
  orExpr.prototype.desugar = function(pinfo){
-    var expr = this.exprs[this.exprs.length-1]; // ASSUME length >=2!!!
-    for(var i=this.exprs.length-2; i>-1; i--){
-      expr = new ifExpr(this.exprs[i], new booleanExpr(types.symbol("true")), expr);
+    // grab the last expr, and remove it from the list and desugar
+    var expr = this.exprs.pop();
+ 
+    // given a desugared chain, add this expr to the chain
+    // we optimize the predicate/consequence by binding the expression to a temp symbol
+    function convertToNestedIf(restAndPinfo, expr){
+ console.log('converting '+expr.toString());
+      var pinfoAndTempSym = pinfo.gensym('tmp'),
+          tmpSym = pinfoAndTempSym[1],  // create a temp symbol 's'
+          tmpBinding = new couple(tmpSym, expr); // (let ((s expr)) (if s s (...))
+      tmpBinding.location = expr.location;
+      var let_exp = new letExpr([tmpBinding], new ifExpr(tmpSym, tmpSym, restAndPinfo[0]));
+      let_exp.location = expr.location;
+      var let_expAndPinfo = let_exp.desugar(pinfoAndTempSym[0])
+      return [let_expAndPinfo[0], restAndPinfo[1]];
     }
-    return expr.desugar(pinfo);
+    var exprsAndPinfo = this.exprs.reduceRight(convertToNestedIf, [expr, pinfo]);
+    return [exprsAndPinfo[0], exprsAndPinfo[1]];
  };
  
  // extend the Program class to collect definitions
@@ -151,12 +163,11 @@
  }
 
  defFunc.prototype.collectDefinitions = function(pinfo){
-    return pinfo.accumulateDefinedBinding(bf(this.name, false, this.args.length,
+    return pinfo.accumulateDefinedBinding(bf(this.name.val, false, this.args.length,
                                              false, this.location),
                                           pinfo, this.location);
  };
  defVar.prototype.collectDefinitions = function(pinfo){
-    var id = this.name.val;
     return pinfo.accumulateDefinedBinding(new bindingConstant(this.name.val, false,
                                                               [],this.location),
                                           pinfo, this.location);
@@ -231,10 +242,10 @@
     return pinfo;
  };
  defFunc.prototype.analyzeUses = function(pinfo){
-    var env1 = pinfo.env,
-        env2 = env1.extend(bf(this, false, this.args.length, false, this.location)),
-        lambda = new lambdaExpr(this.args, this.body);
-    return lambda.analyzeUses(pinfo.updateEnv(env2));
+    // extend the environment with the function, then analyze as a lambda
+    pinfo.env.extend(bf(this.name.val, false, this.args.length, false, this.location));
+    var lambda = new lambdaExpr(this.args, this.body);
+    return lambda.analyzeUses(pinfo);
  };
  defVar.prototype.analyzeUses = function(pinfo){
     return this.expr.analyzeUses(pinfo, pinfo.env);
@@ -253,16 +264,17 @@
     return this.body.analyzeUses(pinfo, env2);
  };
  localExpr.prototype.analyzeUses = function(pinfo){
-    var nestedPinfo = this.defns.reduce(function(p, d){return d.analyzeUses(p);}, pinfo);
-    return this.body.analyzeUses(nested, pinfo.env);
+    var nestedPinfo = this.defs.reduce(function(p, d){return d.analyzeUses(p);}, pinfo);
+    pinfo.env = this.body.analyzeUses(nestedPinfo, nestedPinfo.env);
+    return pinfo;
  };
  callExpr.prototype.analyzeUses = function(pinfo, env){
     return [this.func].concat(this.args).reduce(function(p, arg){
                             return arg.analyzeUses(p, env);
                             }, pinfo);
  }
- ifExpr.prototype.analyzeUses = function(pinfo){
-    var exps = [this.test, this.consequence, this.alternative];
+ ifExpr.prototype.analyzeUses = function(pinfo, env){
+    var exps = [this.predicate, this.consequence, this.alternative];
     return exps.reduce(function(p, exp){
                             return exp.analyzeUses(p,env);
                             }, pinfo);
@@ -446,9 +458,11 @@
                               })
                              , pinfo);
     }
-
-    var pinfo1 = collectDefinitions(programs, pinfo),
-        pinfo2 = collectProvides(programs, pinfo1);
+    console.log("collecting definitions");
+    var pinfo1 = collectDefinitions(programs, pinfo);
+    console.log("collecting provides");
+    var pinfo2 = collectProvides(programs, pinfo1);
+    console.log("analyzing uses");
     return analyzeUses(programs, pinfo2);
  }
  
