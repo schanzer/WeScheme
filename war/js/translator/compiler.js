@@ -66,8 +66,8 @@
     return [new lambdaExpr(this.args, bodyAndPinfo[0]), bodyAndPinfo[1]];
  };
  localExpr.prototype.desugar = function(pinfo){
-    var defnsAndPinfo = desugarProgram(this.defs, pinfo),
-        exprAndPinfo = this.body.desugar(defnsAndPinfo[1]);
+    var defnsAndPinfo = desugarProgram(this.defs, pinfo);
+    var exprAndPinfo = this.body.desugar(defnsAndPinfo[1]);
     return [new localExpr(defnsAndPinfo[0], exprAndPinfo[0]), exprAndPinfo[1]];
  };
  callExpr.prototype.desugar = function(pinfo){
@@ -84,11 +84,10 @@
             exprsAndPinfo[1]];
  };
 
- // convert all these to simpler forms, then desugar those forms
  // letrecs become locals
  letrecExpr.prototype.desugar = function(pinfo){
-    function bindingToDefn(b){return new defVar(b.first, b.second.desugar());};
-    return [new localExpr(this.bindings.map(bindingToDefn), this.body.desugar()), pinfo];
+    function bindingToDefn(b){return new defVar(b.first, b.second);};
+    return new localExpr(this.bindings.map(bindingToDefn), this.body).desugar(pinfo);
  };
  // lets become calls
  letExpr.prototype.desugar = function(pinfo){
