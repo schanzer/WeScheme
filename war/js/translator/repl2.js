@@ -55,16 +55,16 @@ function readFromRepl(event) {
     var aSource = repl_input.value;
     var progres;
     try {
-      sexp = lex(aSource);
       console.log("// LEXING: ///////////////////////////////////\nraw:");
+      sexp = lex(aSource);
       console.log(sexp);
       console.log("pretty:\n"+sexpToString(sexp));
     } catch (e) {
       throw Error("LEXING ERROR\n"+e);
     }
     try {
-      var AST = parse(sexp);
       console.log("// PARSING: //////////////////////////////////\nraw:");
+      var AST = parse(sexp);
       console.log(AST);
       console.log("pretty:");
       console.log(AST.join("\n"));
@@ -72,10 +72,10 @@ function readFromRepl(event) {
       throw Error("PARSING ERROR\n"+e);
     }
     try {
+      console.log("// DESUGARING: //////////////////////////////\nraw");
       var ASTandPinfo = desugar(AST),
           program = ASTandPinfo[0],
           pinfo = ASTandPinfo[1];
-      console.log("// DESUGARING: //////////////////////////////\nraw");
       console.log(program);
       console.log("pinfo:");
       console.log(pinfo);
@@ -83,8 +83,8 @@ function readFromRepl(event) {
       throw Error("DESUGARING ERROR\n"+e);
     }
     try {
-      window.pinfo = analyze(program);
       console.log("// ANALYSIS: //////////////////////////////\nraw");
+      window.pinfo = analyze(program);
       console.log("pinfo (bound to window.pinfo):");
     } catch (e) {
       throw Error("ANALYSIS ERROR\n"+e);
