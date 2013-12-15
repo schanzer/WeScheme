@@ -1,5 +1,6 @@
 /* TODO
  - JSLint
+ - get rid of Constant
  */
 
 //////////////////////////////////////////////////////////////////////////////
@@ -205,6 +206,7 @@
       delims.push(openingDelim);
                    
       i = chewWhiteSpace(str, i);
+      sCol = column; // update sCol in case we chewed whitespace
 
       while (i < str.length && !res.rightListDelims.test(str.charAt(i))) {
         // check for newlines
@@ -216,6 +218,7 @@
         }
 
         i = chewWhiteSpace(str, sexp.location.offset+sexp.location.span);
+        sCol = column; // update sCol in case we chewed whitespace
       }
 
       if(i >= str.length) {
@@ -239,6 +242,7 @@
          throwError(msg, new Location(sCol, sLine, iStart, 1));
       }
       // add 1 to span to count the closing delimeter
+      column++;
       list.location = new Location(sCol, sLine, iStart, i-iStart+1);
       return list;
     }
