@@ -99,7 +99,7 @@
       var str="";
       if(sexp instanceof Array) {
         str += "(" + sexp + ")";
-      } else if (sexp instanceof types.symbol) {
+      } else if (sexp instanceof symbolExpr) {
         str = sexp.val;
       } else if (sexp instanceof types.string) {
         str = '"' + sexp + '"';
@@ -223,18 +223,18 @@
 
       if(i >= str.length) {
          var msg = new types.Message(["read: expected a ",
-                                  otherDelim(openingDelim),
-                                  " to close ",
-                                  new types.ColoredPart(openingDelim.toString(),
-                                                        new Location(sCol, sLine, iStart, i-iStart))
-                                  ]);
+                                      otherDelim(openingDelim),
+                                      " to close ",
+                                      new types.ColoredPart(openingDelim.toString(),
+                                                            new Location(sCol, sLine, i, i-iStart))
+                                      ]);
          throwError(msg, new Location(sCol, sLine, iStart, i-iStart));
       }
       if(!matchingDelims(openingDelim, str.charAt(i))) {
          var msg = new types.Message(["read: expected a ", otherDelim(openingDelim),
                                   " to close ",
                                   new types.ColoredPart(openingDelim.toString(),
-                                                        new Location(sCol, sLine, iStart, 1)),
+                                                        new Location(sCol, sLine, i, 1)),
                                   " but found a ",
                                   new types.ColoredPart(str.charAt(i).toString(),
                                                         new Location(column, line, i, 1))
@@ -439,7 +439,7 @@
       return quotedSexp;
     }
                    
-    // readSymbolOrNumber : String Number -> types.Symbol | types.Number
+    // readSymbolOrNumber : String Number -> symbolExpr | types.Number
     // reads any number or symbol
     function readSymbolOrNumber(str, i) {
     //               console.log("readSymbolOrNumber, starting at "+i);
@@ -466,7 +466,7 @@
       return symbl;
     }
 
-    // readSymbol : String Number String -> types.Symbol
+    // readSymbol : String Number String -> symbolExpr
     // reads in a symbol which can be any charcter except for certain delimiters
     // as described in isValidSymbolCharP
     function readSymbol(str, i, datum) {

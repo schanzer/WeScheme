@@ -1,10 +1,3 @@
-/*
-- preserve location information during desugaring
-- add error messages to desugaring phase for eeeeeeeverything
-- do test cases get desugared?
-- Get plain error messages working, complete desugaring, write analyzer
-*/
-
 // COMMON FUNCTIONS AND STRUCTURES ////////////////////////////////////////
 // used by multiple phases of the compiler
 
@@ -22,18 +15,31 @@ function isEmpty(x) { return x instanceof Array && x.length===0;}
 function first(ls)  { return ls[0]; }
 function rest(ls)   { return ls.slice(1); }
 
-// uniqueSymbols : [listof SymbolExprs] -> Boolean
-// sort the array, and return true unless a duplicate is found
-function uniqueSymbols(lst){
-  var sorted_arr = list.sort(); // You can define the comparing function here.
+// checkDuplicateIdentifiers : [listof SymbolExprs], Program -> Void
+// sort the array, and throw errors for non-symbols, keywords or duplicates
+function checkDuplicateIdentifiers(lst, caller){
+  var sorted_arr = lst.sort(); // You can define the comparing function here.
   var results = [];
-  for (var i = 0; i < arr.length - 1; i++) {
-    if (sorted_arr[i + 1] == sorted_arr[i]) {
-      return false;
+  for (var i = 0; i < lst.length; i++) {
+    if(!(sorted_arr[i] instanceof symbolExpr)){
+      throwError("expected identifier "+sorted_arr[i].val, sorted_arr[i].location);
+    } else if(compilerStructs.keywords.indexOf(sorted_arr[i].val)>-1){
+      throwError(types.Message([new types.ColoredPart(sorted_arr[i].val, sorted_arr[i].location),
+                                " : this is a reserved keyword and cannot be used as a variable or function name"]),
+                               sorted_arr[i].location);
+    } else if(results[sorted_arr[i]]) {
+      throwError(types.Message([new types.ColoredPart(caller.toString(), caller.location),
+                                ": found ",
+                                new types.ColoredPart("a variable", sorted_arr[i].location),
+                                " that is already used ",
+                                new types.ColoredPart("a here", sorted_arr[i-1].location)]),
+                               caller.location);
+    } else {
+      results[sorted_arr[i]] = true;
     }
   }
-  return true;
 }
+
 // the location struct
 var Location = function(sCol, sLine, offset, span, source){
   this.sCol   = sCol;   // starting index into the line
@@ -44,7 +50,10 @@ var Location = function(sCol, sLine, offset, span, source){
   this.toString = function(){
     return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
   };
-  this.toVector = function(){new types.vector(this.source, this.offset, this.sLine, this.sCol, this.sp)};
+  this.toJSON = function(){
+    return {line: this.sLine, span: this.span, offset: this.offset,
+           column: this.sCol, id: this.source || "<definitions>"};
+  };
 }
 
 // couples = pair
@@ -67,13 +76,20 @@ var Constant = function(val, loc){
 
 // encode the msg and location as a JSON error
 function throwError(msg, loc) {
-  loc.source = loc.source || "definitions"; // FIXME -- we should have the source populated
-  
-  var json = {"type": "moby-failure"
+  loc.source = loc.source || "<definitions>"; // FIXME -- we should have the source populated
+  msg.args = msg.args.map(function(part){
+                           return (typeof(part) === 'string')?
+                                    part :
+                                    {text: part.text
+                                    , loc: part.location.toJSON()
+                                    , type: 'ColoredPart'};
+               });
+  var json = {type: "moby-failure"
     , "dom-message": ["span"
                       ,[["class", "Error"]]
                       ,["span"
-                        , [["class", "Message"]].concat(msg)]
+                        , [["class", "Message"]],
+                        msg.toString()]
                       ,["br", [], ""]
                       ,["span"
                         , [["class", "Error.location"]]
@@ -88,9 +104,8 @@ function throwError(msg, loc) {
                            ]
                         ]
                       ]
-    , "structured-error": '{"message": "'+msg+'", "location": {"line": "'+loc.sLine+'", "span": "'+loc.span+'", "offset": "'+loc.offset+'", "column": "'+loc.sCol+'", "id": "'+loc.source+'"}}'
+    , "structured-error": JSON.stringify({message: msg.args, location: loc.toJSON() })
   };
-  console.log(json);
   throw JSON.stringify(json);
 }
 
@@ -102,7 +117,7 @@ var heir = function(p) {
   return new f();
 };
 
-// all Programs, by default, print out their values and do not desugar
+// all Programs, by default, print out their values and have no location
 // anything that behaves differently must override these functions
 var Program = function() {
   // -> String
@@ -313,7 +328,7 @@ mtListExpr.prototype = heir(Program.prototype);
 function booleanExpr(sym) {
   Program.call(this);
   sym = (sym instanceof symbolExpr)? sym.val : sym;
-  this.val = (sym.val === "true" || sym.val === "#t");
+  this.val = (sym === "true" || sym === "#t");
   this.toString = function(){ return this.val? "#t" : "#f";};
 };
 booleanExpr.prototype = heir(Program.prototype);
@@ -941,13 +956,13 @@ function getTopLevelEnv(lang){
     this.usedBindings =  this.usedBindingsHash.values;
  
     this.accumulateDeclaredPermission = function(name, permission){
- console.log('saw a declared permission');
+// console.log('saw a declared permission');
       this.declaredPermissions = [[name, position]].concat(this.declaredPermissions);
       return this;
     };
  
     this.accumulateSharedExpression = function(expression, translation){
- console.log('saw a shared expression');
+// console.log('saw a shared expression');
       var labeledTranslation = makeLabeledTranslation(this.gensymCounter, translation);
       this.sharedExpressions.put(labeledTranslation, expression);
       return this;
@@ -956,22 +971,21 @@ function getTopLevelEnv(lang){
     // accumulateDefinedBinding: binding loc -> pinfo
     // Adds a new defined binding to a pinfo's set.
     this.accumulateDefinedBinding = function(binding, loc){
- console.log('saw a defined binding: \n');
- console.log(binding);
+// console.log('saw a defined binding: \n');
       if(compilerStructs.keywords.indexOf(binding.id) > -1){
-        throwError(types.Message([new ColoredPart(binding.id, loc),
+        throwError(types.Message([new types.ColoredPart(binding.id, loc),
                                   ": this is a reserved keyword and cannot be used"+
                                   "as a variable or function name"]));
       } else if(!this.allowRedefinition && isRedefinition(binding.id)){
         var prevBinding = this.env.lookup(binding.id);
         if(binding.loc){
-          throwError(types.Message([new ColoredPart(binding.id, binding.loc),
+          throwError(types.Message([new types.ColoredPart(binding.id, binding.loc),
                                     ": this name has a ",
-                                    new ColoredPart("previous definition", prevBinding.loc),
+                                    new types.ColoredPart("previous definition", prevBinding.loc),
                                     " and cannot be re-defined"]));
  
         } else {
-          throwError(types.Message([new ColoredPart(binding.id, binding.loc),
+          throwError(types.Message([new types.ColoredPart(binding.id, binding.loc),
                                     ": this name has a ",
                                     "previous definition",
                                     " and cannot be re-defined"]));
@@ -996,7 +1010,7 @@ function getTopLevelEnv(lang){
     // Adds a list of module-imported bindings to the pinfo's known set of bindings, without
     // including them within the set of defined names.
     this.accumulateModuleBindings = function(bindings){
- console.log('saw a module binding');
+// console.log('saw a module binding');
       bindings.forEach(function(b){this.env.extend(binding);});
       return this;
     };
@@ -1004,7 +1018,7 @@ function getTopLevelEnv(lang){
     // accumulateModule: module-binding -> pinfo
     // Adds a module to the pinfo's set.
     this.accumulateModule = function(module){
- console.log('saw a new module');
+// console.log('saw a new module');
       this.modules = [module].concat(this.modules);
       return this;
     };
@@ -1012,15 +1026,15 @@ function getTopLevelEnv(lang){
     // accumulateBindingUse: binding -> pinfo
     // Adds a binding's use to a pinfo's set.
     this.accumulateBindingUse = function(binding){
- console.log('saw a binding use');
-      this.usedBindingsHash.put(binding.id, binding);
+// console.log('saw a binding use');
+      this.usedBindingsHash.put(binding.name, binding);
       return this;
     };
    
     // accumulateFreeVariableUse: symbol -> pinfo
     // Mark a free variable usage.
     this.accumulateFreeVariableUse = function(sym){
- console.log('saw a free variable');
+// console.log('saw a free variable');
       this.freeVariables = ((this.freeVariables.indexOf(sym) > -1)?
                             this.freeVariables : [sym].concat(this.freeVariables));
       return this;
@@ -1029,9 +1043,9 @@ function getTopLevelEnv(lang){
     // gensym: symbol -> [pinfo, symbol]
     // Generates a unique symbol.
     this.gensym = function(label){
- console.log('gensyming');
+// console.log('gensyming');
       this.gensymCounter++;
-      return [this, label+this.gensymCounter];
+      return [this, new symbolExpr(label+this.gensymCounter)];
     };
  
     // permissions: -> (listof permission)
@@ -1111,13 +1125,13 @@ function getTopLevelEnv(lang){
  
     this.toString = function(){
       var s = "pinfo-------------";
- s+= "\nenv: "+this.env.toString();
- s+= "\nmodules: "+this.modules.join(",");
- s+= "\nused bindings: "+this.usedBindings();
- s+= "\nfree variables: "+this.freeVariables.join(",");
- s+= "\ngensym counter: "+this.gensymCounter;
- s+= "\nprovided names: "+this.providedNames.values();
- s+= "\ndefined names: "+this.definedNames.values();
+ s+= "\n**env****: "+this.env.toString();
+ s+= "\n**modules**: "+this.modules.join(",");
+ s+= "\n**used bindings**: "+this.usedBindings();
+ s+= "\n**free variables**: "+this.freeVariables.join(",");
+ s+= "\n**gensym counter**: "+this.gensymCounter;
+ s+= "\n**provided names**: "+this.providedNames.values();
+ s+= "\n**defined names**: "+this.definedNames.values();
  return s;
     };
  }

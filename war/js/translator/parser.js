@@ -1,7 +1,6 @@
 /* TODO
  - JSLint
  - parse bugs: (define 2) (cond)
- - preserve location information during desugaring
  */
 
 (function () {

@@ -1,7 +1,13 @@
 /*
  TODO
+ - desugar Symbols
  - proper handling of 'else' in cond
- - gensym when desugaring and
+ - native call to force-boolean-context in if, and, or and cond
+ - preserve location information during desugaring
+ - test cases get desugared into native calls (and thunks?)
+ - vars defined by 'local' are treated as free?
+ - implement bytecode structs
+ - compilation
 */
 (function () {
  'use strict';
@@ -30,6 +36,7 @@
  // Program.prototype.desugar: pinfo -> [Program, pinfo]
  Program.prototype.desugar = function(pinfo){ return [this, pinfo]; };
  defFunc.prototype.desugar = function(pinfo){
+    if(checkDuplicateIdentifiers(this.args, this))
     var bodyAndPinfo = this.body.desugar(pinfo);
     return [new defFunc(this.name, this.args, bodyAndPinfo[0]), bodyAndPinfo[1]];
  };
@@ -130,7 +137,7 @@
     }
     return expr.desugar(pinfo);
  };
- // ors become nested
+ // ors become nested lets-with-if-bodies
  orExpr.prototype.desugar = function(pinfo){
     // grab the last expr, and remove it from the list and desugar
     var expr = this.exprs.pop();
@@ -138,10 +145,9 @@
     // given a desugared chain, add this expr to the chain
     // we optimize the predicate/consequence by binding the expression to a temp symbol
     function convertToNestedIf(restAndPinfo, expr){
- console.log('converting '+expr.toString());
       var pinfoAndTempSym = pinfo.gensym('tmp'),
-          tmpSym = pinfoAndTempSym[1],  // create a temp symbol 's'
-          tmpBinding = new couple(tmpSym, expr); // (let ((s expr)) (if s s (...))
+          tmpSym = pinfoAndTempSym[1],
+          tmpBinding = new couple(tmpSym, expr); // (let (tmpBinding) (if tmpSym tmpSym (...))
       tmpBinding.location = expr.location;
       var let_exp = new letExpr([tmpBinding], new ifExpr(tmpSym, tmpSym, restAndPinfo[0]));
       let_exp.location = expr.location;
@@ -150,6 +156,9 @@
     }
     var exprsAndPinfo = this.exprs.reduceRight(convertToNestedIf, [expr, pinfo]);
     return [exprsAndPinfo[0], exprsAndPinfo[1]];
+ };
+ symbolExpr.prototype.desugar = function(pinfo){
+    return this;
  };
  
  // extend the Program class to collect definitions

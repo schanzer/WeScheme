@@ -57,7 +57,7 @@ goog.provide("plt.wescheme.RoundRobin");
     };
 
 
-    var liveServers = [1];
+    var liveServers = [];
 
     var AT_LEAST_ONE_SERVER_READY = false;
     var initialize = function(compilation_servers, afterInitialize, onFailure) {
@@ -109,14 +109,14 @@ goog.provide("plt.wescheme.RoundRobin");
     var tryServerN = function(n, countFailures, 
                               programName, code, 
                               onDone, onDoneError) {
- /*
+ 
        // try client-side parsing first, to see if we can avoid hitting the server altogether
        try{
-          var sexp, AST, progres, result;
+          var sexp, AST, ASTandPinfo, local_error;
           try { //////////////////// LEX ///////////////////
             var sexp = lex(code);
           } catch(e) {
-            console.log("LEXING ERROR\n"+e);
+            console.log("LEXING ERROR");
             throw e;
           }
           console.log("LEXER OUTPUT (raw and prettyprinted):");
@@ -125,7 +125,7 @@ goog.provide("plt.wescheme.RoundRobin");
           try{ //////////////////// PARSE ///////////////////
             var AST = parse(sexp);
           } catch(e) {
-            console.log("PARSING ERROR\n"+e);
+            console.log("PARSING ERROR");
             throw e;
           }
           console.log("PARSER OUTPUT (raw and prettyprinted):");
@@ -140,19 +140,19 @@ goog.provide("plt.wescheme.RoundRobin");
             console.log("pinfo:");
             console.log(pinfo);
           } catch (e) {
-            throw Error("DESUGARING ERROR\n"+e);
+            throw Error("DESUGARING ERROR");
           }
           try {
             window.pinfo = analyze(program);
             console.log("// ANALYSIS: //////////////////////////////\nraw");
             console.log("pinfo (bound to window.pinfo):");
           } catch (e) {
-            throw Error("ANALYSIS ERROR\n"+e);
+            throw Error("ANALYSIS ERROR");
           }
         } catch (e) {
-          return onDoneError(e);
+          local_error = e;
         }
- */
+ console.log('sending program out to AWS');
         // if all systems are go, hit the server
         if (n < liveServers.length) {
             liveServers[n].xhr.compileProgram(
@@ -184,7 +184,11 @@ goog.provide("plt.wescheme.RoundRobin");
                                        onDoneError);
                         }
                     } else {
-                        onDoneError(errorStruct.message);
+                        console.log("LOCAL ERROR:");
+                        console.log(local_error);
+                        console.log("SERVER ERROR:");
+                        console.log(errorStruct.message);
+                        onDoneError(local_error);
                     }
                 });
         } else {
