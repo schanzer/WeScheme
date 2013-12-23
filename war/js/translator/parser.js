@@ -1,6 +1,7 @@
 /* TODO
  - JSLint
  - parse bugs: match WeScheme error messages
+  - multiple extra parts
  */
 
 (function () {
@@ -104,9 +105,6 @@
   // parseExprList : SExp -> AST
   // predicates and parsers for call, lambda, local, letrec, let, let*, if, and, or, time, quote and quasiquote exprs
   function parseExprList(sexp) {
-    function isLetrec(sexp) {
-      return isTripleWithFirstEqualTo(sexp, "letrec");
-    }
     function isLet(sexp) {
       return isTripleWithFirstEqualTo(sexp, "let");
     }
@@ -143,7 +141,7 @@
                                       ," but nothing's there"])
                    , sexp.location);
       }
-      // is it just (lambda x)?
+      // is it just (lambda <not-list>)?
       if(sexp[1].length === undefined){
         throwError(new types.Message([new types.ColoredPart("lambda", sexp[0].location)
                                       ," : expected at least one variable (in parentheses) after lambda, but found "
@@ -165,6 +163,13 @@
                                       ," : expected an expression for the function body, but nothing's there"])
                    , sexp.location);
       }
+      // too many expressions?
+      if(sexp.length > 2){
+        throwError(new types.Message([new types.ColoredPart("lambda", sexp[0].location)
+                                      ," : expected a single body, but found "
+                                      , new types.ColoredPart("1 extra part", sexp[1].location)])
+                   , sexp.location);
+      }
       return new lambdaExpr(sexp[1].map(parseIdExpr), parseExpr(sexp[2]));
     }
     function parseLocalExpr(sexp) {
@@ -175,7 +180,7 @@
                                       ," but nothing's there"])
                    , sexp.location);
       }
-      // is it just (local x)?
+      // is it just (local <not-list>)?
       if(sexp[1].length === undefined){
         throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
                                       ," : expected a collection of definitions, but found "
@@ -197,13 +202,52 @@
                                       ," : expected a single body, but found none"])
                    , sexp.location);
       }
+      // too many expressions?
+      if(sexp.length > 3){
+        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+                                      ," : expected a single body, but found "
+                                      , new types.ColoredPart("1 extra part", sexp[1].location)])
+                   , sexp.location);
+      }
       return new localExpr(sexp[1].map(parseDefinition), parseExpr(sexp[2]));
     }
     function parseLetrecExpr(sexp) {
-      return isLetrec(sexp) ? new letrecExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2])) :
+      // is it just (letrec)?
+      if(sexp.length < 3){
         throwError(new types.Message([new types.ColoredPart("letrec", sexp[0].location)
                                       ," : expected an expression after the bindings, but nothing's there"])
-                    , sexp.location);
+                   , sexp.location);
+      }
+      // is it just (letrec <not-list>)?
+      if(sexp[1].length === undefined){
+        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+                                      ," : expected sequence of key value pairs, but given "
+                                      , new types.ColoredPart("something else", sexp[1].location)])
+                   , sexp.location);
+      }
+      // is it a list of not-all-bindings?
+      sexp[1].forEach(function(binding){
+        if (!sexpIsCouple(binding)){
+        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+                                      ," : expected a key/value pair, but found "
+                                      , new types.ColoredPart("something else", binding.location)])
+                   , sexp.location);
+        }
+      });
+      // is it just (letrec (...bindings...) ))?
+      if(sexp.length === 2){
+        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+                                      ," : expected an expression after the bindings, but nothing's there"])
+                   , sexp.location);
+      }
+      // too many expressions?
+      if(sexp.length > 3){
+        throwError(new types.Message([new types.ColoredPart("letrec", sexp[0].location)
+                                      ," : expected a single body, but found "
+                                      , new types.ColoredPart("1 extra part", sexp[1].location)])
+                   , sexp.location);
+      }
+      new letrecExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2]));
 
     }
     function parseLetExpr(sexp) {
@@ -283,7 +327,7 @@
 
   function parseCondExpr(sexp) {
     function parseCondCouple(sexp_) {
-      if(sexpIsisCouple(sexp_)){
+      if(sexpIsCouple(sexp_)){
         var cpl = new couple(parseExpr(sexp_[0]), parseExpr(sexp_[1]));
         cpl.location = sexp_.location;
         return cpl;
@@ -319,7 +363,7 @@
   };
 
   function parseLetCouple(sexp) {
-    return sexpIsisCouple(sexp) ? new couple(parseIdExpr(sexp[0]), parseExpr(sexp[1])) :
+    return sexpIsCouple(sexp) ? new couple(parseIdExpr(sexp[0]), parseExpr(sexp[1])) :
     throwError(new types.Message([" : expected a sequence of key/value pairs, but given "
                                  , new types.ColoredPart("something else", sexp[0].location)])
                 , sexp.location);
@@ -381,7 +425,7 @@
     return isTupleStartingWithOfLength(sexp, symbol, 4);
   };
 
-  function sexpIsisCouple(sexp) {
+  function sexpIsCouple(sexp) {
     return ((isCons(sexp)) && ((sexp.length === 2)));
   };
 
