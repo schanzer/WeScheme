@@ -1,6 +1,6 @@
 /* TODO
  - JSLint
- - parse bugs: (define 2) (cond)
+ - parse bugs: match WeScheme error messages
  */
 
 (function () {
@@ -104,9 +104,6 @@
   // parseExprList : SExp -> AST
   // predicates and parsers for call, lambda, local, letrec, let, let*, if, and, or, time, quote and quasiquote exprs
   function parseExprList(sexp) {
-    function isLambda(sexp) {
-      return isTripleWithFirstEqualTo(sexp, "lambda");
-    }
     function isLocal(sexp) {
       return isTripleWithFirstEqualTo(sexp, "local");
     }
@@ -142,16 +139,37 @@
                           throwError(new types.Message(["function call sexp"]), sexp.location);
     }
     function parseLambdaExpr(sexp) {
-      return isLambda(sexp) ? (sexp[1].length > -1) ?
-        new lambdaExpr(sexp[1].map(parseIdExpr), parseExpr(sexp[2])) :
+      // is it just (lambda)?
+      if(sexp.length === 1){
         throwError(new types.Message([new types.ColoredPart("lambda", sexp[0].location)
-                                      ," : expected at least one variable (in parentheses) after lambda, but found "
-                                      , new types.ColoredPart("something else", sexp[1].location)])
-                   , sexp.location) :
+                                      ," : expected at least one variable (in parentheses) after lambda,"
+                                      ," but nothing's there"])
+                   , sexp.location);
+      }
+      // is it just (lambda x)?
+      if(sexp[1].length === undefined){
         throwError(new types.Message([new types.ColoredPart("lambda", sexp[0].location)
                                       ," : expected at least one variable (in parentheses) after lambda, but found "
                                       , new types.ColoredPart("something else", sexp[1].location)])
                    , sexp.location);
+      }
+      // is it a list of not-all-symbols?
+      sexp[1].forEach(function(arg){
+        if (!(arg instanceof symbolExpr)){
+        throwError(new types.Message([new types.ColoredPart("lambda", sexp[0].location)
+                                      ," : expected as list of variables after lambda, but found "
+                                      , new types.ColoredPart("something else", arg.location)])
+                   , sexp.location);
+        }
+      });
+      // is it just (lambda (x))?
+      if(sexp.length === 2){
+        throwError(new types.Message([new types.ColoredPart("lambda", sexp[0].location)
+                                      ," : expected an expression for the function body, but nothing's there"])
+                   , sexp.location);
+      }
+ 
+      return new lambdaExpr(sexp[1].map(parseIdExpr), parseExpr(sexp[2]));
     }
     function parseLocalExpr(sexp) {
       return isLocal(sexp) ? new localExpr(sexp[1].map(parseDefinition), parseExpr(sexp[2])) :
