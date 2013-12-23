@@ -104,9 +104,6 @@
   // parseExprList : SExp -> AST
   // predicates and parsers for call, lambda, local, letrec, let, let*, if, and, or, time, quote and quasiquote exprs
   function parseExprList(sexp) {
-    function isLocal(sexp) {
-      return isTripleWithFirstEqualTo(sexp, "local");
-    }
     function isLetrec(sexp) {
       return isTripleWithFirstEqualTo(sexp, "letrec");
     }
@@ -168,15 +165,39 @@
                                       ," : expected an expression for the function body, but nothing's there"])
                    , sexp.location);
       }
- 
       return new lambdaExpr(sexp[1].map(parseIdExpr), parseExpr(sexp[2]));
     }
     function parseLocalExpr(sexp) {
-      return isLocal(sexp) ? new localExpr(sexp[1].map(parseDefinition), parseExpr(sexp[2])) :
+      // is it just (local)?
+      if(sexp.length === 1){
         throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
-                               ," : expected a collection of definitions, but given "
-                               , new types.ColoredPart("something else", sexp[1].location)])
-                  , sexp.location);
+                                      ," : expected at least one definition (in square brackets) after local,"
+                                      ," but nothing's there"])
+                   , sexp.location);
+      }
+      // is it just (local x)?
+      if(sexp[1].length === undefined){
+        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+                                      ," : expected a collection of definitions, but found "
+                                      , new types.ColoredPart("something else", sexp[1].location)])
+                   , sexp.location);
+      }
+      // is it a list of not-all-definitions?
+      sexp[1].forEach(function(def){
+        if (!isDefinition(def)){
+        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+                                      ," : expected a definition, but found "
+                                      , new types.ColoredPart("something else", def.location)])
+                   , sexp.location);
+        }
+      });
+      // is it just (local [...defs...] ))?
+      if(sexp.length === 2){
+        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+                                      ," : expected a single body, but found none"])
+                   , sexp.location);
+      }
+      return new localExpr(sexp[1].map(parseDefinition), parseExpr(sexp[2]));
     }
     function parseLetrecExpr(sexp) {
       return isLetrec(sexp) ? new letrecExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2])) :
