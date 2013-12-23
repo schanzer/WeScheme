@@ -1,7 +1,10 @@
 /* TODO
  - JSLint
  - parse bugs: match WeScheme error messages
-  - multiple extra parts
+    - definitions
+    - cond
+    - provide
+    - require
  */
 
 (function () {
@@ -106,9 +109,17 @@
   // predicates and parsers for call, lambda, local, letrec, let, let*, if, and, or, time, quote and quasiquote exprs
   function parseExprList(sexp) {
     function errorInParsing(msg){
+ console.log(msg);
       throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)].concat(msg))
                  , sexp.location);
     }
+    // convert an array of expressions to one of ColoredParts
+    function collectExtraParts(parts){
+      var coloredParts = parts.map(function(sexp){ return new types.ColoredPart("_", sexp.location); }),
+          txt = (coloredParts.length === 1)? " extra part " : " extra parts ";
+      return [coloredParts.length.toString(), txt, "<<"].concat(coloredParts).concat(">>");
+    }
+ 
     function isTime(sexp) {
       return isTupleStartingWithOfLength(sexp, "time", 2);
     }
@@ -139,8 +150,7 @@
       }
       // too many expressions?
       if(sexp.length > 2){
-        errorInParsing([" : expected a single body, but found "
-                        , new types.ColoredPart("1 extra part", sexp[1].location)]);
+        errorInParsing([" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(2))));
       }
       return new lambdaExpr(sexp[1].map(parseIdExpr), parseExpr(sexp[2]));
     }
@@ -170,8 +180,7 @@
       }
       // too many expressions?
       if(sexp.length > 3){
-        errorInParsing([" : expected a single body, but found "
-                        , new types.ColoredPart("1 extra part", sexp[1].location)]);
+        errorInParsing([" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
       }
       return new localExpr(sexp[1].map(parseDefinition), parseExpr(sexp[2]));
     }
@@ -198,8 +207,7 @@
       }
       // too many expressions?
       if(sexp.length > 3){
-        errorInParsing([" : expected a single body, but found "
-                        , new types.ColoredPart("1 extra part", sexp[1].location)]);
+        errorInParsing([" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
       }
       new letrecExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2]));
 
@@ -227,8 +235,7 @@
       }
       // too many expressions?
       if(sexp.length > 3){
-        errorInParsing([" : expected a single body, but found "
-                        , new types.ColoredPart("1 extra part", sexp[1].location)]);
+        errorInParsing([" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
       }
       new letExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2]));
     }
@@ -255,8 +262,7 @@
       }
       // too many expressions?
       if(sexp.length > 3){
-        errorInParsing([" : expected a single body, but found "
-                        , new types.ColoredPart("1 extra part", sexp[1].location)]);
+        errorInParsing([" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
       }
       return new letStarExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2]));
     }
@@ -269,9 +275,7 @@
       // Does it have too many parts?
       if(sexp.length > 4){
         errorInParsing([": expected only a test, a consequence, and an "
-                        ,"alternative, but found more than three of these ",
-                        "<<", new types.ColoredPart("⬜", sexp[4].location),
-                        ">>"]);
+                        ,"alternative, but found "].concat(collectExtraParts(sexp.slice(4))));
       }
       return new ifExpr(parseExpr(sexp[1]), parseExpr(sexp[2]), parseExpr(sexp[3]));
     }
