@@ -23,6 +23,11 @@
     return x === y;
  }
  
+ function isCons(x)  { return x instanceof Array && x.length>=1;}
+ function isEmpty(x) { return x instanceof Array && x.length===0;}
+ function rest(ls)   { return ls.slice(1); }
+ function cons(x, y) { return [x].concat(y);}
+ 
   // PARSING ///////////////////////////////////////////
  
    // parse* : sexp list -> AST
@@ -156,8 +161,8 @@
         errorInParsing(sexp, [" : expected an expression for the function body, but nothing's there"]);
       }
       // too many expressions?
-      if(sexp.length > 2){
-        errorInParsing(sexp, [" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(2))));
+      if(sexp.length > 3){
+        errorInParsing(sexp, [" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
       }
       return new lambdaExpr(sexp[1].map(parseIdExpr), parseExpr(sexp[2]));
     }
