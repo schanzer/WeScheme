@@ -1,14 +1,6 @@
 // COMMON FUNCTIONS AND STRUCTURES ////////////////////////////////////////
 // used by multiple phases of the compiler
 
-// isSymbolEqualTo : symbolExpr symbolExpr -> Boolean
-// are these all symbols of the same value?
-function isSymbolEqualTo(x, y) {
-    x = (x instanceof symbolExpr)? x.val : x;
-    y = (y instanceof symbolExpr)? y.val : y;
-    return x === y;
-}
-
 function cons(x, y) { return [x].concat(y);}
 function isCons(x)  { return x instanceof Array && x.length>=1;}
 function isEmpty(x) { return x instanceof Array && x.length===0;}
@@ -52,7 +44,7 @@ var Location = function(sCol, sLine, offset, span, source){
   };
   this.toJSON = function(){
     return {line: this.sLine.toString(), id: this.source || "<definitions>", span: this.span.toString(),
-           offset: (this.offset+1).toString(), column: this.sCol.toString(), };
+           offset: (this.offset+1).toString(), column: this.sCol.toString()};
   };
 }
 
@@ -78,6 +70,7 @@ var Constant = function(val, loc){
 function throwError(msg, loc) {
   console.log(msg+'\n'+loc.toString());
   loc.source = loc.source || "<definitions>"; // FIXME -- we should have the source populated
+  // rewrite args to match what the runtime expects
   msg.args = msg.args.map(function(part){
                            return (typeof(part) === 'string')?
                                     part :
