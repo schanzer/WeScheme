@@ -105,17 +105,6 @@
   // parseExprList : SExp -> AST
   // predicates and parsers for call, lambda, local, letrec, let, let*, if, and, or, time, quote and quasiquote exprs
   function parseExprList(sexp) {
-    function isIf(sexp) {
-      return isQuadWithFirstEqualTo(sexp, "if");
-    }
-    function isAnd(sexp) {
-      return ((isCons(sexp)) && (isSymbolExpr(sexp[0]))
-              && (isSymbolEqualTo(sexp[0], "and")) && sexp.length >= 3);
-    }
-    function isOr(sexp) {
-      return ((isCons(sexp)) && (isSymbolExpr(sexp[0]))
-              && (isSymbolEqualTo(sexp[0], "or")) && sexp.length >= 3);
-    }
     function isTime(sexp) {
       return isTupleStartingWithOfLength(sexp, "time", 2);
     }
@@ -317,16 +306,29 @@
       return new letStarExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2]));
     }
     function parseIfExpr(sexp) {
-      return isIf(sexp) ? new ifExpr(parseExpr(sexp[1]), parseExpr(sexp[2]), parseExpr(sexp[3])) :
-      throwError(new types.Message([new types.ColoredPart("if", sexp[0].location)
-                                    ,": expected a test, a consequence, and an "
-                                    ,"alternative, but all three were not found"])
-                 , sexp.location);
+      // Does it have too few parts?
+      if(sexp.length < 4){
+        throwError(new types.Message([new types.ColoredPart("if", sexp[0].location)
+                                      ,": expected a test, a consequence, and an "
+                                      ,"alternative, but all three were not found"])
+                   , sexp.location);
+      }
+      // Does it have too many parts?
+      if(sexp.length > 4){
+        throwError(new types.Message([new types.ColoredPart("if", sexp[0].location)
+                                      ,": expected only a test, a consequence, and an "
+                                      ,"alternative, but found more than three of these ",
+                                      "<<", new types.ColoredPart("⬜", sexp[4].location),
+                                      ">>"])
+                   , sexp.location);
+      }
+      return new ifExpr(parseExpr(sexp[1]), parseExpr(sexp[2]), parseExpr(sexp[3]));
     }
     function parseBeginExpr(sexp) {
       // is it just (begin)?
       if(sexp.length < 2){
-        throwError(new types.Message(["Inside a begin, expected to find a body, but nothing was found."])
+        throwError(new types.Message([new types.ColoredPart("begin", sexp[0].location),
+                                      " : Inside a begin, expected to find a body, but nothing was found."])
                    , sexp.location);
       }
       return new beginExpr(rest(sexp).map(parseExpr));
