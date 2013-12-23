@@ -73,7 +73,8 @@
       return new defStruct(parseIdExpr(sexp[1]), sexp[2].map(parseIdExpr));
     }
     function parseDefFunc(sexp) {
-      return (rest(sexp[1]).length > 0) ? new defFunc(parseIdExpr(sexp[1][0]), rest(sexp[1]).map(parseIdExpr), parseExpr(sexp[2])) :
+      return (rest(sexp[1]).length > 0) ?
+          new defFunc(parseIdExpr(sexp[1][0]), rest(sexp[1]).map(parseIdExpr), parseExpr(sexp[2])) :
           throwError(new types.Message(["expected at least one argument name after the function name, but found none."]),
                      sexp.location);
     }
@@ -122,13 +123,16 @@
       return isQuadWithFirstEqualTo(sexp, "if");
     }
     function isBegin(sexp) {
-      return ((isCons(sexp)) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], "begin")));
+      return ((isCons(sexp)) && (isSymbolExpr(sexp[0]))
+              && (isSymbolEqualTo(sexp[0], "begin")) && sexp.length >= 2);
     }
     function isAnd(sexp) {
-      return ((isCons(sexp)) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], "and")));
+      return ((isCons(sexp)) && (isSymbolExpr(sexp[0]))
+              && (isSymbolEqualTo(sexp[0], "and")) && sexp.length >= 3);
     }
     function isOr(sexp) {
-      return ((isCons(sexp)) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], "or")));
+      return ((isCons(sexp)) && (isSymbolExpr(sexp[0]))
+              && (isSymbolEqualTo(sexp[0], "or")) && sexp.length >= 3);
     }
     function isTime(sexp) {
       return isTupleStartingWithOfLength(sexp, "time", 2);
@@ -138,42 +142,70 @@
                           throwError(new types.Message(["function call sexp"]), sexp.location);
     }
     function parseLambdaExpr(sexp) {
-      return isLambda(sexp) ? (sexp[1].length > -1) ? new lambdaExpr(sexp[1].map(parseIdExpr), parseExpr(sexp[2])) :
-      throwError(new types.Message(["expected at least one argument name in the sequence after `lambda', but found none"])
-                 , sexp.location):
-      throwError(new types.Message(["lambda function sexp"]), sexp.location);
+      return isLambda(sexp) ? (sexp[1].length > -1) ?
+        new lambdaExpr(sexp[1].map(parseIdExpr), parseExpr(sexp[2])) :
+        throwError(new types.Message([new types.ColoredPart("lambda", sexp[0].location)
+                                      ," : expected at least one variable (in parentheses) after lambda, but found "
+                                      , new types.ColoredPart("something else", sexp[1].location)])
+                   , sexp.location) :
+        throwError(new types.Message([new types.ColoredPart("lambda", sexp[0].location)
+                                      ," : expected at least one variable (in parentheses) after lambda, but found "
+                                      , new types.ColoredPart("something else", sexp[1].location)])
+                   , sexp.location);
     }
     function parseLocalExpr(sexp) {
       return isLocal(sexp) ? new localExpr(sexp[1].map(parseDefinition), parseExpr(sexp[2])) :
-      throwError(new types.Message(["local expression sexp"]), sexp.location);
+        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+                               ," : expected a collection of definitions, but given "
+                               , new types.ColoredPart("something else", sexp[1].location)])
+                  , sexp.location);
     }
     function parseLetrecExpr(sexp) {
       return isLetrec(sexp) ? new letrecExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2])) :
-      throwError(new types.Message(["letrec expression sexp"]), sexp.location);
+        throwError(new types.Message([new types.ColoredPart("letrec", sexp[0].location)
+                                      ," : expected an expression after the bindings, but nothing's there"])
+                    , sexp.location);
+
     }
     function parseLetExpr(sexp) {
       return isLet(sexp) ? new letExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2])) :
-      throwError(new types.Message(["let expression sexp"]), sexp.location);
+        throwError(new types.Message([new types.ColoredPart("let", sexp[0].location)
+                               ," : expected a sequence of key/value pairs, but given "
+                               , new types.ColoredPart("something else", sexp[1].location)])
+                  , sexp.location);
     }
     function parseLetStarExpr(sexp) {
       return isLetStar(sexp) ? new letStarExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2])) :
-      throwError(new types.Message(["let* expression sexp"]), sexp.location);
+        throwError(new types.Message([new types.ColoredPart("let*", sexp[0].location)
+                               ," : expected a sequence of key/value pairs, but given "
+                               , new types.ColoredPart("something else", sexp[1].location)])
+                  , sexp.location);
     }
     function parseIfExpr(sexp) {
       return isIf(sexp) ? new ifExpr(parseExpr(sexp[1]), parseExpr(sexp[2]), parseExpr(sexp[3])) :
-      throwError(new types.Message(["if expression sexp"]), sexp.location);
+      throwError(new types.Message([new types.ColoredPart("if", sexp[0].location)
+                                    ,": expected a test, a consequence, and an "
+                                    ,"alternative, but all three were not found"])
+                 , sexp.location);
     }
     function parseBeginExpr(sexp) {
       return isBegin(sexp) ? new beginExpr(rest(sexp).map(parseExpr)) :
-      throwError(new types.Message(["begin expression sexp"]), sexp.location);
+        throwError(new types.Message(["Inside a begin, expected to find a body, but nothing was found."])
+                   , sexp.location);
     }
     function parseAndExpr(sexp) {
       return isAnd(sexp) ? new andExpr(rest(sexp).map(parseExpr)) :
-      throwError(new types.Message(["and expression sexp"]), sexp.location);
+        throwError(new types.Message([new types.ColoredPart("and", sexp[0].location),
+                                      ": expected at least 2 arguments, but given ",
+                                      (sexp.length-1).toString()])
+                 , sexp.location);
     }
     function parseOrExpr(sexp) {
       return isOr(sexp) ? new orExpr(rest(sexp).map(parseExpr)) :
-      throwError(new types.Message(["or expression sexp"]), sexp.location);
+        throwError(new types.Message([new types.ColoredPart("or", sexp[0].location)
+                                    ,": expected at least 2 arguments, but given "
+                                    ,(sexp.length-1).toString()])
+                 , sexp.location);
     }
     function parseTimeExpr(sexp) {
       return isTime(sexp) ? new timeExpr(parseExpr(sexp[1])) :
@@ -211,32 +243,48 @@
   };
 
   function parseCondExpr(sexp) {
-   if(sexpIsCondListP(sexp)){
+    function parseCondCouple(sexp_) {
+      if(sexpIsisCouple(sexp_)){
+        var cpl = new couple(parseExpr(sexp_[0]), parseExpr(sexp_[1]));
+        cpl.location = sexp_.location;
+        return cpl;
+      } else {
+        return throwError(new types.Message([new types.ColoredPart("cond", sexp[0].location),
+                                             " : expected a clause with a question and an answer, but found a ",
+                                             new types.ColoredPart("clause", sexp_.location),
+                                             " with only ",
+                                             new types.ColoredPart("one part", sexp_[0].location)])
+                          , sexp.location);
+      }
+    }
+ 
+    if(sexpIsCondListP(sexp)){
       return new condExpr(rest(sexp).reduceRight((function (rst, couple) {
                                  if((isSymbolExpr(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (!(isEmpty(rst)))){
-                                 return throwError(new types.Message(["found an `else' clause that isn't the last clause in its `cond' expression"]), couple.location);
+                                 return throwError(new types.Message([new types.ColoredPart("cond", sexp[0].location),
+                                                                      " : found an ",
+                                                                      new types.ColoredPart("else clause", couple.location),
+                                                                      "that isn't the last clause in its cond expression; there is ",
+                                                                      new types.ColoredPart("another clause", rst[0].location),
+                                                                      " after it"])
+                                                   , couple.location);
                                  } else {
                                    return cons(parseCondCouple(couple), rst);
                                  }
                                  }), []));
-   } else {
-    throwError(new types.Message(["cond expression sexp"]), sexp.location);
-   }
-  };
-
-  function parseCondCouple(sexp) {
-   if(sexpIsisCouple(sexp)){
-      var cpl = new couple(parseExpr(sexp[0]), parseExpr(sexp[1]));
-      cpl.location = sexp.location;
-      return cpl;
-   } else {
-      return throwError(new types.Message(["couple of expressions sexp"]), sexp.location);
-   }
+    } else {
+      throwError(new types.Message([new types.ColoredPart("cond", sexp[0].location),
+                                    " : expected at least one clause after cond, but nothing's there"])
+                 , sexp.location);
+    }
   };
 
   function parseLetCouple(sexp) {
     return sexpIsisCouple(sexp) ? new couple(parseIdExpr(sexp[0]), parseExpr(sexp[1])) :
-    throwError(new types.Message(["couple of an id and an expression sexp"]), sexp.location);
+    throwError(new types.Message([" : expected a sequence of key/value pairs, but given "
+                                 , new types.ColoredPart("something else", sexp[0].location)])
+                , sexp.location);
+
   };
 
   function parseQuasiQuotedExpr(sexp, inlist) {
@@ -272,7 +320,6 @@
                     ((isSymbolEqualTo("true", sexp)) || (isSymbolEqualTo("false", sexp))) ? new booleanExpr(sexp) :
                     isSymbolEqualTo("empty", sexp) ? new callExpr(new primop("list"), []) :
                     isSymbolExpr(sexp) ? sexpIsisPrimop(sexp) ? new primop(sexp) : sexp :
-                    imageP(sexp) ? parseImage(sexp) :
       throwError(new types.Message([sexp+"expected a function, but nothing's there"]), sexp.location);
    singleton.location = sexp.location;
    return singleton;

@@ -43,7 +43,7 @@ function checkDuplicateIdentifiers(lst, caller){
 // the location struct
 var Location = function(sCol, sLine, offset, span, source){
   this.sCol   = sCol;   // starting index into the line
-  this.sLine  = sLine;  // starting line # (1-index)
+  this.sLine  = sLine;  // starting line # (0-index)
   this.offset = offset; // ch index of lexeme start, from beginning
   this.span   = span;   // num chrs between lexeme start and end
   this.source = source; // [OPTIONAL] id of the containing DOM element
@@ -51,8 +51,8 @@ var Location = function(sCol, sLine, offset, span, source){
     return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
   };
   this.toJSON = function(){
-    return {line: this.sLine, span: this.span, offset: this.offset,
-           column: this.sCol, id: this.source || "<definitions>"};
+    return {line: this.sLine.toString(), id: this.source || "<definitions>", span: this.span.toString(),
+           offset: (this.offset+1).toString(), column: this.sCol.toString(), };
   };
 }
 
@@ -76,6 +76,7 @@ var Constant = function(val, loc){
 
 // encode the msg and location as a JSON error
 function throwError(msg, loc) {
+  console.log(msg+'\n'+loc.toString());
   loc.source = loc.source || "<definitions>"; // FIXME -- we should have the source populated
   msg.args = msg.args.map(function(part){
                            return (typeof(part) === 'string')?

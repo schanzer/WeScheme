@@ -122,11 +122,11 @@
     // datum
     function readProg(str) {
     //               console.log("readProg");
-      var i = 0; sCol = column = 0; sLine = line = 1; // initialize all position indices
+      var i = 0; sCol = column = 0; sLine = line = 0; // initialize all position indices
       var sexp,
           sexps = [];
       delims = [];
-      // get rid of any whitespace at thr start of the string
+      // get rid of any whitespace at the start of the string
       i = chewWhiteSpace(str, 0);
       while(i < str.length) {
         sexp = readSExpByIndex(str, i);
@@ -141,7 +141,7 @@
     // readSSFile : String -> SExp
     // removes the first three lines of the string that contain DrScheme meta data
     function readSSFile(str) {
-      var i = 0; sCol = column = 0; sline = line = 1; // initialize all position indices
+      var i = 0; sCol = column = 0; sline = line = 0; // initialize all position indices
       var crs = 0;
 
       while(i < str.length && crs < 3) {
@@ -206,7 +206,6 @@
       delims.push(openingDelim);
                    
       i = chewWhiteSpace(str, i);
-      sCol = column; // update sCol in case we chewed whitespace
 
       while (i < str.length && !res.rightListDelims.test(str.charAt(i))) {
         // check for newlines
@@ -226,19 +225,20 @@
                                       otherDelim(openingDelim),
                                       " to close ",
                                       new types.ColoredPart(openingDelim.toString(),
-                                                            new Location(sCol, sLine, i, i-iStart))
+                                                            new Location(sCol, sLine, iStart, 1))
                                       ]);
          throwError(msg, new Location(sCol, sLine, iStart, i-iStart));
       }
       if(!matchingDelims(openingDelim, str.charAt(i))) {
-         var msg = new types.Message(["read: expected a ", otherDelim(openingDelim),
-                                  " to close ",
-                                  new types.ColoredPart(openingDelim.toString(),
-                                                        new Location(sCol, sLine, i, 1)),
-                                  " but found a ",
-                                  new types.ColoredPart(str.charAt(i).toString(),
-                                                        new Location(column, line, i, 1))
-                                  ]);
+         var msg = new types.Message(["read: expected a ",
+                                      otherDelim(openingDelim),
+                                      " to close ",
+                                      new types.ColoredPart(openingDelim.toString(),
+                                                            new Location(sCol, sLine, iStart, 1)),
+                                      " but found a ",
+                                      new types.ColoredPart(str.charAt(i).toString(),
+                                                            new Location(column, line, i, 1))
+                                      ]);
          throwError(msg, new Location(sCol, sLine, iStart, 1));
       }
       // add 1 to span to count the closing delimeter
@@ -284,7 +284,7 @@
       }
 
       if(i >= str.length) {
-        throwError(new types.Message(["read: expected a closing \'\"\' ", " ended with " + chr])
+        throwError(new types.Message(["read: expected a closing \'\"\' "])
                    , new Location(sCol, sLine, iStart, i-iStart));
       }
       var strng = types.string(datum);
