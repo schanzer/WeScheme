@@ -220,7 +220,7 @@
       }
       // is it just (letrec <not-list>)?
       if(sexp[1].length === undefined){
-        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+        throwError(new types.Message([new types.ColoredPart("letrec", sexp[0].location)
                                       ," : expected sequence of key value pairs, but given "
                                       , new types.ColoredPart("something else", sexp[1].location)])
                    , sexp.location);
@@ -228,7 +228,7 @@
       // is it a list of not-all-bindings?
       sexp[1].forEach(function(binding){
         if (!sexpIsCouple(binding)){
-        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+        throwError(new types.Message([new types.ColoredPart("letrec", sexp[0].location)
                                       ," : expected a key/value pair, but found "
                                       , new types.ColoredPart("something else", binding.location)])
                    , sexp.location);
@@ -236,7 +236,7 @@
       });
       // is it just (letrec (...bindings...) ))?
       if(sexp.length === 2){
-        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
+        throwError(new types.Message([new types.ColoredPart("letrec", sexp[0].location)
                                       ," : expected an expression after the bindings, but nothing's there"])
                    , sexp.location);
       }
@@ -251,11 +251,42 @@
 
     }
     function parseLetExpr(sexp) {
-      return isLet(sexp) ? new letExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2])) :
+      // is it just (let)?
+      if(sexp.length === 1){
         throwError(new types.Message([new types.ColoredPart("let", sexp[0].location)
-                               ," : expected a sequence of key/value pairs, but given "
-                               , new types.ColoredPart("something else", sexp[1].location)])
-                  , sexp.location);
+                                      ," : expected at least one binding (in parentheses) after let, but nothing's there"])
+                   , sexp.location);
+      }
+      // is it just (let <not-list>)?
+      if(sexp[1].length === undefined){
+        throwError(new types.Message([new types.ColoredPart("let", sexp[0].location)
+                                      ," : expected sequence of key/value pairs, but given "
+                                      , new types.ColoredPart("something else", sexp[1].location)])
+                   , sexp.location);
+      }
+      // is it a list of not-all-bindings?
+      sexp[1].forEach(function(binding){
+        if (!sexpIsCouple(binding)){
+        throwError(new types.Message([new types.ColoredPart("let", sexp[0].location)
+                                      ," : expected a key/value pair, but found "
+                                      , new types.ColoredPart("something else", binding.location)])
+                   , sexp.location);
+        }
+      });
+      // is it just (let (...bindings...) ))?
+      if(sexp.length === 2){
+        throwError(new types.Message([new types.ColoredPart("let", sexp[0].location)
+                                      ," : expected a single body, but found none"])
+                   , sexp.location);
+      }
+      // too many expressions?
+      if(sexp.length > 3){
+        throwError(new types.Message([new types.ColoredPart("let", sexp[0].location)
+                                      ," : expected a single body, but found "
+                                      , new types.ColoredPart("1 extra part", sexp[1].location)])
+                   , sexp.location);
+      }
+      new letExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2]));
     }
     function parseLetStarExpr(sexp) {
       return isLetStar(sexp) ? new letStarExpr(sexp[1].map(parseLetCouple), parseExpr(sexp[2])) :
