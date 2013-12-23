@@ -103,28 +103,6 @@ function readFromRepl(event) {
     output_list.insertBefore(temp, repl_input_li);
     addToHistory(aSource);
 
-    /*
-    // if there's an error don't print the output
-    if(!progres.err) {
-      var output = formatOutput(progres.vals);
-
-      // adds an li for each value in the output
-      for(var i=0; i<output.length; i++) {
-        var temp1 = document.createElement("li");
-        temp1.textContent = output[i];
-        temp1.setAttribute("class", "value");
-        output_list.insertBefore(temp1, repl_input_li);
-      }
-    } else {
-      var temp2 = document.createElement("li");
-      temp2.textContent = isString(progres.err) ?
-      progres.err :
-      progres.err.proc + ": " + progres.err.msg;
-      temp2.setAttribute("class", "error");
-      output_list.insertBefore(temp2, repl_input_li);
-    }
-    return false;
-     */
   } else if(key === 38) {
     repl_input.value = popElementFromHistory(1, repl_input.value);
     return false;
