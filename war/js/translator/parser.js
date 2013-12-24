@@ -5,7 +5,6 @@
  TODO
  - JSLint
  - proper parsing of
-    - require
     - quoted
     - quasiquoted
  */
@@ -63,8 +62,10 @@
  // convert an array of expressions to one of ColoredParts
  function collectExtraParts(parts){
     var coloredParts = parts.map(function(sexp){ return new types.ColoredPart("_", sexp.location); }),
-        txt = (coloredParts.length === 1)? " extra part " : " extra parts ";
-    return [coloredParts.length.toString(), txt, "<<"].concat(coloredParts).concat(">>");
+        txt = (coloredParts.length === 0)? " parts " :
+              (coloredParts.length === 1)? " extra part " : " extra parts ",
+        tail = ["<<"].concat(coloredParts).concat(">>");
+    return [coloredParts.length.toString(), txt].concat(tail);
  }
 
   //////////////////////////////////////// DEFINITION PARSING ////////////////////////////////
@@ -384,6 +385,7 @@
     return (function () {
         var peek = sexp[0],
             expr = !(isSymbolExpr(peek)) ? parseFuncCall(sexp) :
+                    isSymbolEqualTo("λ", peek)       ? parseLambdaExpr(sexp) :
                     isSymbolEqualTo("lambda", peek)  ? parseLambdaExpr(sexp) :
                     isSymbolEqualTo("local", peek)   ? parseLocalExpr(sexp) :
                     isSymbolEqualTo("letrec", peek)  ? parseLetrecExpr(sexp) :
@@ -477,7 +479,7 @@
   }
 
   function parseIdExpr(sexp) {
-    return isId(sexp) ? sexp :
+    return isSymbolExpr(sexp) ? sexp :
     throwError(new types.Message(["ID"]), sexp.location);
   }
 
@@ -497,22 +499,41 @@
     return ((isCons(sexp)) && (sexp.length >= 2) && (isSymbolExpr(sexp[0])) && (isSymbolEqualTo(sexp[0], "cond")));
   }
 
-  function isId(sexp) {
-    return isSymbolExpr(sexp);
-  }
-
   //////////////////////////////////////// REQUIRE PARSING ////////////////////////////////
   function isRequire(sexp) {
     return isCons(sexp) && isSymbolExpr(sexp[0]) && isSymbolEqualTo(sexp[0], "require");
   }
 
   function parseRequire(sexp) {
-    var uri = sexp[1],
-        require = (isString(uri) || isSymbolExpr(uri)) ? new req(uri) :
-              isSymbolEqualTo(uri[0], "lib") ? new req(uri) :
-              new req(cons("planet", cons(second(uri), [rest(third(uri))])));
-    require.location = sexp.location;
-    return require;
+    // is it (require)?
+    if(sexp.length < 2){
+      errorInParsing(sexp, [" : expected a module name after `require', but found nothing"]);
+    }
+    // if it's (require (lib...))
+    if((sexp[1] instanceof Array) && isSymbolEqualTo(sexp[1][0], "lib")){
+        // is it (require (lib)) or (require (lib <string>))
+        if(sexp[1].length < 3){
+          errorInParsing(sexp, [" : expected at least two strings after "
+                                , new types.ColoredPart("lib", sexp[1][0].location)]);
+        }
+        // is it (require (lib not-strings))?
+        sexp[1].slice(1).forEach(function(str){
+          if (!(str instanceof stringExpr)){
+            errorInParsing(sexp, [" : expected a string for a library collection, but found "
+                                  , new types.ColoredPart("something else", str.location)]);
+          }
+         });
+    // if it's (require (planet...))
+    } else if((sexp[1] instanceof Array) && isSymbolEqualTo(sexp[1][0], "planet")){
+      errorInParsing(sexp, [" : Importing PLaneT pacakges is not supported at this time"]);
+    // if it's (require <not-a-string-or-symbol>)
+    } else if(!((sexp[1] instanceof symbolExpr) || (sexp[1] instanceof stringExpr))){
+      errorInParsing(sexp, [" : expected a module name as a string or a `(lib ...)' form, but found "
+                            , new types.ColoredPart("something else", sexp[1].location)]);
+    }
+    var req = new requireExpr(sexp[1]);
+    req.location = sexp.location;
+    return req;
   }
 
   //////////////////////////////////////// PROVIDE PARSING ////////////////////////////////

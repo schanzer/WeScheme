@@ -15,7 +15,7 @@
 // A Constant is either:
 // - types.Number
 // - symbolExpr
-// - types.String
+// - stringExpr
 // - types.Character
 (function () {
  'use strict';
@@ -117,8 +117,8 @@
         str += "(" + sexp + ")";
       } else if (sexp instanceof symbolExpr) {
         str = sexp.val;
-      } else if (sexp instanceof types.string) {
-        str = '"' + sexp + '"';
+      } else if (sexp instanceof stringExpr) {
+        str = '"' + sexp.val + '"';
       } else if (sexp instanceof Char) {
         str = sexp.toString();
       } else {
@@ -303,8 +303,9 @@
         throwError(new types.Message(["read: expected a closing \'\"\' "])
                    , new Location(sCol, sLine, iStart, i-iStart));
       }
-      var strng = types.string(datum);
-      return new Constant(strng, new Location(sCol, sLine, iStart, i+1-iStart));
+      var strng = new stringExpr(datum);
+      strng.location = new Location(sCol, sLine, iStart, i+1-iStart);
+      return strng;
     }
 
     // readPoundSExp : String Number -> SExp
