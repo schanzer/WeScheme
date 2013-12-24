@@ -33,6 +33,22 @@
     // the delimiters encountered so far, and line and column
     var delims, line, column, sCol, sLine;
 
+    // the location struct
+    var Location = function(sCol, sLine, offset, span, source){
+      this.sCol   = sCol;   // starting index into the line
+      this.sLine  = sLine;  // starting line # (0-index)
+      this.offset = offset; // ch index of lexeme start, from beginning
+      this.span   = span;   // num chrs between lexeme start and end
+      this.source = source; // [OPTIONAL] id of the containing DOM element
+      this.toString = function(){
+        return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
+      };
+      this.toJSON = function(){
+        return {line: this.sLine.toString(), id: this.source || "<definitions>", span: this.span.toString(),
+               offset: (this.offset+1).toString(), column: this.sCol.toString()};
+      };
+    };
+
     /////////////////////
     /* Utility Methods */
     /////////////////////

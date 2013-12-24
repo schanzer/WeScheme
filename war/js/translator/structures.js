@@ -1,12 +1,6 @@
 // COMMON FUNCTIONS AND STRUCTURES ////////////////////////////////////////
 // used by multiple phases of the compiler
 
-function cons(x, y) { return [x].concat(y);}
-function isCons(x)  { return x instanceof Array && x.length>=1;}
-function isEmpty(x) { return x instanceof Array && x.length===0;}
-function first(ls)  { return ls[0]; }
-function rest(ls)   { return ls.slice(1); }
-
 // checkDuplicateIdentifiers : [listof SymbolExprs], Program -> Void
 // sort the array, and throw errors for non-symbols, keywords or duplicates
 function checkDuplicateIdentifiers(lst, caller){
@@ -30,22 +24,6 @@ function checkDuplicateIdentifiers(lst, caller){
       results[sorted_arr[i]] = true;
     }
   }
-}
-
-// the location struct
-var Location = function(sCol, sLine, offset, span, source){
-  this.sCol   = sCol;   // starting index into the line
-  this.sLine  = sLine;  // starting line # (0-index)
-  this.offset = offset; // ch index of lexeme start, from beginning
-  this.span   = span;   // num chrs between lexeme start and end
-  this.source = source; // [OPTIONAL] id of the containing DOM element
-  this.toString = function(){
-    return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
-  };
-  this.toJSON = function(){
-    return {line: this.sLine.toString(), id: this.source || "<definitions>", span: this.span.toString(),
-           offset: (this.offset+1).toString(), column: this.sCol.toString()};
-  };
 }
 
 // couples = pair

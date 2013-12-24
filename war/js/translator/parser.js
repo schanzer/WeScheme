@@ -1,9 +1,13 @@
-/* TODO
+/* 
+ 
+ Parser for http://docs.racket-lang.org/htdp-langs/intermediate-lam.html
+ 
+ TODO
  - JSLint
- - parse bugs: match WeScheme error messages
-    - definitions
-    - provide
+ - proper parsing of
     - require
+    - quoted
+    - quasiquoted
  */
 
 (function () {
@@ -24,7 +28,6 @@
  }
  
  function isCons(x)  { return x instanceof Array && x.length>=1;}
- function isEmpty(x) { return x instanceof Array && x.length===0;}
  function rest(ls)   { return ls.slice(1); }
  function cons(x, y) { return [x].concat(y);}
  
@@ -45,7 +48,7 @@
  
   // parse : sexp -> AST
   function parse(sexp) {
-    return isEmpty(sexp) ? [] :
+    return (sexp.length === 0) ? [] :
     (!isCons(sexp)) ? throwError(new types.Message(["The sexp is not a list of definitions or expressions: "+sexp]),
                                 sexp.location):
     parseStar(sexp);
@@ -65,53 +68,112 @@
  }
 
   //////////////////////////////////////// DEFINITION PARSING ////////////////////////////////
+  // if the first symbol
   function isDefinition(sexp) {
-    return (isStructDefinition(sexp) || isFunctionDefinition(sexp) || isVariableDefinition(sexp));
+    return isCons(sexp) && (sexp[0].val.indexOf("define") !== -1);
   }
 
-  // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define-struct'
+  // if it's an sexp, where the first sub-exp is a symbol and that symbol is 'define-struct'
   function isStructDefinition(sexp) {
     return ((isCons(sexp))
-            && (sexp.length === 3)
             && (isSymbolExpr(sexp[0]))
             && (isSymbolEqualTo("define-struct", sexp[0])));
   }
 
-  // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define' and rest is a Cons
-  function isFunctionDefinition(sexp) {
-    return ((isCons(sexp))
-            && (sexp.length === 3)
-            && (isSymbolExpr(sexp[0]))
-            && (isSymbolEqualTo("define", sexp[0]))
-            && (isCons(sexp[1])));
-  }
-
-  // if it's an sexp of length 3, where the first sub-exp is a symbol and that symbol is 'define' and rest is NOT a Cons
-  function isVariableDefinition(sexp) {
-    return ((isCons(sexp))
-            && (sexp.length === 3)
-            && (isSymbolExpr(sexp[0]))
-            && (isSymbolEqualTo("define", sexp[0]))
-            && (!(isCons(sexp[1]))));
+  // if it's an sexp, where the first sub-exp is a symbol and that symbol is
+  // 'define', and the second sub-exp is an array
+  function isValueDefinition(sexp) {
+    return (isCons(sexp) && isSymbolExpr(sexp[0]) && isSymbolEqualTo("define", sexp[0]));
   }
 
   // : parseDefinition : SExp -> AST (definition)
   function parseDefinition(sexp) {
     function parseDefStruct(sexp) {
+      // is it just (define-struct)?
+      if(sexp.length < 2){
+        errorInParsing(sexp, [" : expected the structure name after define-struct, but nothing's there"]);
+      }
+      // is the structure name there?
+      if(!(sexp[1] instanceof symbolExpr)){
+        errorInParsing(sexp, [" : expected the structure name after define-struct, but found "
+                              , new types.ColoredPart("something else", sexp[1].location)]);
+      }
+      // is it just (define-struct <name>)?
+      if(sexp.length < 3){
+        errorInParsing(sexp, [" : expected at least one field name (in parentheses) after the "
+                              , new types.ColoredPart("structure name", sexp[1].location)
+                              , ", but found nothing"]);
+      }
+      // is the structure name followed by a list?
+      if(!(sexp[2] instanceof Array)){
+        errorInParsing(sexp, [" : expected at least one field name (in parentheses) after the "
+                              , new types.ColoredPart("structure name", sexp[1].location)
+                              , ", but found "
+                              , new types.ColoredPart("something else", sexp[2].location)]);
+      }
+      // is it a list of not-all-symbols?
+      sexp[2].forEach(function(arg){
+        if (!(arg instanceof symbolExpr)){
+          errorInParsing(sexp, [" : expected a field name, but found "
+                                , new types.ColoredPart("something else", arg.location)]);
+        }
+      });
+      // too many expressions?
+      if(sexp.length > 3){
+        errorInParsing(sexp, [" : expected nothing after the "
+                              , new types.ColoredPart("field names", sexp[2].location)
+                              , ", but found "].concat(collectExtraParts(sexp.slice(3))));
+      }
       return new defStruct(parseIdExpr(sexp[1]), sexp[2].map(parseIdExpr));
     }
-    function parseDefFunc(sexp) {
-      return (rest(sexp[1]).length > 0) ?
-          new defFunc(parseIdExpr(sexp[1][0]), rest(sexp[1]).map(parseIdExpr), parseExpr(sexp[2])) :
-          throwError(new types.Message(["expected at least one argument name after the function name, but found none."]),
-                     sexp.location);
-    }
     function parseDef(sexp) {
-      return new defVar(parseIdExpr(sexp[1]), parseExpr(sexp[2]));
+      // is it just (define)?
+      if(sexp.length < 2){
+        errorInParsing(sexp, [" : expected a variable, or a function name and its variables "
+                              , "(in parentheses), after define, but nothing's there"]);
+      }
+      // If it's (define (f x)...)
+      if(sexp[1] instanceof Array){
+          // is the first element in the list a symbol?
+          if(!(sexp[1][0] instanceof symbolExpr)){
+            errorInParsing(sexp, [" : expected a function name after the open parenthesis but found "
+                                  , new types.ColoredPart("something else", sexp[1][0].location)]);
+          }
+          // is the next element a list of not-all-symbols?
+          sexp[1].forEach(function(arg){
+            if (!(arg instanceof symbolExpr)){
+              errorInParsing(sexp, [" : expected a variable but found "
+                                    , new types.ColoredPart("something else", arg.location)]);
+            }
+          });
+          // is it just (define (<name> <args>))?
+          if(sexp.length < 3){
+            errorInParsing(sexp, [" : expected an expression for the function body, but nothing's there"]);
+          }
+          return new defFunc(parseIdExpr(sexp[1][0]), rest(sexp[1]).map(parseIdExpr), parseExpr(sexp[2]));
+      }
+      // If it's (define x ...)
+      if(sexp[1] instanceof symbolExpr){
+          // is it just (define x)?
+          if(sexp.length < 3){
+            errorInParsing(sexp, [" : expected an expression after the variable "
+                                  , new types.ColoredPart(sexp[1].val, sexp[1].location)
+                                  , " but nothing's there"]);
+          }
+          // is it just (define x)?
+          if(sexp.length > 3){
+            errorInParsing(sexp, [" : expected only one expression after the variable "
+                                  , new types.ColoredPart(sexp[1].val, sexp[1].location)
+                                  , " but found "].concat(collectExtraParts(sexp.slice(3))));
+          }
+          return new defVar(parseIdExpr(sexp[1]), parseExpr(sexp[2]));
+      }
+      // If it's (define <invalid> ...)
+      errorInParsing(sexp, [" : expected a variable but found "
+                            , new types.ColoredPart("something else", sexp[1].location)]);
     }
     var def = isStructDefinition(sexp) ? parseDefStruct(sexp) :
-              isFunctionDefinition(sexp) ? parseDefFunc(sexp) :
-              isVariableDefinition(sexp) ? parseDef(sexp) :
+              isValueDefinition(sexp) ? parseDef(sexp) :
               throwError(new types.Message(["Expected to find a definition, but found: "+ sexp]),
                          sexp.location);
     def.location = sexp.location;
@@ -130,11 +192,8 @@
   }
 
   // parseExprList : SExp -> AST
-  // predicates and parsers for call, lambda, local, letrec, let, let*, if, and, or, time, quote and quasiquote exprs
+  // predicates and parsers for call, lambda, local, letrec, let, let*, if, and, or, quote and quasiquote exprs
   function parseExprList(sexp) {
-    function isTime(sexp) {
-      return isTupleStartingWithOfLength(sexp, "time", 2);
-    }
     function parseFuncCall(sexp) {
       return isCons(sexp)? new callExpr(parseExpr(sexp[0]), rest(sexp).map(parseExpr)) :
                           throwError(new types.Message(["function call sexp"]), sexp.location);
@@ -145,7 +204,7 @@
         errorInParsing(sexp, [" : expected at least one variable (in parentheses) after lambda, but nothing's there"]);
       }
       // is it just (lambda <not-list>)?
-      if(sexp[1].length === undefined){
+      if(sexp[1] instanceof Array){
         errorInParsing(sexp, [" : expected at least one variable (in parentheses) after lambda, but found "
                               , new types.ColoredPart("something else", sexp[1].location)]);
       }
@@ -173,7 +232,7 @@
                         ," but nothing's there"]);
       }
       // is it just (local <not-list>)?
-      if(sexp[1].length === undefined){
+      if(sexp[1] instanceof Array){
         errorInParsing(sexp, [" : expected a collection of definitions, but found "
                         , new types.ColoredPart("something else", sexp[1].location)]);
       }
@@ -202,7 +261,7 @@
         errorInParsing(sexp, [" : expected an expression after the bindings, but nothing's there"]);
       }
       // is it just (letrec <not-list>)?
-      if(sexp[1].length === undefined){
+      if(sexp[1] instanceof Array){
         errorInParsing(sexp, [" : expected sequence of key value pairs, but given "
                               , new types.ColoredPart("something else", sexp[1].location)]);
       }
@@ -230,7 +289,7 @@
         errorInParsing(sexp, [" : expected at least one binding (in parentheses) after let, but nothing's there"]);
       }
       // is it just (let <not-list>)?
-      if(sexp[1].length === undefined){
+      if(sexp[1] instanceof Array){
         errorInParsing(sexp, [" : expected sequence of key/value pairs, but given "
                         , new types.ColoredPart("something else", sexp[1].location)]);
       }
@@ -257,7 +316,7 @@
         errorInParsing(sexp, [" : expected at least one binding (in parentheses) after let, but nothing's there"]);
       }
       // is it just (let* <not-list>)?
-      if(sexp[1].length === undefined){
+      if(sexp[1] instanceof Array){
         errorInParsing(sexp, [" : expected sequence of key/value pairs, but given "
                               , new types.ColoredPart("something else", sexp[1].location)]);
       }
@@ -295,7 +354,7 @@
       if(sexp.length < 2){
         errorInParsing(sexp, [" : Inside a begin, expected to find a body, but nothing was found."]);
       }
-      return new beginExpr(rest(sexp).map(parseExpr));
+      return new beginExpr(sexp.slice(1).map(parseExpr));
     }
     function parseAndExpr(sexp) {
       // is it just (and)?
@@ -303,7 +362,7 @@
         errorInParsing(sexp, [": expected at least 2 arguments, but given "
                               , new types.ColoredPart((sexp.length-1).toString(), sexp[1].location)]);
       }
-      return new andExpr(rest(sexp).map(parseExpr));
+      return new andExpr(sexp.slice(1).map(parseExpr));
     }
     function parseOrExpr(sexp) {
       // is it just (or)?
@@ -311,14 +370,10 @@
         errorInParsing(sexp, [": expected at least 2 arguments, but given "
                               , new types.ColoredPart((sexp.length-1).toString(), sexp[1].location)]);
       }
-      return new orExpr(rest(sexp).map(parseExpr));
-    }
-    function parseTimeExpr(sexp) {
-      return isTime(sexp) ? new timeExpr(parseExpr(sexp[1])) :
-      throwError(new types.Message(["time expression sexp"]), sexp.location);
+      return new orExpr(sexp.slice(1).map(parseExpr));
     }
     function parseQuotedExpr(sexp) {
-      return new quotedExpr(isEmpty(sexp) ?   new callExpr(new primop("list"), []) :
+      return new quotedExpr((sexp.length === 0) ?   new callExpr(new primop("list"), []) :
                             isCons(sexp) ?    new callExpr(new primop("list"), sexp.map(parseQuotedExpr)) :
                             isNumber(sexp) ?  new numberExpr(sexp) :
                             isString(sexp) ?  new stringExpr(sexp) :
@@ -339,7 +394,6 @@
                     isSymbolEqualTo("begin", peek)   ? parseBeginExpr(sexp) :
                     isSymbolEqualTo("and", peek)     ? parseAndExpr(sexp) :
                     isSymbolEqualTo("or", peek)      ? parseOrExpr(sexp) :
-                    isSymbolEqualTo("time", peek)    ? parseTimeExpr(sexp) :
                     isSymbolEqualTo("quote", peek)   ? parseQuotedExpr(sexp[1]) :
                     isSymbolEqualTo("quasiquote", peek) ? parseQuasiQuotedExpr(sexp[1], false) :
                     parseFuncCall(sexp);
@@ -367,7 +421,7 @@
  
     if(sexpIsCondListP(sexp)){
       return new condExpr(rest(sexp).reduceRight(function (rst, couple) {
-                 if((isSymbolExpr(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (!(isEmpty(rst)))){
+                 if((isSymbolExpr(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (rst.length > 0)){
                  errorInParsing(sexp, [" : found an ",
                                        new types.ColoredPart("else clause", couple.location),
                                        "that isn't the last clause in its cond expression; there is ",
@@ -388,7 +442,7 @@
   }
 
   function parseQuasiQuotedExpr(sexp, inlist) {
-    return isEmpty(sexp) ? new qqList([]) :
+    return (sexp.length === 0) ? new qqList([]) :
     isCons(sexp) ? parseQqList(sexp, inlist) :
     isNumber(sexp) ? new numberExpr(sexp) :
     isString(sexp) ? new stringExpr(sexp) :
