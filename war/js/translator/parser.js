@@ -62,6 +62,7 @@
  //////////////////////////////////////// PARSING ERRORS ////////////////////////////////
  function errorInParsing(sexp, msg){
     throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)].concat(msg))
+               , " : "
                , sexp.location);
  }
  // convert an array of expressions to one of ColoredParts
@@ -97,22 +98,22 @@
     function parseDefStruct(sexp) {
       // is it just (define-struct)?
       if(sexp.length < 2){
-        errorInParsing(sexp, [" : expected the structure name after define-struct, but nothing's there"]);
+        errorInParsing(sexp, ["expected the structure name after define-struct, but nothing's there"]);
       }
       // is the structure name there?
       if(!(sexp[1] instanceof symbolExpr)){
-        errorInParsing(sexp, [" : expected the structure name after define-struct, but found "
+        errorInParsing(sexp, ["expected the structure name after define-struct, but found "
                               , new types.ColoredPart("something else", sexp[1].location)]);
       }
       // is it just (define-struct <name>)?
       if(sexp.length < 3){
-        errorInParsing(sexp, [" : expected at least one field name (in parentheses) after the "
+        errorInParsing(sexp, ["expected at least one field name (in parentheses) after the "
                               , new types.ColoredPart("structure name", sexp[1].location)
                               , ", but found nothing"]);
       }
       // is the structure name followed by a list?
       if(!(sexp[2] instanceof Array)){
-        errorInParsing(sexp, [" : expected at least one field name (in parentheses) after the "
+        errorInParsing(sexp, ["expected at least one field name (in parentheses) after the "
                               , new types.ColoredPart("structure name", sexp[1].location)
                               , ", but found "
                               , new types.ColoredPart("something else", sexp[2].location)]);
@@ -120,13 +121,13 @@
       // is it a list of not-all-symbols?
       sexp[2].forEach(function(arg){
         if (!(arg instanceof symbolExpr)){
-          errorInParsing(sexp, [" : expected a field name, but found "
+          errorInParsing(sexp, ["expected a field name, but found "
                                 , new types.ColoredPart("something else", arg.location)]);
         }
       });
       // too many expressions?
       if(sexp.length > 3){
-        errorInParsing(sexp, [" : expected nothing after the "
+        errorInParsing(sexp, ["expected nothing after the "
                               , new types.ColoredPart("field names", sexp[2].location)
                               , ", but found "].concat(collectExtraParts(sexp.slice(3))));
       }
@@ -135,26 +136,26 @@
     function parseDef(sexp) {
       // is it just (define)?
       if(sexp.length < 2){
-        errorInParsing(sexp, [" : expected a variable, or a function name and its variables "
+        errorInParsing(sexp, ["expected a variable, or a function name and its variables "
                               , "(in parentheses), after define, but nothing's there"]);
       }
       // If it's (define (f x)...)
       if(sexp[1] instanceof Array){
           // is the first element in the list a symbol?
           if(!(sexp[1][0] instanceof symbolExpr)){
-            errorInParsing(sexp, [" : expected a function name after the open parenthesis but found "
+            errorInParsing(sexp, ["expected a function name after the open parenthesis but found "
                                   , new types.ColoredPart("something else", sexp[1][0].location)]);
           }
           // is the next element a list of not-all-symbols?
           sexp[1].forEach(function(arg){
             if (!(arg instanceof symbolExpr)){
-              errorInParsing(sexp, [" : expected a variable but found "
+              errorInParsing(sexp, ["expected a variable but found "
                                     , new types.ColoredPart("something else", arg.location)]);
             }
           });
           // is it just (define (<name> <args>))?
           if(sexp.length < 3){
-            errorInParsing(sexp, [" : expected an expression for the function body, but nothing's there"]);
+            errorInParsing(sexp, ["expected an expression for the function body, but nothing's there"]);
           }
           return new defFunc(parseIdExpr(sexp[1][0]), rest(sexp[1]).map(parseIdExpr), parseExpr(sexp[2]));
       }
@@ -162,20 +163,20 @@
       if(sexp[1] instanceof symbolExpr){
           // is it just (define x)?
           if(sexp.length < 3){
-            errorInParsing(sexp, [" : expected an expression after the variable "
+            errorInParsing(sexp, ["expected an expression after the variable "
                                   , new types.ColoredPart(sexp[1].val, sexp[1].location)
                                   , " but nothing's there"]);
           }
           // is it just (define x)?
           if(sexp.length > 3){
-            errorInParsing(sexp, [" : expected only one expression after the variable "
+            errorInParsing(sexp, ["expected only one expression after the variable "
                                   , new types.ColoredPart(sexp[1].val, sexp[1].location)
                                   , " but found "].concat(collectExtraParts(sexp.slice(3))));
           }
           return new defVar(parseIdExpr(sexp[1]), parseExpr(sexp[2]));
       }
       // If it's (define <invalid> ...)
-      errorInParsing(sexp, [" : expected a variable but found "
+      errorInParsing(sexp, ["expected a variable but found "
                             , new types.ColoredPart("something else", sexp[1].location)]);
     }
     var def = isStructDefinition(sexp) ? parseDefStruct(sexp) :
@@ -207,84 +208,83 @@
     function parseLambdaExpr(sexp) {
       // is it just (lambda)?
       if(sexp.length === 1){
-        errorInParsing(sexp, [" : expected at least one variable (in parentheses) after lambda, but nothing's there"]);
+        errorInParsing(sexp, ["expected at least one variable (in parentheses) after lambda, but nothing's there"]);
       }
       // is it just (lambda <not-list>)?
       if(!(sexp[1] instanceof Array)){
-        errorInParsing(sexp, [" : expected at least one variable (in parentheses) after lambda, but found "
+        errorInParsing(sexp, ["expected at least one variable (in parentheses) after lambda, but found "
                               , new types.ColoredPart("something else", sexp[1].location)]);
       }
       // is it a list of not-all-symbols?
       sexp[1].forEach(function(arg){
         if (!(arg instanceof symbolExpr)){
-          errorInParsing(sexp, [" : expected as list of variables after lambda, but found "
+          errorInParsing(sexp, ["expected as list of variables after lambda, but found "
                                 , new types.ColoredPart("something else", arg.location)]);
         }
       });
       // is it just (lambda (x))?
       if(sexp.length === 2){
-        errorInParsing(sexp, [" : expected an expression for the function body, but nothing's there"]);
+        errorInParsing(sexp, ["expected an expression for the function body, but nothing's there"]);
       }
       // too many expressions?
       if(sexp.length > 3){
-        errorInParsing(sexp, [" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
+        errorInParsing(sexp, ["expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
       }
       return new lambdaExpr(sexp[1].map(parseIdExpr), parseExpr(sexp[2]));
     }
     function parseLocalExpr(sexp) {
       // is it just (local)?
       if(sexp.length === 1){
-        errorInParsing(sexp, [" : expected at least one definition (in square brackets) after local,"
+        errorInParsing(sexp, ["expected at least one definition (in square brackets) after local,"
                         ," but nothing's there"]);
       }
       // is it just (local <not-list>)?
       if(!(sexp[1] instanceof Array)){
-        errorInParsing(sexp, [" : expected a collection of definitions, but found "
+        errorInParsing(sexp, ["expected a collection of definitions, but found "
                         , new types.ColoredPart("something else", sexp[1].location)]);
       }
       // is it a list of not-all-definitions?
       sexp[1].forEach(function(def){
         if (!isDefinition(def)){
-        errorInParsing(sexp, [" : expected a definition, but found "
+        errorInParsing(sexp, ["expected a definition, but found "
                       , new types.ColoredPart("something else", def.location)]);
         }
       });
       // is it just (local [...defs...] ))?
       if(sexp.length === 2){
-        throwError(new types.Message([new types.ColoredPart("local", sexp[0].location)
-                                      ," : expected a single body, but found none"])
-                   , sexp.location);
+        errorInParsing(sexp, [new types.ColoredPart("local", sexp[0].location)
+                              ,"expected a single body, but found none"]);
       }
       // too many expressions?
       if(sexp.length > 3){
-        errorInParsing(sexp, [" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
+        errorInParsing(sexp, ["expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
       }
       return new localExpr(sexp[1].map(parseDefinition), parseExpr(sexp[2]));
     }
     function parseLetrecExpr(sexp) {
       // is it just (letrec)?
       if(sexp.length < 3){
-        errorInParsing(sexp, [" : expected an expression after the bindings, but nothing's there"]);
+        errorInParsing(sexp, ["expected an expression after the bindings, but nothing's there"]);
       }
       // is it just (letrec <not-list>)?
       if(sexp[1] instanceof Array){
-        errorInParsing(sexp, [" : expected sequence of key value pairs, but given "
+        errorInParsing(sexp, ["expected sequence of key value pairs, but given "
                               , new types.ColoredPart("something else", sexp[1].location)]);
       }
       // is it a list of not-all-bindings?
       sexp[1].forEach(function(binding){
         if (!sexpIsCouple(binding)){
-          errorInParsing(sexp, [" : expected a key/value pair, but found "
+          errorInParsing(sexp, ["expected a key/value pair, but found "
                                 , new types.ColoredPart("something else", binding.location)]);
         }
       });
       // is it just (letrec (...bindings...) ))?
       if(sexp.length === 2){
-        errorInParsing(sexp, [" : expected an expression after the bindings, but nothing's there"]);
+        errorInParsing(sexp, ["expected an expression after the bindings, but nothing's there"]);
       }
       // too many expressions?
       if(sexp.length > 3){
-        errorInParsing(sexp, [" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
+        errorInParsing(sexp, ["expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
       }
       return new letrecExpr(sexp[1].map(parseBinding), parseExpr(sexp[2]));
 
@@ -292,54 +292,54 @@
     function parseLetExpr(sexp) {
       // is it just (let)?
       if(sexp.length === 1){
-        errorInParsing(sexp, [" : expected at least one binding (in parentheses) after let, but nothing's there"]);
+        errorInParsing(sexp, ["expected at least one binding (in parentheses) after let, but nothing's there"]);
       }
       // is it just (let <not-list>)?
       if(sexp[1] instanceof Array){
-        errorInParsing(sexp, [" : expected sequence of key/value pairs, but given "
+        errorInParsing(sexp, ["expected sequence of key/value pairs, but given "
                         , new types.ColoredPart("something else", sexp[1].location)]);
       }
       // is it a list of not-all-bindings?
       sexp[1].forEach(function(binding){
         if (!sexpIsCouple(binding)){
-          errorInParsing(sexp, [" : expected a key/value pair, but found "
+          errorInParsing(sexp, ["expected a key/value pair, but found "
                           , new types.ColoredPart("something else", binding.location)]);
         }
       });
       // is it just (let (...bindings...) ))?
       if(sexp.length === 2){
-        errorInParsing(sexp, [" : expected a single body, but found none"]);
+        errorInParsing(sexp, ["expected a single body, but found none"]);
       }
       // too many expressions?
       if(sexp.length > 3){
-        errorInParsing(sexp, [" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
+        errorInParsing(sexp, ["expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
       }
       return new letExpr(sexp[1].map(parseBinding), parseExpr(sexp[2]));
     }
     function parseLetStarExpr(sexp) {
       // is it just (let*)?
       if(sexp.length === 1){
-        errorInParsing(sexp, [" : expected at least one binding (in parentheses) after let, but nothing's there"]);
+        errorInParsing(sexp, ["expected at least one binding (in parentheses) after let, but nothing's there"]);
       }
       // is it just (let* <not-list>)?
       if(sexp[1] instanceof Array){
-        errorInParsing(sexp, [" : expected sequence of key/value pairs, but given "
+        errorInParsing(sexp, ["expected sequence of key/value pairs, but given "
                               , new types.ColoredPart("something else", sexp[1].location)]);
       }
       // is it a list of not-all-bindings?
       sexp[1].forEach(function(binding){
         if (!sexpIsCouple(binding)){
-          errorInParsing(sexp, [" : expected a key/value pair, but found "
+          errorInParsing(sexp, ["expected a key/value pair, but found "
                                 , new types.ColoredPart("something else", binding.location)]);
         }
       });
       // is it just (let* (...bindings...) ))?
       if(sexp.length === 2){
-        errorInParsing(sexp, [" : expected a single body, but found none"]);
+        errorInParsing(sexp, ["expected a single body, but found none"]);
       }
       // too many expressions?
       if(sexp.length > 3){
-        errorInParsing(sexp, [" : expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
+        errorInParsing(sexp, ["expected a single body, but found "].concat(collectExtraParts(sexp.slice(3))));
       }
       return new letStarExpr(sexp[1].map(parseBinding), parseExpr(sexp[2]));
     }
@@ -358,7 +358,7 @@
     function parseBeginExpr(sexp) {
       // is it just (begin)?
       if(sexp.length < 2){
-        errorInParsing(sexp, [" : Inside a begin, expected to find a body, but nothing was found."]);
+        errorInParsing(sexp, ["Inside a begin, expected to find a body, but nothing was found."]);
       }
       return new beginExpr(rest(sexp).map(parseExpr));
     }
@@ -413,7 +413,7 @@
   function parseCondExpr(sexp) {
     function parseCondCouple(sexp_) {
       if(sexp_.length === 0){
-        errorInParsing(sexp, [" : expected a clause with a question and an answer, but found an ",
+        errorInParsing(sexp, ["expected a clause with a question and an answer, but found an ",
                               new types.ColoredPart("empty part", sexp_.location)]);
       }
       if(sexpIsCouple(sexp_)){
@@ -421,7 +421,7 @@
         cpl.location = sexp_.location;
         return cpl;
       }
-      errorInParsing(sexp, [" : expected a clause with a question and an answer, but found a ",
+      errorInParsing(sexp, ["expected a clause with a question and an answer, but found a ",
                             new types.ColoredPart("clause", sexp_.location),
                             " with only ",
                             new types.ColoredPart("one part", sexp_[0].location)]);
@@ -430,7 +430,7 @@
     if(sexpIsCondListP(sexp)){
       return new condExpr(rest(sexp).reduceRight(function (rst, couple) {
                  if((isSymbol(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (rst.length > 0)){
-                 errorInParsing(sexp, [" : found an ",
+                 errorInParsing(sexp, ["found an ",
                                        new types.ColoredPart("else clause", couple.location),
                                        "that isn't the last clause in its cond expression; there is ",
                                        new types.ColoredPart("another clause", rst[0].location),
@@ -440,12 +440,12 @@
                  }
                }, []));
     }
-    errorInParsing(sexp, [" : expected at least one clause after cond, but nothing's there"]);
+    errorInParsing(sexp, ["expected at least one clause after cond, but nothing's there"]);
   }
 
   function parseBinding(sexp) {
     return sexpIsCouple(sexp) ? new couple(parseIdExpr(sexp[0]), parseExpr(sexp[1])) :
-    errorInParsing(sexp, [" : expected a sequence of key/value pairs, but given "
+    errorInParsing(sexp, ["expected a sequence of key/value pairs, but given "
                           , new types.ColoredPart("something else", sexp[0].location)]);
   }
 
@@ -514,28 +514,28 @@
   function parseRequire(sexp) {
     // is it (require)?
     if(sexp.length < 2){
-      errorInParsing(sexp, [" : expected a module name after `require', but found nothing"]);
+      errorInParsing(sexp, ["expected a module name after `require', but found nothing"]);
     }
     // if it's (require (lib...))
     if((sexp[1] instanceof Array) && isSymbolEqualTo(sexp[1][0], "lib")){
         // is it (require (lib)) or (require (lib <string>))
         if(sexp[1].length < 3){
-          errorInParsing(sexp, [" : expected at least two strings after "
+          errorInParsing(sexp, ["expected at least two strings after "
                                 , new types.ColoredPart("lib", sexp[1][0].location)]);
         }
         // is it (require (lib not-strings))?
         rest(sexp[1]).forEach(function(str){
           if (!(str instanceof stringExpr)){
-            errorInParsing(sexp, [" : expected a string for a library collection, but found "
+            errorInParsing(sexp, ["expected a string for a library collection, but found "
                                   , new types.ColoredPart("something else", str.location)]);
           }
          });
     // if it's (require (planet...))
     } else if((sexp[1] instanceof Array) && isSymbolEqualTo(sexp[1][0], "planet")){
-      errorInParsing(sexp, [" : Importing PLaneT pacakges is not supported at this time"]);
+      errorInParsing(sexp, ["Importing PLaneT pacakges is not supported at this time"]);
     // if it's (require <not-a-string-or-symbol>)
     } else if(!((sexp[1] instanceof symbolExpr) || (sexp[1] instanceof stringExpr))){
-      errorInParsing(sexp, [" : expected a module name as a string or a `(lib ...)' form, but found "
+      errorInParsing(sexp, ["expected a module name as a string or a `(lib ...)' form, but found "
                             , new types.ColoredPart("something else", sexp[1].location)]);
     }
     var req = new requireExpr(sexp[1]);
