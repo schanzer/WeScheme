@@ -10,11 +10,9 @@
  * Given an Array of SExps, produce an array of Programs
  * see structures.js for Program types
  
- 
- 
  TODO
  - JSLint
- - proper parsing of
+ - proper parsing/errors for
     - quoted
     - quasiquoted
  */
@@ -388,6 +386,18 @@
                             isSymbol(sexp)  ?  sexp :
                             throwError(new types.Message(["quoted sexp"]), sexp.location));
     }
+    function parseTime(sexp) {
+      // is it just (time)?
+      if(sexp.length < 2){
+        errorInParsing(sexp, ["expected an expression after time, but nothing's there "]);
+      }
+      if(sexp.length > 2){
+        errorInParsing(sexp, ["expected only one expression after time, but"
+                              , " found "].concat(collectExtraParts(sexp.slice[2])));
+      }
+      return new timeExpr(sexp[1]);
+    }
+
     return (function () {
         var peek = sexp[0],
             expr = !(isSymbol(peek)) ? parseFuncCall(sexp) :
@@ -404,6 +414,7 @@
                     isSymbolEqualTo("or", peek)      ? parseOrExpr(sexp) :
                     isSymbolEqualTo("quote", peek)   ? parseQuotedExpr(sexp[1]) :
                     isSymbolEqualTo("quasiquote", peek) ? parseQuasiQuotedExpr(sexp[1], false) :
+                    isSymbolEqualTo("time", peek)    ? parseTime(sexp) :
                     parseFuncCall(sexp);
           expr.location = sexp.location;
           return expr;
