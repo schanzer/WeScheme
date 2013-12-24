@@ -1,25 +1,27 @@
 /* TODO
  - JSLint
- - get rid of Constant
  */
 
 //////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////// LEXER OBJECT //////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
+// Parse a program into SExps
+//
 // A SExp is either:
-// - Constant x Location
-// - Symbol x Location
+// - Atom x Location
 // - [ListOf SExp] x Location
 //
-// A Constant is either:
-// - types.Number
+// An Atom is either:
+// - numberExpr
 // - symbolExpr
 // - stringExpr
+// - booleanExpr
 // - types.Character
+
 (function () {
  'use strict';
- /*global Comment, Constant, Location, charVal, types, throwError, proc */
+ /*global Comment, Location, charVal, types, throwError, proc */
     /////////////////////
     /*      Data       */
     /////////////////////
@@ -320,9 +322,9 @@
         var p = str.charAt(i);
         switch(p){
           case 't':  // test for both forms of true
-          case 'T':  datum = new symbolExpr("true"); i++; break;
+          case 'T':  datum = new booleanExpr("true"); i++; break;
           case 'f':  // test for both forms of false
-          case 'F':  datum = new symbolExpr("false"); i++; break;
+          case 'F':  datum = new booleanExpr("false"); i++; break;
           // for all others, back up a character and keep reading
           case '\\': datum = readChar(str, i-1);
                      i+= datum.location.span-1; break;
@@ -367,7 +369,7 @@
                           datum.length === 1   ? datum :
                             throwError(new types.Message(["read: Unsupported character: #\\",datum]),
                                        new Location(sCol, sLine, iStart, i-iStart));
-      var chr = new types.char(datum);
+      var chr = new charExpr(datum);
       chr.location = new Location(sCol, sLine, iStart, i-iStart);
       return chr;
     }
@@ -474,8 +476,12 @@
           column++;
         }
         var num = jsnums.fromString(datum);
-        // if the string we've seen IS a Number, return it as a Constant. Otherwise bail
-        if(num) return new Constant(num, new Location(sCol, sLine, iStart, i-iStart));
+        // if the string we've seen IS a Number, return it as a numberExpr. Otherwise bail
+         if(num){
+           var sexp = new numberExpr(datum);
+           sexp.location = new Location(sCol, sLine, iStart, i-iStart);
+           return sexp;
+         }
       }
                    
       // if it was never a number (or turned out not to be), return the Symbol
@@ -502,20 +508,14 @@
         }
       }
 
-      if(i >= str.length) {
-        if(datum === "") {
-          throwError(new types.Message(["read: Unexpected EOF while reading a symbol"])
-                     ,new Location(sCol, sLine, iStart, i-iStart));
-        } else {
-          symbl = new symbolExpr(datum);
-          symbl.location = new Location(sCol, sLine, iStart, i-iStart);
-          return symbl;
-        }
+      if((i >= str.length) && (datum === "")) {
+        throwError(new types.Message(["read: Unexpected EOF while reading a symbol"])
+                  ,new Location(sCol, sLine, iStart, i-iStart));
       }
 
       var p = str.charAt(i);
 
-      symbl = new symbolExpr(datum);
+      symbl = (datum==="true" || datum==="false")? new booleanExpr(datum) : new symbolExpr(datum);
       symbl.location = new Location(sCol, sLine, iStart, i-iStart);
       return symbl;
     }
@@ -540,7 +540,7 @@
       }
 
       i++; // skip over the closing |
-      var symbl = new symbolExpr(datum);
+      symbl = (datum==="true" || datum==="false")? new booleanExpr(datum) : new symbolExpr(datum);
       symbl.location = new Location(sCol, sLine, iStart, i-iStart);
       return symbl;
     }
