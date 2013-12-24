@@ -12,6 +12,7 @@
  
  TODO
  - JSLint
+ - multipart error messages (cond)
  - proper parsing/errors for
     - quoted
     - quasiquoted
@@ -70,6 +71,7 @@
  }
  // convert an array of expressions to one of ColoredParts
  function collectExtraParts(parts){
+ console.log("collecting");
     var coloredParts = parts.map(function(sexp){ return new types.ColoredPart("_", sexp.location); }),
         txt = (coloredParts.length === 1)? " extra part " : " extra parts ";
     return [coloredParts.length.toString(), txt, "<<"].concat(coloredParts).concat(">>");
@@ -422,36 +424,50 @@
   }
 
   function parseCondExpr(sexp) {
-    function parseCondCouple(sexp_) {
-      if(sexp_.length === 0){
-        errorInParsing(sexp, ["expected a clause with a question and an answer, but found an ",
-                              new types.ColoredPart("empty part", sexp_.location)]);
-      }
-      if(sexpIsCouple(sexp_)){
-        var cpl = new couple(parseExpr(sexp_[0]), parseExpr(sexp_[1]));
-        cpl.location = sexp_.location;
-        return cpl;
-      }
-      errorInParsing(sexp, ["expected a clause with a question and an answer, but found a ",
-                            new types.ColoredPart("clause", sexp_.location),
-                            " with only ",
-                            new types.ColoredPart("one part", sexp_[0].location)]);
+    // is it just (cond)?
+    if(sexp.length === 1){
+        errorInParsing(sexp, ["expected at least one clause after cond, but nothing's there"]);
     }
  
-    if(sexpIsCondListP(sexp)){
-      return new condExpr(rest(sexp).reduceRight(function (rst, couple) {
-                 if((isSymbol(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (rst.length > 0)){
-                 errorInParsing(sexp, ["found an ",
-                                       new types.ColoredPart("else clause", couple.location),
-                                       "that isn't the last clause in its cond expression; there is ",
-                                       new types.ColoredPart("another clause", rst[0].location),
-                                        " after it"]);
-                 } else {
-                   return [parseCondCouple(couple)].concat(rst);
-                 }
-               }, []));
+    function parseCondCouple(clause) {
+      if(!(clause instanceof Array)){
+        errorInParsing(sexp, ["expected a clause with a question and an answer, but found an "
+                              , new types.ColoredPart("something else", clause.location)]);
+      }
+      if(clause.length === 0){
+        errorInParsing(sexp, ["expected a clause with a question and an answer, but found an "
+                              , new types.ColoredPart("empty part", clause.location)]);
+      }
+      if(clause.length === 1){
+        errorInParsing(sexp, ["expected a clause with a question and an answer, but found a "
+                              , new types.ColoredPart("clause", clause.location)
+                              , " with only "
+                              , new types.ColoredPart("one part", clause[0].location)]);
+      }
+      if(clause.length > 2){
+        errorInParsing(sexp, ["expected a clause with a question and an answer, but found a "
+                              , new types.ColoredPart("clause", clause.location)
+                              , " with "].concat(collectExtraParts(clause.slice(2))));
+      }
+      if(sexpIsCouple(clause)){
+        var cpl = new couple(parseExpr(clause[0]), parseExpr(clause[1]));
+        cpl.location = clause.location;
+        return cpl;
+      }
     }
-    errorInParsing(sexp, ["expected at least one clause after cond, but nothing's there"]);
+ 
+    return new condExpr(rest(sexp).reduceRight(function (rst, couple) {
+               if((isSymbol(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (rst.length > 0)){
+               errorInParsing(sexp, ["found an ",
+                                     new types.ColoredPart("else clause", couple.location),
+                                     "that isn't the last clause in its cond expression; there is ",
+                                     new types.ColoredPart("another clause", rst[0].location),
+                                      " after it"]);
+               } else {
+                 return [parseCondCouple(couple)].concat(rst);
+               }
+             }, []));
+ 
   }
 
   function parseBinding(sexp) {
