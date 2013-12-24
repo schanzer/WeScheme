@@ -1,5 +1,10 @@
 /* 
  
+ 
+ //////////////////////////////////////////////////////////////////////////////
+ ///////////////////////////////// PARSER OBJECT //////////////////////////////
+ //////////////////////////////////////////////////////////////////////////////
+ 
  Parser for http://docs.racket-lang.org/htdp-langs/intermediate-lam.html
  
  TODO
@@ -13,11 +18,11 @@
  'use strict';
  
  //////////////////////////////////// UTILITY FUNCTIONS //////////////////////////////
- function isString(x) { return x instanceof stringExpr;}
- function isNumber(x) { return x instanceof numberExpr;}
+ function isString(x) { return x instanceof stringExpr; }
+ function isNumber(x) { return x instanceof numberExpr; }
  function isSymbol(x) { return x instanceof symbolExpr; }
- function isBoolean(x) { return x instanceof booleanExpr; }
- function isChar(x) { return x instanceof charExpr; }
+ function isChar(x)   { return x instanceof charExpr;   }
+ function isBoolean(x){ return x instanceof booleanExpr;}
  
  // isSymbolEqualTo : symbolExpr symbolExpr -> Boolean
  // are these all symbols of the same value?
@@ -29,7 +34,6 @@
  
  function isCons(x)  { return x instanceof Array && x.length>=1;}
  function rest(ls)   { return ls.slice(1); }
- function cons(x, y) { return [x].concat(y);}
  
   // PARSING ///////////////////////////////////////////
  
@@ -356,7 +360,7 @@
       if(sexp.length < 2){
         errorInParsing(sexp, [" : Inside a begin, expected to find a body, but nothing was found."]);
       }
-      return new beginExpr(sexp.slice(1).map(parseExpr));
+      return new beginExpr(rest(sexp).map(parseExpr));
     }
     function parseAndExpr(sexp) {
       // is it just (and)?
@@ -364,7 +368,7 @@
         errorInParsing(sexp, [": expected at least 2 arguments, but given "
                               , new types.ColoredPart((sexp.length-1).toString(), sexp[1].location)]);
       }
-      return new andExpr(sexp.slice(1).map(parseExpr));
+      return new andExpr(rest(sexp).map(parseExpr));
     }
     function parseOrExpr(sexp) {
       // is it just (or)?
@@ -372,7 +376,7 @@
         errorInParsing(sexp, [": expected at least 2 arguments, but given "
                               , new types.ColoredPart((sexp.length-1).toString(), sexp[1].location)]);
       }
-      return new orExpr(sexp.slice(1).map(parseExpr));
+      return new orExpr(rest(sexp.map(parseExpr));
     }
     function parseQuotedExpr(sexp) {
       return new quotedExpr((sexp.length === 0) ?   new callExpr(new primop("list"), []) :
@@ -432,7 +436,7 @@
                                        new types.ColoredPart("another clause", rst[0].location),
                                         " after it"]);
                  } else {
-                   return cons(parseCondCouple(couple), rst);
+                   return [parseCondCouple(couple)].concat(rst);
                  }
                }, []));
     }
@@ -520,7 +524,7 @@
                                 , new types.ColoredPart("lib", sexp[1][0].location)]);
         }
         // is it (require (lib not-strings))?
-        sexp[1].slice(1).forEach(function(str){
+        rest(sexp[1]).forEach(function(str){
           if (!(str instanceof stringExpr)){
             errorInParsing(sexp, [" : expected a string for a library collection, but found "
                                   , new types.ColoredPart("something else", str.location)]);
