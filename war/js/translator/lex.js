@@ -17,7 +17,7 @@
 // - symbolExpr
 // - stringExpr
 // - booleanExpr
-// - types.Character
+// - charExpr
 
 (function () {
  'use strict';

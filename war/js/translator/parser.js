@@ -7,6 +7,11 @@
  
  Parser for http://docs.racket-lang.org/htdp-langs/intermediate-lam.html
  
+ * Given an Array of SExps, produce an array of Programs
+ * see structures.js for Program types
+ 
+ 
+ 
  TODO
  - JSLint
  - proper parsing of
@@ -37,7 +42,7 @@
  
   // PARSING ///////////////////////////////////////////
  
-   // parse* : sexp list -> AST
+   // parse* : sexp list -> Program list
   function parseStar(sexps) {
    function parseSExp(sexp) {
      return isDefinition(sexp) ? parseDefinition(sexp) :
@@ -50,7 +55,7 @@
     return sexps.map(parseSExp);
   }
  
-  // parse : sexp -> AST
+  // parse : sexp list -> Program list
   function parse(sexp) {
     return (sexp.length === 0) ? [] :
     (!isCons(sexp)) ? throwError(new types.Message(["The sexp is not a list of definitions or expressions: "+sexp]),
@@ -61,38 +66,33 @@
 
  //////////////////////////////////////// PARSING ERRORS ////////////////////////////////
  function errorInParsing(sexp, msg){
-    throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)].concat(msg))
-               , " : "
+    throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+                                  , " : "].concat(msg))
                , sexp.location);
  }
  // convert an array of expressions to one of ColoredParts
  function collectExtraParts(parts){
     var coloredParts = parts.map(function(sexp){ return new types.ColoredPart("_", sexp.location); }),
-        txt = (coloredParts.length === 0)? " parts " :
-              (coloredParts.length === 1)? " extra part " : " extra parts ",
-        tail = ["<<"].concat(coloredParts).concat(">>");
-    return [coloredParts.length.toString(), txt].concat(tail);
+        txt = (coloredParts.length === 1)? " extra part " : " extra parts ";
+    return [coloredParts.length.toString(), txt, "<<"].concat(coloredParts).concat(">>");
  }
 
   //////////////////////////////////////// DEFINITION PARSING ////////////////////////////////
-  // if the first symbol
-  function isDefinition(sexp) {
-    return isCons(sexp) && (sexp[0].val.indexOf("define") !== -1);
-  }
-
-  // if it's an sexp, where the first sub-exp is a symbol and that symbol is 'define-struct'
+  // (define-struct ...)
   function isStructDefinition(sexp) {
-    return ((isCons(sexp))
-            && (isSymbol(sexp[0]))
-            && (isSymbolEqualTo("define-struct", sexp[0])));
+    return ((isCons(sexp)) && (isSymbol(sexp[0])) && (isSymbolEqualTo("define-struct", sexp[0])));
   }
 
-  // if it's an sexp, where the first sub-exp is a symbol and that symbol is
-  // 'define', and the second sub-exp is an array
+  // (define ...)
   function isValueDefinition(sexp) {
     return (isCons(sexp) && isSymbol(sexp[0]) && isSymbolEqualTo("define", sexp[0]));
   }
 
+  // is it any kind of definition?
+  function isDefinition(sexp) {
+    return isStructDefinition(sexp) || isValueDefinition(sexp);
+  }
+ 
   // : parseDefinition : SExp -> AST (definition)
   function parseDefinition(sexp) {
     function parseDefStruct(sexp) {
@@ -376,7 +376,7 @@
         errorInParsing(sexp, [": expected at least 2 arguments, but given "
                               , new types.ColoredPart((sexp.length-1).toString(), sexp[1].location)]);
       }
-      return new orExpr(rest(sexp.map(parseExpr));
+      return new orExpr(rest(sexp.map(parseExpr)));
     }
     function parseQuotedExpr(sexp) {
       return new quotedExpr((sexp.length === 0) ?   new callExpr(new primop("list"), []) :
