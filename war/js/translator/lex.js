@@ -38,7 +38,7 @@
     // the location struct
     var Location = function(sCol, sLine, offset, span, source){
       this.sCol   = sCol;   // starting index into the line
-      this.sLine  = sLine;  // starting line # (0-index)
+      this.sLine  = sLine;  // starting line # (1-index)
       this.offset = offset; // ch index of lexeme start, from beginning
       this.span   = span;   // num chrs between lexeme start and end
       this.source = source; // [OPTIONAL] id of the containing DOM element
@@ -112,19 +112,13 @@
       return i;
     }
 
-    Array.prototype.toString = function () {return this.join(" "); };           
+    Array.prototype.toString = function () {return this.join(" "); };
     function sexpToString(sexp) {
       var str="";
       if(sexp instanceof Array) {
-        str += "(" + sexp + ")";
-      } else if (sexp instanceof symbolExpr) {
-        str = sexp.val;
-      } else if (sexp instanceof stringExpr) {
-        str = '"' + sexp.val + '"';
-      } else if (sexp instanceof Char) {
-        str = sexp.toString();
+        str += "(" + sexp.map(sexpToString).toString() + ")";
       } else {
-         str = sexp.toString();
+        str += sexp.toString();
       }
 
       return str;
@@ -139,8 +133,7 @@
     // reads multiple sexps encoded into this string and converts them to a SExp
     // datum
     function readProg(str) {
-    //               console.log("readProg");
-      var i = 0; sCol = column = 0; sLine = line = 0; // initialize all position indices
+      var i = 0; sCol = column = 0; sLine = line = 1; // initialize all position indices
       var sexp,
           sexps = [];
       delims = [];
@@ -159,7 +152,7 @@
     // readSSFile : String -> SExp
     // removes the first three lines of the string that contain DrScheme meta data
     function readSSFile(str) {
-      var i = 0; sCol = column = 0; sline = line = 0; // initialize all position indices
+      var i = 0; sCol = column = 0; sline = line = 1; // initialize all position indices
       var crs = 0;
 
       while(i < str.length && crs < 3) {
@@ -181,7 +174,6 @@
     // readSExp : String -> SExp
     // reads the first sexp encoded in this string and converts it to a SExp datum
     function readSExp(str) {
-    //               console.log("readSexp");
       delims = [];
       var sexp = readSExpByIndex(str, 0);
       return sexp instanceof Comment ? null : sexp;
@@ -191,7 +183,6 @@
     // reads a sexp encoded as a string starting at the i'th character and converts
     // it to a SExp datum
     function readSExpByIndex(str, i) {
-    //               console.log("readSexpByIndex: starting at "+i);
       sCol = column; sLine = line; var iStart = i;
       var p;
       p = str.charAt(i);
@@ -202,8 +193,10 @@
         throwError(new types.Message(["Unexpected EOF while reading a SExp"])
                                  ,new Location(sCol, sLine, iStart, i-iStart));
       }
-       var sexp = res.rightListDelims.test(p) ? throwError(new types.Message(["Unexpected '"+p+"'"])
-                                                          ,new Location(sCol, sLine, iStart, i-iStart)) :
+       var sexp = res.rightListDelims.test(p) ?
+                   throwError(new types.Message(["read : expected a "+otherDelim(p)+" to open "
+                                                , new types.ColoredPart(p, new Location(sCol, sLine, iStart, 1))])
+                              ,new Location(sCol, sLine, iStart, i-iStart)) :
                  res.leftListDelims.test(p) ? readList(str, i) :
                  p === '"'                  ? readString(str, i) :
                  p === '#'                  ? readPoundSExp(str, i) :
@@ -216,7 +209,6 @@
     // readList : String Number -> SExp
     // reads a list encoded in this string with the left delimiter at index i
     function readList(str, i) {
-//                   console.log("readList");
       var sCol = column, sLine = line, iStart = i;
       var openingDelim = str.charAt(i++);
       column++; // count the openingDelim
@@ -269,7 +261,6 @@
     // reads a string encoded in this string with the leftmost quotation mark
     // at index i
     function readString(str, i) {
-    //               console.log("readString");
       var sCol = column, sLine = line, iStart = i;
       i++; // skip over the opening quotation mark and char
       column++;
@@ -313,7 +304,6 @@
     // readPoundSExp : String Number -> SExp
     // reads a sexp begining with a # sign.
     function readPoundSExp(str, i) {
-    //               console.log("readPoundSExp:, i is "+i);
       var sCol = column, sLine = line, iStart = i, datum;
       i++; column++; // skip over the pound sign
       
@@ -346,7 +336,6 @@
     // readChar : String Number -> types.char
     // reads a character encoded in the string and returns a representative datum
     function readChar(str, i) {
-    //               console.log("readChar: i is "+i);
       var sCol = column, sLine = line, iStart = i;
       i+=2;  column+=2; // skip over the #\\
       var datum = "";
@@ -399,7 +388,6 @@
     // readSExpComment : String Number -> Atom
     // reads exactly one SExp and ignores it entirely
     function readSExpComment(str, i) {
-    //               console.log('readSExpComment with i at '+i);
       var sCol = column, sLine = line;
       var ignore = readSExpByIndex(str, i); // we only read this to extract location
       i =+ ignore.location.span;
@@ -435,7 +423,6 @@
     // readQuote : String Number -> SExp
     // reads a quote, quasiquote, or unquote encoded as a string
     function readQuote(str, i) {
-    //               console.log("readQuote");
       var sCol = column, sLine = line, iStart = i;
       var p = str.charAt(i);
       var symbol = p == "'" ? new symbolExpr("quote") :
@@ -461,7 +448,6 @@
     // readSymbolOrNumber : String Number -> symbolExpr | types.Number
     // reads any number or symbol
     function readSymbolOrNumber(str, i) {
-    //               console.log("readSymbolOrNumber, starting at "+i);
       var sCol = column, sLine = line, iStart = i;
       var p = str.charAt(i), datum = "";
 
@@ -493,7 +479,6 @@
     // reads in a symbol which can be any charcter except for certain delimiters
     // as described in isValidSymbolCharP
     function readSymbol(str, i, datum) {
-    //               console.log("readSymbol");
       var sCol = column-datum.length, sLine = line, iStart = i-datum.length, symbl;
       while(i < str.length && isValidSymbolCharP(str.charAt(i))) {
         // check for newlines
@@ -524,7 +509,6 @@
     // reads the next couple characters as is without any restraint until it reads
     // a |.  It ignores both the closing | and the opening |.
     function readVerbatimSymbol(str, i, datum) {
-    //              console.log("readVerbatimSymbol");
       var sCol = column-datum.length, sLine = line, iStart = i-datum;
       i++; // skip over the opening |
       while(i < str.length && str.charAt(i) !== "|") {

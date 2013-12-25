@@ -121,7 +121,7 @@ goog.provide("plt.wescheme.RoundRobin");
           }
           console.log("LEXER OUTPUT (raw and prettyprinted):");
           console.log(sexp);
-          console.log(sexpToString(sexp));
+          console.log(sexp.map(sexpToString).join(" "));
           try{ //////////////////// PARSE ///////////////////
             var AST = parse(sexp);
           } catch(e) {
