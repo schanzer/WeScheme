@@ -42,6 +42,8 @@
       this.offset = offset; // ch index of lexeme start, from beginning
       this.span   = span;   // num chrs between lexeme start and end
       this.source = source; // [OPTIONAL] id of the containing DOM element
+      this.start  = function(){ return new Location("", "", this.offset, 1); };
+      this.end    = function(){ return new Location("", "", this.offset+this.span-1, 1); };
       this.toString = function(){
         return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
       };

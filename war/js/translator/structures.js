@@ -1,5 +1,6 @@
-// COMMON FUNCTIONS AND STRUCTURES ////////////////////////////////////////
-// used by multiple phases of the compiler
+//////////////////////////////////////////////////////////////////////////////
+/////////////////// COMMON FUNCTIONS AND STRUCTURES //////////////////////////
+//////////////// used by multiple phases of the compiler/////////////////////
 
 // checkDuplicateIdentifiers : [listof SymbolExprs], Program -> Void
 // sort the array, and throw errors for non-symbols, keywords or duplicates
@@ -37,25 +38,24 @@ function couple(first, second) {
 function coupleFirst(x) { return x.first; };
 function coupleSecond(x) { return x.second; };
 
-// the constant struct
-var Constant = function(val, loc){
-  this.val = val;
-  this.location = loc;
-  this.toString = function(){return this.val.toString();};
-}
-
 // encode the msg and location as a JSON error
 function throwError(msg, loc) {
-  console.log(msg+'\n'+loc.toString());
+  console.log(msg);
   loc.source = loc.source || "<definitions>"; // FIXME -- we should have the source populated
-  // rewrite args to match what the runtime expects
-  msg.args = msg.args.map(function(part){
-                           return (typeof(part) === 'string')?
-                                    part :
-                                    {text: part.text
-                                    , loc: part.location.toJSON()
-                                    , type: 'ColoredPart'};
-               });
+
+  // rewrite a ColoredPart to match the format expected by the runtime
+  function rewritePart(part){
+    if(typeof(part) === 'string'){
+      return part;
+    } else if(part.location !== undefined){
+      return {text: part.text, type: 'ColoredPart', loc: part.location.toJSON()};
+    } else if(part.locations !== undefined){
+      return {text: part.text, type: 'MultiPart'
+            , locs: part.locations.map(function(l){return l.toJSON()})};
+    }
+  }
+  msg.args = msg.args.map(rewritePart);
+  
   var json = {type: "moby-failure"
     , "dom-message": ["span"
                       ,[["class", "Error"]]
@@ -78,6 +78,7 @@ function throwError(msg, loc) {
                       ]
     , "structured-error": JSON.stringify({message: msg.args, location: loc.toJSON() })
   };
+  console.log(json);
   throw JSON.stringify(json);
 }
 
@@ -245,10 +246,11 @@ function ifExpr(predicate, consequence, alternative) {
 };
 ifExpr.prototype = heir(Program.prototype);
 
-// time expression TODO
-function timeExpr(val) {
+// time expression
+function timeExpr(expr) {
   Program.call(this);
-  this.val = val;
+  this.expr = expr;
+  this.toString = function(){ return "(time "+this.expr.toString()+")"; };
 };
 timeExpr.prototype = heir(Program.prototype);
 
@@ -343,12 +345,12 @@ function primop(val) {
 primop.prototype = heir(Program.prototype);
 
 // require-url
-function req(uri) {
+function requireExpr(spec) {
   Program.call(this);
-  this.uri = uri;
-  this.toString = function(){ return "(require "+this.uri+")"; };
+  this.spec = spec;
+  this.toString = function(){ return "(require "+this.spec.toString()+")"; };
 };
-req.prototype = heir(Program.prototype);
+requireExpr.prototype = heir(Program.prototype);
 
 // provide
 function provideStatement(val) {
@@ -361,7 +363,6 @@ provideStatement.prototype = heir(Program.prototype);
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // STRUCTURES NEEDED BY THE COMPILER ////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 // bindingConstant: records an id and its associated Java implementation.
 function bindingConstant(name, moduleSource, permissions, loc){

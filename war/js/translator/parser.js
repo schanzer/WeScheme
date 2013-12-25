@@ -12,6 +12,7 @@
  
  TODO
  - JSLint
+ - cond clause errors report wrong location
  - multipart error messages (cond)
  - proper parsing/errors for
     - quoted
@@ -71,7 +72,6 @@
  }
  // convert an array of expressions to one of ColoredParts
  function collectExtraParts(parts){
- console.log("collecting");
     var coloredParts = parts.map(function(sexp){ return new types.ColoredPart("_", sexp.location); }),
         txt = (coloredParts.length === 1)? " extra part " : " extra parts ";
     return [coloredParts.length.toString(), txt, "<<"].concat(coloredParts).concat(">>");
@@ -139,8 +139,13 @@
         errorInParsing(sexp, ["expected a variable, or a function name and its variables "
                               , "(in parentheses), after define, but nothing's there"]);
       }
-      // If it's (define (f x)...)
+      // If it's (define (...)...)
       if(sexp[1] instanceof Array){
+          // is there at least one element?
+          if(sexp[1].length === 0){
+            errorInParsing(sexp, ["expected a name for the function, inside the "
+                                  , new types.ColoredPart("parentheses", sexp[1].location)]);
+          }
           // is the first element in the list a symbol?
           if(!(sexp[1][0] instanceof symbolExpr)){
             errorInParsing(sexp, ["expected a function name after the open parenthesis but found "
@@ -157,6 +162,11 @@
           if(sexp.length < 3){
             errorInParsing(sexp, ["expected an expression for the function body, but nothing's there"]);
           }
+          // too many parts?
+          if(sexp.length > 3){
+            errorInParsing(sexp, ["expected only one expression for the function body "
+                                  , " but found "].concat(collectExtraParts(sexp.slice(3))));
+          }
           return new defFunc(parseIdExpr(sexp[1][0]), rest(sexp[1]).map(parseIdExpr), parseExpr(sexp[2]));
       }
       // If it's (define x ...)
@@ -167,7 +177,7 @@
                                   , new types.ColoredPart(sexp[1].val, sexp[1].location)
                                   , " but nothing's there"]);
           }
-          // is it just (define x)?
+          // too many parts?
           if(sexp.length > 3){
             errorInParsing(sexp, ["expected only one expression after the variable "
                                   , new types.ColoredPart(sexp[1].val, sexp[1].location)
@@ -430,8 +440,9 @@
     }
  
     function parseCondCouple(clause) {
+      var clauseLocations = [clause.location.start(), clause.location.end()];
       if(!(clause instanceof Array)){
-        errorInParsing(sexp, ["expected a clause with a question and an answer, but found an "
+        errorInParsing(sexp, ["expected a clause with a question and an answer, but found "
                               , new types.ColoredPart("something else", clause.location)]);
       }
       if(clause.length === 0){
@@ -440,13 +451,13 @@
       }
       if(clause.length === 1){
         errorInParsing(sexp, ["expected a clause with a question and an answer, but found a "
-                              , new types.ColoredPart("clause", clause.location)
+                              , new types.MultiPart("clause", clauseLocations, true)
                               , " with only "
                               , new types.ColoredPart("one part", clause[0].location)]);
       }
       if(clause.length > 2){
         errorInParsing(sexp, ["expected a clause with a question and an answer, but found a "
-                              , new types.ColoredPart("clause", clause.location)
+                              , new types.MultiPart("clause", clauseLocations, true)
                               , " with "].concat(collectExtraParts(clause.slice(2))));
       }
       if(sexpIsCouple(clause)){
