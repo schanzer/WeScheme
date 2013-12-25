@@ -12,8 +12,6 @@
  
  TODO
  - JSLint
- - cond clause errors report wrong location
- - multipart error messages (cond)
  - proper parsing/errors for
     - quoted
     - quasiquoted

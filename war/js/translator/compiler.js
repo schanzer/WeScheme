@@ -1,11 +1,12 @@
 /*
  TODO
- - desugar Symbols
+ - desugar Symbols, callExpr
  - proper handling of 'else' in cond
  - native call to force-boolean-context in if, and, or and cond
  - preserve location information during desugaring
  - test cases get desugared into native calls (and thunks?)
- - vars defined by 'local' are treated as free?
+ - vars defined by 'local' should be temporarily added to the pinfo
+ - require
  - implement bytecode structs
  - compilation
 */
@@ -36,17 +37,20 @@
  // Program.prototype.desugar: pinfo -> [Program, pinfo]
  Program.prototype.desugar = function(pinfo){ return [this, pinfo]; };
  defFunc.prototype.desugar = function(pinfo){
-    if(checkDuplicateIdentifiers(this.args, this))
+    checkDuplicateIdentifiers(this.args, this);
     var bodyAndPinfo = this.body.desugar(pinfo);
-    return [new defFunc(this.name, this.args, bodyAndPinfo[0]), bodyAndPinfo[1]];
+    this.body = bodyAndPinfo[0];
+    return [this, bodyAndPinfo[1]];
  };
  defVar.prototype.desugar = function(pinfo){
     var exprAndPinfo = this.expr.desugar(pinfo);
-    return [new defVar(this.name, exprAndPinfo[0]), exprAndPinfo[1]];
+    this.expr = exprAndPinfo[0];
+    return [this, exprAndPinfo[1]];
  };
  defVars.prototype.desugar = function(pinfo){
     var exprAndPinfo = this.expr.desugar(pinfo);
-    return [new defVars(this.names, exprAndPinfo[0]), exprAndPinfo[1]];
+    this.expr = exprAndPinfo[0];
+    return [this, exprAndPinfo[1]];
  };
  defStruct.prototype.desugar = function(pinfo){
     var name = this.name.toString(),
@@ -59,6 +63,7 @@
                              new booleanExpr("false"),
                              new numberExpr(fields.length),
                              new numberExpr(0)]);
+        call.location = this.location;
     var defineValuesStx = [new defVars(idSymbols, call)],
         selectorStx = [];
     // given a field, make a definition that binds struct-field to the result of
@@ -75,35 +80,47 @@
  };
  beginExpr.prototype.desugar = function(pinfo){
     var exprsAndPinfo = desugarProgram(this.exprs, pinfo);
-    return [new beginExpr(exprsAndPinfo[0]), exprsAndPinfo[1]];
+    this.exprs = exprsAndPinfo[0];
+    return [this, exprsAndPinfo[1]];
  };
  lambdaExpr.prototype.desugar = function(pinfo){
     var bodyAndPinfo = this.body.desugar(pinfo);
-    return [new lambdaExpr(this.args, bodyAndPinfo[0]), bodyAndPinfo[1]];
+    this.body = bodyAndPinfo[0];
+    return [this, bodyAndPinfo[1]];
  };
  localExpr.prototype.desugar = function(pinfo){
     var defnsAndPinfo = desugarProgram(this.defs, pinfo);
     var exprAndPinfo = this.body.desugar(defnsAndPinfo[1]);
-    return [new localExpr(defnsAndPinfo[0], exprAndPinfo[0]), exprAndPinfo[1]];
+    this.defs = defnsAndPinfo[0];
+    this.body = exprAndPinfo[0];
+    return [this, exprAndPinfo[1]];
  };
  callExpr.prototype.desugar = function(pinfo){
     var exprsAndPinfo = desugarProgram([this.func].concat(this.args), pinfo);
-    return [new callExpr(exprsAndPinfo[0][0], exprsAndPinfo[0].slice(1)),
-            exprsAndPinfo[1]];
+    this.func = exprsAndPinfo[0][0];
+    this.args = exprsAndPinfo[0].slice(1);
+    return [this, exprsAndPinfo[1]];
  };
  ifExpr.prototype.desugar = function(pinfo){
     var exprsAndPinfo = desugarProgram([this.predicate,
                                         this.consequence,
                                         this.alternative],
                                        pinfo);
-    return [new ifExpr(exprsAndPinfo[0][0], exprsAndPinfo[0][1], exprsAndPinfo[0][2]),
-            exprsAndPinfo[1]];
+    this.predicate = exprsAndPinfo[0][0];
+    this.consequence = exprsAndPinfo[0][1];
+    this.alternative = exprsAndPinfo[0][2];
+    return [this, exprsAndPinfo[1]];
  };
 
  // letrecs become locals
  letrecExpr.prototype.desugar = function(pinfo){
-    function bindingToDefn(b){return new defVar(b.first, b.second);};
-    return new localExpr(this.bindings.map(bindingToDefn), this.body).desugar(pinfo);
+    function bindingToDefn(b){
+      var def = new defVar(b.first, b.second);
+      def.location = b.location;
+      return def};
+    var local_exp = new localExpr(this.bindings.map(bindingToDefn), this.body).desugar(pinfo);
+    local_exp.location = this.location;
+    return local_exp;
  };
  // lets become calls
  letExpr.prototype.desugar = function(pinfo){
@@ -204,7 +221,7 @@
         bindings = [structure, constructor, predicate].concat(selectors, mutators);
     return pinfo.accumulateDefinedBindings(bindings, pinfo, this.location);
  };
- req.prototype.collectDefinitions = function(pinfo){
+ requireExpr.prototype.collectDefinitions = function(pinfo){
  }
  
  // extend the Program class to collect provides
@@ -422,7 +439,7 @@
  qqList.prototype.compile = function(env, pinfo){}
  primop.prototype.compile = function(env, pinfo){}
  quasiquotedExpr.prototype.compile = function(env, pinfo){}
- req.prototype.compile = function(pinfo){};
+ requireExpr.prototype.compile = function(pinfo){};
  provideStatement.prototype.compile = function(env, pinfo){};
  defStruct.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: define-struct should have been desugared"; };
  letStarExpr.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: letrec should have been desugared"; };
@@ -491,7 +508,7 @@
    
     // pull out separate program components for ordered compilation
     var defns    = program.filter(isDefinition),
-        requires = program.filter((function(p){return (p instanceof req);})),
+        requires = program.filter((function(p){return (p instanceof requireExpr);})),
         provides = program.filter((function(p){return (p instanceof provideStatement);})),
         exprs    = program.filter(isExpression);
  

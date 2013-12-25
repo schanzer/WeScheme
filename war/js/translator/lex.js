@@ -229,7 +229,7 @@
         }
 
         i = chewWhiteSpace(str, sexp.location.offset+sexp.location.span);
-        sCol = column; // update sCol in case we chewed whitespace
+//        sCol = column; // update sCol in case we chewed whitespace
       }
 
       if(i >= str.length) {

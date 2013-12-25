@@ -41,6 +41,7 @@ function coupleSecond(x) { return x.second; };
 // encode the msg and location as a JSON error
 function throwError(msg, loc) {
   console.log(msg);
+  console.log(loc);
   loc.source = loc.source || "<definitions>"; // FIXME -- we should have the source populated
 
   // rewrite a ColoredPart to match the format expected by the runtime
@@ -55,7 +56,6 @@ function throwError(msg, loc) {
     }
   }
   msg.args = msg.args.map(rewritePart);
-  
   var json = {type: "moby-failure"
     , "dom-message": ["span"
                       ,[["class", "Error"]]
