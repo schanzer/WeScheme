@@ -12,6 +12,8 @@
  
  TODO
  - JSLint
+ - multipart error anomalies
+ - case
  - proper parsing/errors for
     - quoted
     - quasiquoted
@@ -25,6 +27,7 @@
  function isNumber(x) { return x instanceof numberExpr; }
  function isSymbol(x) { return x instanceof symbolExpr; }
  function isChar(x)   { return x instanceof charExpr;   }
+ function isVector(x) { return x instanceof vectorExpr;}
  function isBoolean(x){ return x instanceof booleanExpr;}
  
  // isSymbolEqualTo : symbolExpr symbolExpr -> Boolean
@@ -65,7 +68,7 @@
  //////////////////////////////////////// PARSING ERRORS ////////////////////////////////
  function errorInParsing(sexp, msg){
     throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
-                                  , " : "].concat(msg))
+                                  , ": "].concat(msg))
                , sexp.location);
  }
  // convert an array of expressions to one of ColoredParts
@@ -303,7 +306,7 @@
         errorInParsing(sexp, ["expected at least one binding (in parentheses) after let, but nothing's there"]);
       }
       // is it just (let <not-list>)?
-      if(sexp[1] instanceof Array){
+      if(!(sexp[1] instanceof Array) || (sexp[1].length < 1)){
         errorInParsing(sexp, ["expected sequence of key/value pairs, but given "
                         , new types.ColoredPart("something else", sexp[1].location)]);
       }
@@ -330,7 +333,7 @@
         errorInParsing(sexp, ["expected at least one binding (in parentheses) after let, but nothing's there"]);
       }
       // is it just (let* <not-list>)?
-      if(sexp[1] instanceof Array){
+      if(!(sexp[1] instanceof Array)){
         errorInParsing(sexp, ["expected sequence of key/value pairs, but given "
                               , new types.ColoredPart("something else", sexp[1].location)]);
       }
@@ -507,12 +510,18 @@
                     return parseQuasiQuotedExpr(x, true);
                     }));
   }
-
+ 
+  function parseVector(sexp){
+    sexp.vals = parseStar(sexp.vals);
+    return sexp;
+  }
+ 
   function parseExprSingleton(sexp) {
     var singleton = isString(sexp)  ? sexp :
                     isNumber(sexp)  ? sexp :
                     isBoolean(sexp) ? sexp :
                     isChar(sexp)    ? sexp :
+                    isVector(sexp)  ? parseVector(sexp) :
                     isSymbolEqualTo("quote", sexp) ? new quotedExpr(sexp) :
                     isSymbolEqualTo("empty", sexp) ? new callExpr(new primop("list"), []) :
                     isSymbol(sexp) ? sexpIsPrimop(sexp) ? new primop(sexp) : sexp :
@@ -584,7 +593,20 @@
     return isCons(sexp) && isSymbol(sexp[0]) && isSymbolEqualTo(sexp[0], "provide");
  }
  function parseProvide(sexp) {
-    var provide = new provideStatement(isSymbol(sexp[1]) ? rest(sexp) : "all-defined-out");
+    var clauses = rest(sexp).map(function(p){
+        // symbols are ok
+        if(p instanceof symbolExpr){ return p;}
+        // (struct-out sym) is ok
+        if((p instanceof Array) && (p.length == 2)
+           && (p[0] instanceof symbolExpr) && isSymbolEqualTo(p[0], "struct-out")
+           && (p[1] instanceof symbolExpr)){
+          return p;
+        }
+        // everything else is NOT okay
+        errorInParsing(sexp, ["I don't recognize the syntax of this "
+                              , new types.ColoredPart("clause", p.location)]);
+    });
+    var provide = new provideStatement(clauses);
     provide.location = sexp.location;
     return provide;
   }

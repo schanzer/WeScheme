@@ -1,5 +1,8 @@
 /* TODO
  - JSLint
+TODO:
+ vector lexing: http://docs.racket-lang.org/reference/reader.html#%28part._parse-vector%29
+ better lexing of numbers
  */
 
 //////////////////////////////////////////////////////////////////////////////
@@ -21,7 +24,6 @@
 
 (function () {
  'use strict';
- /*global Comment, Location, charVal, types, throwError, proc */
     /////////////////////
     /*      Data       */
     /////////////////////
@@ -229,7 +231,6 @@
         }
 
         i = chewWhiteSpace(str, sexp.location.offset+sexp.location.span);
-//        sCol = column; // update sCol in case we chewed whitespace
       }
 
       if(i >= str.length) {
@@ -324,6 +325,12 @@
                      i+= datum.location.span; break;
           case ';':  datum = readSExpComment(str, i+1);
                      i+= datum.location.span+1; break;
+          case '(':
+          case '[':
+          case '{':  var sexp = readList(str, i),
+                    datum = new vectorExpr(sexp);
+                    datum.location = sexp.location;
+                    i+= datum.location.span; break;
           default: throwError(new types.Message(["Unknown pound-prefixed sexp: #", p]),
                               new Location(sCol, sLine, iStart, i-iStart));
          }
@@ -332,6 +339,7 @@
                    new Location(sCol, sLine, iStart, i-iStart));
       }
       datum.location = new Location(sCol, sLine, iStart, i-iStart);
+                   console.log(datum);
       return datum;
     }
 

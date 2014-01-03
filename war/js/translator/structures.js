@@ -40,10 +40,7 @@ function coupleSecond(x) { return x.second; };
 
 // encode the msg and location as a JSON error
 function throwError(msg, loc) {
-  console.log(msg);
-  console.log(loc);
   loc.source = loc.source || "<definitions>"; // FIXME -- we should have the source populated
-
   // rewrite a ColoredPart to match the format expected by the runtime
   function rewritePart(part){
     if(typeof(part) === 'string'){
@@ -78,7 +75,6 @@ function throwError(msg, loc) {
                       ]
     , "structured-error": JSON.stringify({message: msg.args, location: loc.toJSON() })
   };
-  console.log(json);
   throw JSON.stringify(json);
 }
 
@@ -276,6 +272,17 @@ function stringExpr(val) {
 };
 stringExpr.prototype = heir(Program.prototype);
 
+// vector expression
+function vectorExpr(vals, size) {
+  Program.call(this);
+  this.vals = vals;
+  this.toString = function(){
+    var strVals = this.vals.map(function(v){return v.toString();});
+    return "#("+strVals.join(" ")+")" ;
+  };
+};
+vectorExpr.prototype = heir(Program.prototype);
+
 // char expression
 function charExpr(val) {
   Program.call(this);
@@ -353,10 +360,10 @@ function requireExpr(spec) {
 requireExpr.prototype = heir(Program.prototype);
 
 // provide
-function provideStatement(val) {
+function provideStatement(clauses) {
   Program.call(this);
-  this.val = val;
-  this.toString = function(){ return "(provide "+this.val+")" };
+  this.clauses = clauses;
+  this.toString = function(){ return "(provide "+this.clauses.toString()+")" };
 };
 provideStatement.prototype = heir(Program.prototype);
 
@@ -839,6 +846,10 @@ function getTopLevelEnv(lang){
       }
     };
  
+    this.extendEnv_moduleBinding = function(module){
+      throw "extendEnv_moduleBinding not implemented yet! (see Structures.js)";
+    };
+ 
     this.toString = function(){
       return this.bindings.values().reduce(function(s, b){
         return s+"\n  |---"+b.name;}, "");
@@ -881,7 +892,7 @@ function getTopLevelEnv(lang){
   // PINFO STRUCTS ////////////////////////////////////////////////////////////////
   var defaultCurrentModulePath = "";
   function defaultModuleResolver(){}
-  function defaultModulePathResolver(){}
+  function defaultModulePathResolver(){return false;}
 
   // pinfo (program-info) is the "world" structure for the compilers;
   // it captures the information we get from analyzing and compiling
@@ -929,13 +940,11 @@ function getTopLevelEnv(lang){
     this.usedBindings =  this.usedBindingsHash.values;
  
     this.accumulateDeclaredPermission = function(name, permission){
-// console.log('saw a declared permission');
       this.declaredPermissions = [[name, position]].concat(this.declaredPermissions);
       return this;
     };
  
     this.accumulateSharedExpression = function(expression, translation){
-// console.log('saw a shared expression');
       var labeledTranslation = makeLabeledTranslation(this.gensymCounter, translation);
       this.sharedExpressions.put(labeledTranslation, expression);
       return this;
@@ -944,7 +953,6 @@ function getTopLevelEnv(lang){
     // accumulateDefinedBinding: binding loc -> pinfo
     // Adds a new defined binding to a pinfo's set.
     this.accumulateDefinedBinding = function(binding, loc){
-// console.log('saw a defined binding: \n');
       if(compilerStructs.keywords.indexOf(binding.id) > -1){
         throwError(types.Message([new types.ColoredPart(binding.id, loc),
                                   ": this is a reserved keyword and cannot be used"+
@@ -983,7 +991,6 @@ function getTopLevelEnv(lang){
     // Adds a list of module-imported bindings to the pinfo's known set of bindings, without
     // including them within the set of defined names.
     this.accumulateModuleBindings = function(bindings){
-// console.log('saw a module binding');
       bindings.forEach(function(b){this.env.extend(binding);});
       return this;
     };
@@ -991,7 +998,6 @@ function getTopLevelEnv(lang){
     // accumulateModule: module-binding -> pinfo
     // Adds a module to the pinfo's set.
     this.accumulateModule = function(module){
-// console.log('saw a new module');
       this.modules = [module].concat(this.modules);
       return this;
     };
@@ -999,7 +1005,6 @@ function getTopLevelEnv(lang){
     // accumulateBindingUse: binding -> pinfo
     // Adds a binding's use to a pinfo's set.
     this.accumulateBindingUse = function(binding){
-// console.log('saw a binding use');
       this.usedBindingsHash.put(binding.name, binding);
       return this;
     };
@@ -1007,7 +1012,6 @@ function getTopLevelEnv(lang){
     // accumulateFreeVariableUse: symbol -> pinfo
     // Mark a free variable usage.
     this.accumulateFreeVariableUse = function(sym){
-// console.log('saw a free variable');
       this.freeVariables = ((this.freeVariables.indexOf(sym) > -1)?
                             this.freeVariables : [sym].concat(this.freeVariables));
       return this;
@@ -1016,7 +1020,6 @@ function getTopLevelEnv(lang){
     // gensym: symbol -> [pinfo, symbol]
     // Generates a unique symbol.
     this.gensym = function(label){
-// console.log('gensyming');
       this.gensymCounter++;
       return [this, new symbolExpr(label+this.gensymCounter)];
     };
@@ -1116,7 +1119,7 @@ function getTopLevelEnv(lang){
  function getBasePinfo(language){
     var pinfo = new compilerStructs.pinfo();
     if(language === "moby"){
-      pinfo.env = extendEnv_ModuleBinding(getTopLevelEnv(language),
+      pinfo.env = extendEnv_moduleBinding(getTopLevelEnv(language),
                                           mobyModuleBinding);
     } else if(language === "base"){
       pinfo.env = getTopLevelEnv(language);
