@@ -309,7 +309,18 @@ TODO:
     function readPoundSExp(str, i) {
       var sCol = column, sLine = line, iStart = i, datum;
       i++; column++; // skip over the pound sign
-      
+              
+      // Check specially for vector literals, matching #n[...]
+      var vectorMatch = new RegExp("([0-9]*)[\[\(\{]*", "g"),
+          vectorTest = vectorMatch.exec(str.slice(i));
+      if(vectorTest !== null){
+        var size = vectorTest[1],
+            sexp = readList(str, i+(size.length));
+        datum = new vectorExpr(sexp, size);
+        datum.location = sexp.location;
+        i = sexp.location.span;
+        return datum;
+      }
 
       if(i < str.length) {
         var p = str.charAt(i);
@@ -325,12 +336,6 @@ TODO:
                      i+= datum.location.span; break;
           case ';':  datum = readSExpComment(str, i+1);
                      i+= datum.location.span+1; break;
-          case '(':
-          case '[':
-          case '{':  var sexp = readList(str, i),
-                    datum = new vectorExpr(sexp);
-                    datum.location = sexp.location;
-                    i+= datum.location.span; break;
           default: throwError(new types.Message(["Unknown pound-prefixed sexp: #", p]),
                               new Location(sCol, sLine, iStart, i-iStart));
          }
@@ -339,7 +344,6 @@ TODO:
                    new Location(sCol, sLine, iStart, i-iStart));
       }
       datum.location = new Location(sCol, sLine, iStart, i-iStart);
-                   console.log(datum);
       return datum;
     }
 

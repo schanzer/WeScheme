@@ -513,7 +513,12 @@
  
   function parseVector(sexp){
     sexp.vals = parseStar(sexp.vals);
-    return sexp;
+    sexp.size = Math.max(sexp.size, sexp.vals.length);
+    if(sexp.vals.length < sexp.size){
+      for(var i=sexp.vals.length-1; i < sexp.size; i++)
+        sexp.vals[i] = sexp.vals[sexp.vals.length-1] || 0;
+    }
+    return new callExpr(new symbolExpr("vector"), sexp.vals);
   }
  
   function parseExprSingleton(sexp) {
