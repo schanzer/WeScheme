@@ -1,8 +1,29 @@
-/* TODO
+/* 
+ 
+ Follows WeScheme's current implementation: http://docs.racket-lang.org/htdp-langs/advanced.html
+ NOT SUPPORTED BY WESCHEME:
+  - define-datatype
+  - begin0
+  - set!
+  - time
+  - delay
+  - shared
+  - recur
+  - match
+  - check-member-of
+  - check-range
+  - (require planet)
+  - byetstrings (#"Apple")
+  - regexps
+  - #hash
+  - #rx or #px
+  - graphs (#1=100 #1# #1#)
+ 
+ 
+ TODO
  - JSLint
-TODO:
- vector lexing: http://docs.racket-lang.org/reference/reader.html#%28part._parse-vector%29
- better lexing of numbers
+ - better lexing of numbers: http://docs.racket-lang.org/reference/reader.html#(part._parse-number)
+
  */
 
 //////////////////////////////////////////////////////////////////////////////
@@ -21,6 +42,7 @@ TODO:
 // - stringExpr
 // - booleanExpr
 // - charExpr
+// - vectorExpr
 
 (function () {
  'use strict';
@@ -33,6 +55,10 @@ TODO:
     res.leftListDelims = /[(\u005B\u007B]/;
     res.rightListDelims = /[)\u005D\u007D]/;
     res.quotes = /[\'`,]/;
+    res.hex2 = new RegExp("([0-9a-f]{1,2})", "i");
+    res.hex4 = new RegExp("([0-9a-f]{1,4})", "i");
+    res.hex8 = new RegExp("([0-9a-f]{1,8})", "i");
+    res.oct3 = new RegExp("([0-7]{1,3})", "i");
  
     // the delimiters encountered so far, and line and column
     var delims, line, column, sCol, sLine;
@@ -277,20 +303,45 @@ TODO:
         else { column++; }
 
         if(chr === '\\') {
-          chr = str.charAt(++i);
-          chr = chr === 'a'  ? '\u0007' :
-          chr === 'b'  ? '\b' :
-          chr === 't'  ? '\t' :
-          chr === 'n'  ? '\n' :
-          chr === 'v'  ? '\v' :
-          chr === 'f'  ? '\f' :
-          chr === 'r'  ? '\r' :
-          chr === 'e'  ? '\u0027' :
-          chr === '"'  ? '"' :
-          chr === "'"  ? "'" :
-          chr === '\\' ? '\\' :
-          throwError(new types.Message(["Escape sequence not supported:", ", \\", chr]),
-                      new Location(sCol, sLine, iStart, i-iStart));
+          chr = str.charAt(i++);
+                   console.log('CHAR IS '+chr+', str(i) is '+str.slice(i));
+          switch(true){
+             case /a/.test(chr)  : chr = '\u0007'; break;
+             case /b/.test(chr)  : chr = '\b'; break;
+             case /t/.test(chr)  : chr = '\t'; break;
+             case /n/.test(chr)  : chr = '\n'; break;
+             case /v/.test(chr)  : chr = '\v'; break;
+             case /f/.test(chr)  : chr = '\f'; break;
+             case /r/.test(chr)  : chr = '\r'; break;
+             case /e/.test(chr)  : chr = '\u0027'; break;
+             case /\"/.test(chr)  : break;
+             case /\'/.test(chr)  : break;
+             case /\\/.test(chr) : break;
+             // if it's a charCode symbol, match with a regexp and move i forward
+             case /[0-7]{1,3}/.test(str.slice(i-1)) :
+                var match = res.oct3.exec(str.slice(i-1))[1];
+                chr = String.fromCharCode(parseInt(match, 8));
+                i += match.length-1; column += match.length-1;
+                break;
+              case /x/.test(chr)  :
+                var match = res.hex2.exec(str.slice(i))[1];
+                chr = String.fromCharCode(parseInt(match, 16));
+                i += match.length; column += match.length;
+                break;
+             case /u/.test(chr)  :
+                var match = res.hex4.exec(str.slice(i))[1];
+                chr = String.fromCharCode(parseInt(match, 16));
+                i += match.length; column += match.length;
+                break;
+             case /U/.test(chr)  :
+                var match = res.hex8.exec(str.slice(i))[1];
+                chr = String.fromCharCode(parseInt(match, 16));
+                i += match.length; column += match.length;
+                break;
+             default   :
+                throwError(new types.Message(["Escape sequence not supported:", ", \\", chr]),
+                           new Location(sCol, sLine, iStart, i-iStart));
+          }
         }
         datum += chr;
       }
