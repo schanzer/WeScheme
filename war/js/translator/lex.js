@@ -23,7 +23,7 @@
  TODO
  - JSLint
  - better lexing of numbers: http://docs.racket-lang.org/reference/reader.html#(part._parse-number)
-
+- quote and quasiquote
  */
 
 //////////////////////////////////////////////////////////////////////////////
@@ -304,7 +304,6 @@
 
         if(chr === '\\') {
           chr = str.charAt(i++);
-                   console.log('CHAR IS '+chr+', str(i) is '+str.slice(i));
           switch(true){
              case /a/.test(chr)  : chr = '\u0007'; break;
              case /b/.test(chr)  : chr = '\b'; break;
@@ -318,12 +317,12 @@
              case /\'/.test(chr)  : break;
              case /\\/.test(chr) : break;
              // if it's a charCode symbol, match with a regexp and move i forward
-             case /[0-7]{1,3}/.test(str.slice(i-1)) :
+             case res.oct3.test(str.slice(i-1)) :
                 var match = res.oct3.exec(str.slice(i-1))[1];
                 chr = String.fromCharCode(parseInt(match, 8));
                 i += match.length-1; column += match.length-1;
                 break;
-              case /x/.test(chr)  :
+             case /x/.test(chr)  :
                 var match = res.hex2.exec(str.slice(i))[1];
                 chr = String.fromCharCode(parseInt(match, 16));
                 i += match.length; column += match.length;

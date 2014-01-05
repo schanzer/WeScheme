@@ -13,7 +13,6 @@
  TODO
  - JSLint
  - multipart error anomalies
- - case
  - proper parsing/errors for
     - quoted
     - quasiquoted
@@ -410,6 +409,7 @@
                     isSymbolEqualTo("let", peek)     ? parseLetExpr(sexp) :
                     isSymbolEqualTo("let*", peek)    ? parseLetStarExpr(sexp) :
                     isSymbolEqualTo("cond", peek)    ? parseCondExpr(sexp) :
+                    isSymbolEqualTo("case", peek)    ? parseCaseExpr(sexp) :
                     isSymbolEqualTo("if", peek)      ? parseIfExpr(sexp) :
                     isSymbolEqualTo("begin", peek)   ? parseBeginExpr(sexp) :
                     isSymbolEqualTo("and", peek)     ? parseAndExpr(sexp) :
@@ -467,9 +467,63 @@
                  return [parseCondCouple(couple)].concat(rst);
                }
              }, []));
- 
   }
 
+   function parseCaseExpr(sexp) {
+    // is it just (case)?
+    if(sexp.length === 1){
+        errorInParsing(sexp, ["expected at least one clause after case, but nothing's there"]);
+    }
+    if(sexp.length === 2){
+        errorInParsing(sexp, ["expected a clause with at least one choice (in parentheses)",
+                              "and an answer after the expression, but nothing's there"]);
+    }
+ 
+    function parseCaseCouple(clause) {
+      var clauseLocations = [clause.location.start(), clause.location.end()];
+      if(!(clause instanceof Array)){
+        errorInParsing(sexp, ["expected a clause with at least one choice (in parentheses), but found "
+                              , new types.ColoredPart("something else", clause.location)]);
+      }
+      if(clause.length === 0){
+        errorInParsing(sexp, ["expected at least one choice (in parentheses) and an answer, but found an "
+                              , new types.ColoredPart("empty part", clause.location)]);
+      }
+      if(!(clause[0] instanceof Array)){
+        errorInParsing(sexp, ["eexpected at least one choice (in parentheses), but found "
+                              , new types.ColoredPart("something else", clause.location)]);
+      }
+      if(clause.length === 1){
+        errorInParsing(sexp, ["expected a clause with a question and an answer, but found a "
+                              , new types.MultiPart("clause", clauseLocations, true)
+                              , " with only "
+                              , new types.ColoredPart("one part", clause[0].location)]);
+      }
+      if(clause.length > 2){
+        errorInParsing(sexp, ["expected only one expression for the answer in the case clause, but found "
+                              , new types.MultiPart("clause", clauseLocations, true)
+                              , collectExtraParts(clause.slice(2))]);
+      }
+      if(sexpIsCouple(clause)){
+        var cpl = new couple(parseExpr(clause[0]), parseExpr(clause[1]));
+        cpl.location = clause.location;
+        return cpl;
+      }
+    }
+ 
+    return new caseExpr(sexp[1], sexp.slice(2).reduceRight(function (rst, couple) {
+               if((isSymbol(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (rst.length > 0)){
+               errorInParsing(sexp, ["found an ",
+                                     new types.ColoredPart("else clause", couple.location),
+                                     "that isn't the last clause in its case expression; there is ",
+                                     new types.ColoredPart("another clause", rst[0].location),
+                                      " after it"]);
+               } else {
+                 return [parseCaseCouple(couple)].concat(rst);
+               }
+             }, []));
+  }
+ 
   function parseBinding(sexp) {
     return sexpIsCouple(sexp) ? new couple(parseIdExpr(sexp[0]), parseExpr(sexp[1])) :
     errorInParsing(sexp, ["expected a sequence of key/value pairs, but given "

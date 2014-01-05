@@ -161,7 +161,7 @@ function lambdaExpr(args, body) {
 };
 lambdaExpr.prototype = heir(Program.prototype);
 
-// Local expression TODO
+// Local expression
 function localExpr(defs, body) {
   Program.call(this);
   this.defs = defs;
@@ -206,6 +206,18 @@ function condExpr(clauses) {
     return "(cond\n    "+this.clauses.join("\n    ")+")";
   };
 };
+
+// Case expression
+function caseExpr(expr, clauses) {
+  console.log(clauses);
+  Program.call(this);
+  this.expr = expr;
+  this.clauses = clauses;
+  this.toString = function(){
+    return "(case "+this.expr.toString()+"\n    "+this.clauses.join("\n    ")+")";
+  };
+};
+caseExpr.prototype = heir(Program.prototype);
 
 // and expression
 function andExpr(exprs) {
