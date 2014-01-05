@@ -242,14 +242,6 @@ function ifExpr(predicate, consequence, alternative) {
 };
 ifExpr.prototype = heir(Program.prototype);
 
-// time expression
-function timeExpr(expr) {
-  Program.call(this);
-  this.expr = expr;
-  this.toString = function(){ return "(time "+this.expr.toString()+")"; };
-};
-timeExpr.prototype = heir(Program.prototype);
-
 // symbol expression (ID)
 function symbolExpr(val) {
   Program.call(this);
@@ -276,9 +268,10 @@ stringExpr.prototype = heir(Program.prototype);
 function vectorExpr(vals, size) {
   Program.call(this);
   this.vals = vals;
+  this.size = size;
   this.toString = function(){
     var strVals = this.vals.map(function(v){return v.toString();});
-    return "#("+strVals.join(" ")+")" ;
+    return "#"+this.size+"("+strVals.join(" ")+")" ;
   };
 };
 vectorExpr.prototype = heir(Program.prototype);
