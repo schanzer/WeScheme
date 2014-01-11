@@ -189,10 +189,14 @@ goog.provide("plt.wescheme.RoundRobin");
                     } else {
                         console.log("SERVER ERROR:");
                         console.log(errorStruct.message);
+                        var local = JSON.parse(local_error)["structured-error"],
+                            server= JSON.parse(errorStruct.message)["structured-error"];
+                                              console.log('comparing (local to server)');
+
                         // remove extraneous spaces and force everything to lowercase
                         // if the results are different, we should log them to the server
-                        if(!sameResults(local_error, errorStruct.message)){
-                            logResults(code, local_error, errorStruct.message);
+                        if(!sameResults(JSON.parse(local), JSON.parse(server))){
+                            logResults(code, JSON.stringify(local), JSON.stringify(server));
                         }
                         onDoneError(errorStruct.message);
                     }
@@ -201,10 +205,46 @@ goog.provide("plt.wescheme.RoundRobin");
             onAllCompilationServersFailing(onDoneError);
         }
     };
-
+ 
     // differentResults : local server -> boolean
-    function sameResults(local, server){
-      return local === server;
+    // credit to: http://stackoverflow.com/questions/1068834/object-comparison-in-javascript
+    function sameResults(x, y){
+      function saveDiffAndReturn(x, y){
+        document.getElementById('diffString').value = "LOCAL: "+JSON.stringify(x)
+                                                      +"\nSERVER: "+JSON.stringify(y);
+        return false;
+       }
+ 
+       // if both x and y are null or undefined and exactly the same
+       if (x === y) return true;
+
+       // if they are not strictly equal, they both need to be Objects
+       if ( !(x instanceof Object) || !(y instanceof Object) ) return saveDiffAndReturn(x,y);
+ 
+       // does every property in x also exist in y?
+       for (var p in x) {
+          // empty fields can be safely removed
+          if(x[p] === ""){ delete x[p]; continue; }
+          // allows to compare x[ p ] and y[ p ] when set to undefined
+          if ( ! x.hasOwnProperty(p) ) return saveDiffAndReturn(p+":undefined",y[p]);
+          if ( ! y.hasOwnProperty(p) ) return saveDiffAndReturn(x[p],p+":undefined");
+          // if they have the same strict value or identity then they are equal
+          if ( x[p] === y[p] ) continue;
+          // Numbers, Strings, Functions, Booleans must be strictly equal
+          if ( typeof(x[p]) !== "object" ) return saveDiffAndReturn(x,y);
+
+          // Objects and Arrays must be tested recursively
+          if ( !sameResults(x[p],  y[p]) ) return false;
+       }
+       
+       for (p in y) {
+          // empty fields can be safely removed
+          if(y[p] === ""){ delete y[p]; continue; }
+ 
+          // allows x[ p ] to be set to undefined
+          if ( y.hasOwnProperty(p) && !x.hasOwnProperty(p) ) return saveDiffAndReturn(p+":undefined",y[p]);
+       }
+       return true;
     }
  
     // logResults : code local server -> void
@@ -212,10 +252,8 @@ goog.provide("plt.wescheme.RoundRobin");
     function logResults(code, local, server){
       console.log('silently logging anonymized error message to GDocs');
       document.getElementById('expr').value = code;
-      document.getElementById('local').value = local;
-      document.getElementById('server').value = server;
-      document.getElementById('local').value.replace(/\s+/,"").toLowerCase();
-      document.getElementById('server').value.replace(/\s+/,"").toLowerCase();
+      document.getElementById('local').value = local.replace(/\s+/,"").toLowerCase();
+      document.getElementById('server').value = server.replace(/\s+/,"").toLowerCase();
       document.getElementById('errorLogForm').submit();
     }
 
@@ -225,7 +263,6 @@ goog.provide("plt.wescheme.RoundRobin");
     var lastCompiledName = null;
     var lastCompiledCode = null;
     var lastCompiledResult = null;
-
 
     // The name "round-robin" is historical: we really contact the
     // servers in order, starting from liveServers[0], liveServers[1], ...
