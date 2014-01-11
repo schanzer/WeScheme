@@ -207,11 +207,21 @@ goog.provide("plt.wescheme.RoundRobin");
     };
  
     // differentResults : local server -> boolean
+    // if there's a difference, log a diff to the form and return false
     // credit to: http://stackoverflow.com/questions/1068834/object-comparison-in-javascript
     function sameResults(x, y){
+      function alphabetizeObject(obj){
+        var fields = [], str="{", i;
+        for (i in obj) { if (obj.hasOwnProperty(i)) fields.push(i); }
+        fields.sort();
+        for (var i=0;i<fields.length; i++) { str+=fields[i]+":"+obj[fields[i]]+", "; }
+        return str+"}";
+      }
+ 
       function saveDiffAndReturn(x, y){
-        document.getElementById('diffString').value = "LOCAL: "+JSON.stringify(x)
-                                                      +"\nSERVER: "+JSON.stringify(y);
+        var local = (x instanceof Object)? alphabetizeObject(x) : x.toString(),
+            server= (y instanceof Object)? alphabetizeObject(y) : y.toString();
+        document.getElementById('diffString').value = "LOCAL: "+local+"\nSERVER: "+server;
         return false;
        }
  
