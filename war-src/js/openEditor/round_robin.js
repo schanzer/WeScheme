@@ -140,19 +140,22 @@ goog.provide("plt.wescheme.RoundRobin");
             console.log("pinfo:");
             console.log(pinfo);
           } catch (e) {
-            throw Error("DESUGARING ERROR");
+            console.log("DESUGARING ERROR");
+            throw e;
           }
           try {
             window.pinfo = analyze(program);
             console.log("// ANALYSIS: //////////////////////////////\nraw");
             console.log("pinfo (bound to window.pinfo):");
           } catch (e) {
-            throw Error("ANALYSIS ERROR");
+            console.log("ANALYSIS ERROR");
+            throw e;
           }
         } catch (e) {
           local_error = e;
+          console.log(local_error);
+          onDoneError(local_error);
         }
- console.log('sending program out to AWS');
         // if all systems are go, hit the server
         if (n < liveServers.length) {
             liveServers[n].xhr.compileProgram(
@@ -184,11 +187,14 @@ goog.provide("plt.wescheme.RoundRobin");
                                        onDoneError);
                         }
                     } else {
-                        console.log("LOCAL ERROR:");
-                        console.log(local_error);
                         console.log("SERVER ERROR:");
                         console.log(errorStruct.message);
-                        onDoneError(local_error);
+                        // remove extraneous spaces and force everything to lowercase
+                        // if the results are different, we should log them to the server
+                        if(!sameResults(local_error, errorStruct.message)){
+                            logResults(code, local_error, errorStruct.message);
+                        }
+                        onDoneError(errorStruct.message);
                     }
                 });
         } else {
@@ -196,6 +202,22 @@ goog.provide("plt.wescheme.RoundRobin");
         }
     };
 
+    // differentResults : local server -> boolean
+    function sameResults(local, server){
+      return local === server;
+    }
+ 
+    // logResults : code local server -> void
+    // send code, local error and server error to a Google spreadsheet
+    function logResults(code, local, server){
+      console.log('silently logging anonymized error message to GDocs');
+      document.getElementById('expr').value = code;
+      document.getElementById('local').value = local;
+      document.getElementById('server').value = server;
+      document.getElementById('local').value.replace(/\s+/,"").toLowerCase();
+      document.getElementById('server').value.replace(/\s+/,"").toLowerCase();
+      document.getElementById('errorLogForm').submit();
+    }
 
     // TODO: add a real LRU cache for compilations.
     // The following does a minor bit of caching for the very
@@ -233,8 +255,6 @@ goog.provide("plt.wescheme.RoundRobin");
                 onAllCompilationServersFailing(onDoneError);
             }
         };
-
-    
 
     //////////////////////////////////////////////////////////////////////
 
