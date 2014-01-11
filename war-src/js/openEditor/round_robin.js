@@ -231,6 +231,11 @@ goog.provide("plt.wescheme.RoundRobin");
        // if they are not strictly equal, they both need to be Objects
        if ( !(x instanceof Object) || !(y instanceof Object) ) return saveDiffAndReturn(x,y);
  
+       // if both are Locations, we only care about offset and span, so perform a weak comparison
+       if ( x.hasOwnProperty('offset') && y.hasOwnProperty('offset') ){
+          return ( (x.span === y.span) && (x.offset === y.offset) )? true : saveDiffAndReturn(x,y);
+       }
+ 
        // does every property in x also exist in y?
        for (var p in x) {
           // empty fields can be safely removed
