@@ -24,6 +24,9 @@
  - JSLint
  - better lexing of numbers: http://docs.racket-lang.org/reference/reader.html#(part._parse-number)
 - quote and quasiquote
+ - #\99 shoudl lex as #\9, 9
+ - "\p will crash the lexer
+ - unclosed string and #q don't throw the right error struct
  */
 
 //////////////////////////////////////////////////////////////////////////////
@@ -44,22 +47,54 @@
 // - charExpr
 // - vectorExpr
 
-(function () {
- 'use strict';
     /////////////////////
     /*      Data       */
     /////////////////////
 
     // a collection of common RegExps
-    var res = {};
-    res.leftListDelims = /[(\u005B\u007B]/;
-    res.rightListDelims = /[)\u005D\u007D]/;
-    res.quotes = /[\'`,]/;
-    res.hex2 = new RegExp("([0-9a-f]{1,2})", "i");
-    res.hex4 = new RegExp("([0-9a-f]{1,4})", "i");
-    res.hex8 = new RegExp("([0-9a-f]{1,8})", "i");
-    res.oct3 = new RegExp("([0-7]{1,3})", "i");
- 
+    var leftListDelims = /[(\u005B\u007B]/,
+        rightListDelims = /[)\u005D\u007D]/,
+        quotes = /[\'`,]/;
+
+/*        // number lexing from http://docs.racket-lang.org/reference/reader.html#(part._parse-number)
+        exactness       = new RegExp("[#e|#i]{0,1}", "i"),
+        sign            = new RegExp("[-|+]"),
+        expMark_16      = new RegExp("[s|1]"),
+        expMark_10      = new RegExp("[s|1]"),
+        digit_2         = new RegExp("[0-1]"),
+        digit_8         = new RegExp("[0-7]"),
+        digit_10        = new RegExp("[0-9]"),
+        digit_16        = new RegExp("[0-9a-f]","i"),
+        digits_hash     = new RegExp("["+digit_16.source+"]+"+"#*"+"]"),
+        unsignedInteger = new RegExp("("+digit_16.source+")+"),
+        unsignedRational= new RegExp("["+unsignedInteger.source+"(\/"+unsignedInteger.source+"){0,1}]"),
+        exactInteger    = new RegExp("["+sign.source+"{0,1}"+unsignedInteger.source+"]"),
+        exactRational   = new RegExp("["+sign.source+"{0,1}"+unsignedRational.source+"]"),
+        exactComplex    = new RegExp("["+exactRational.source+sign.source+unsignedRational.source+"i]"),
+        inexactSimple   = new RegExp("["+digits_hash.source+"[.]{0,1}"+"#*"+
+                                     "|"+unsignedInteger.source+"{0,1}"+"."+digits_hash.source+
+                                     "|"+digits_hash.source+"/"+digits_hash.source+"]"),
+        inexactNormal   = new RegExp("["+inexactSimple.source +
+                                        "["+expMark_16.source + exactInteger.source+"]{0,1}"+"]"),
+        inexactReal     = new RegExp("["+sign.source+"{0,1}"+inexactNormal.source +
+                                     "|"+sign.source+inexactSpecial+"]"),
+        inexactSpecial  = new RegExp("["+"inf.0|nan.0|inf.f|nan.f"+"]"),
+        inexactUnsigned = new RegExp("["+inexactNormal.source+"|"+inexactSpecial.source+"]"),
+        digits_hash     = new RegExp("["+digit_16.source+"+"+"#*"+"]"),
+        inexactComplex  = new RegExp("["+inexactReal.source+"{0,1}"+sign.source+inexactUnsigned.source+"i"+
+                                     "|"+inexactReal.source+"@"+inexactReal.source+"]"),
+        inexact         = new RegExp("["+inexactReal.source+"|"+inexactComplex.source+"]"),
+        exact           = new RegExp("["+exactRational+"|"+exactComplex+"]", "i"),
+        number          = new RegExp("["+exact +"|"+ inexact+"]", "i"),
+        general         = new RegExp(exactness.source+number.source, "i"),
+        hex2            = new RegExp("("+digit_16.source+"{1,2})", "i"),
+        hex4            = new RegExp("("+digit_16.source+"{1,4})", "i"),
+        hex8            = new RegExp("("+digit_16.source+"{1,8})", "i"),
+        oct3            = new RegExp("("+digit_8.source+"{1,3})", "i");
+*/
+(function () {
+    'use strict';
+
     // the delimiters encountered so far, and line and column
     var delims, line, column, sCol, sLine;
 
@@ -223,15 +258,15 @@
         throwError(new types.Message(["Unexpected EOF while reading a SExp"])
                                  ,new Location(sCol, sLine, iStart, i-iStart));
       }
-       var sexp = res.rightListDelims.test(p) ?
-                   throwError(new types.Message(["read : expected a "+otherDelim(p)+" to open "
+       var sexp = rightListDelims.test(p) ?
+                   throwError(new types.Message(["read: expected a ", otherDelim(p), " to open "
                                                 , new types.ColoredPart(p, new Location(sCol, sLine, iStart, 1))])
-                              ,new Location(sCol, sLine, iStart, i-iStart)) :
-                 res.leftListDelims.test(p) ? readList(str, i) :
+                              ,new Location(sCol, sLine, iStart, 1)) :
+                 leftListDelims.test(p) ? readList(str, i) :
                  p === '"'                  ? readString(str, i) :
                  p === '#'                  ? readPoundSExp(str, i) :
                  p === ';'                  ? readLineComment(str, i) :
-                 res.quotes.test(p)         ? readQuote(str, i) :
+                 quotes.test(p)             ? readQuote(str, i) :
                   /* else */                   readSymbolOrNumber(str, i);
        return sexp;
     }
@@ -247,7 +282,7 @@
                    
       i = chewWhiteSpace(str, i);
 
-      while (i < str.length && !res.rightListDelims.test(str.charAt(i))) {
+      while (i < str.length && !rightListDelims.test(str.charAt(i))) {
         // check for newlines
         if(str.charAt(i) === "\n"){ line++; column = 0;}
         sexp = readSExpByIndex(str, i);
@@ -278,7 +313,7 @@
                                       new types.ColoredPart(str.charAt(i).toString(),
                                                             new Location(column, line, i, 1))
                                       ]);
-         throwError(msg, new Location(sCol, sLine, iStart, 1));
+         throwError(msg, new Location(column, line, i, 1));
       }
       // add 1 to span to count the closing delimeter
       column++;
@@ -317,25 +352,26 @@
              case /\'/.test(chr)  : break;
              case /\\/.test(chr) : break;
              // if it's a charCode symbol, match with a regexp and move i forward
-             case res.oct3.test(str.slice(i-1)) :
-                var match = res.oct3.exec(str.slice(i-1))[1];
-                chr = String.fromCharCode(parseInt(match, 8));
-                i += match.length-1; column += match.length-1;
-                break;
              case /x/.test(chr)  :
-                var match = res.hex2.exec(str.slice(i))[1];
+                var match = hex2.exec(str.slice(i))[1];
+                   console.log(match);
                 chr = String.fromCharCode(parseInt(match, 16));
                 i += match.length; column += match.length;
                 break;
              case /u/.test(chr)  :
-                var match = res.hex4.exec(str.slice(i))[1];
+                var match = hex4.exec(str.slice(i))[1];
                 chr = String.fromCharCode(parseInt(match, 16));
                 i += match.length; column += match.length;
                 break;
              case /U/.test(chr)  :
-                var match = res.hex8.exec(str.slice(i))[1];
+                var match = hex8.exec(str.slice(i))[1];
                 chr = String.fromCharCode(parseInt(match, 16));
                 i += match.length; column += match.length;
+                break;
+             case oct3.test(str.slice(i-1)) :
+                var match = oct3.exec(str.slice(i-1))[1];
+                chr = String.fromCharCode(parseInt(match, 8));
+                i += match.length-1; column += match.length-1;
                 break;
              default   :
                 throwError(new types.Message(["Escape sequence not supported:", ", \\", chr]),
@@ -363,7 +399,7 @@
       // Check specially for vector literals, matching #n[...]
       var vectorMatch = new RegExp("([0-9]*)[\[\(\{]*", "g"),
           vectorTest = vectorMatch.exec(str.slice(i));
-      if(vectorTest !== null){
+      if(vectorTest[1].length > 0){
         var size = vectorTest[1],
             sexp = readList(str, i+(size.length));
         datum = new vectorExpr(sexp, size);
@@ -371,7 +407,6 @@
         i = sexp.location.span;
         return datum;
       }
-
       if(i < str.length) {
         var p = str.charAt(i);
         switch(p){
@@ -384,7 +419,7 @@
                      i+= datum.location.span-1; break;
           case '|':  datum = readMultiLineComment(str, i-1);
                      i+= datum.location.span; break;
-          case ';':  datum = readSExpComment(str, i+1);
+          case ';':  console.log('reading #;');datum = readSExpComment(str, i+1);
                      i+= datum.location.span+1; break;
           default: throwError(new types.Message(["Unknown pound-prefixed sexp: #", p]),
                               new Location(sCol, sLine, iStart, i-iStart));
