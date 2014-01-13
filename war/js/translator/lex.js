@@ -23,9 +23,7 @@
  TODO
  - JSLint
  - better lexing of numbers: http://docs.racket-lang.org/reference/reader.html#(part._parse-number)
-- quote and quasiquote
- - #\99 shoudl lex as #\9, 9
- - "\p will crash the lexer
+ - quote and quasiquote
  - unclosed string and #q don't throw the right error struct
  */
 
@@ -52,9 +50,10 @@
     /////////////////////
 
     // a collection of common RegExps
-    var leftListDelims = /[(\u005B\u007B]/,
+    var leftListDelims  = /[(\u005B\u007B]/,
         rightListDelims = /[)\u005D\u007D]/,
-        quotes = /[\'`,]/;
+        quotes          = /[\'`,]/,
+        oct3            = new RegExp("([0-7]{1,3})", "i");
 
 /*        // number lexing from http://docs.racket-lang.org/reference/reader.html#(part._parse-number)
         exactness       = new RegExp("[#e|#i]{0,1}", "i"),
@@ -90,8 +89,8 @@
         hex2            = new RegExp("("+digit_16.source+"{1,2})", "i"),
         hex4            = new RegExp("("+digit_16.source+"{1,4})", "i"),
         hex8            = new RegExp("("+digit_16.source+"{1,8})", "i"),
-        oct3            = new RegExp("("+digit_8.source+"{1,3})", "i");
 */
+
 (function () {
     'use strict';
 
@@ -354,7 +353,6 @@
              // if it's a charCode symbol, match with a regexp and move i forward
              case /x/.test(chr)  :
                 var match = hex2.exec(str.slice(i))[1];
-                   console.log(match);
                 chr = String.fromCharCode(parseInt(match, 16));
                 i += match.length; column += match.length;
                 break;
@@ -374,15 +372,23 @@
                 i += match.length-1; column += match.length-1;
                 break;
              default   :
-                throwError(new types.Message(["Escape sequence not supported:", ", \\", chr]),
-                           new Location(sCol, sLine, iStart, i-iStart));
+        throwError(new types.Message(["<definitions>:"
+                                      , line.toString()
+                                      , ":"
+                                      , sCol.toString()
+                                      , ": read: unknown escape sequence \\" +chr+" in string"])
+                   , new Location(sCol, sLine, iStart, i-iStart));
           }
         }
         datum += chr;
       }
 
       if(i >= str.length) {
-        throwError(new types.Message(["read: expected a closing \'\"\' "])
+        throwError(new types.Message(["<definitions>:"
+                                      , line.toString()
+                                      , ":"
+                                      , sCol.toString()
+                                      , ": read: expected a closing \'\"\' "])
                    , new Location(sCol, sLine, iStart, i-iStart));
       }
       var strng = new stringExpr(datum);
@@ -395,11 +401,10 @@
     function readPoundSExp(str, i) {
       var sCol = column, sLine = line, iStart = i, datum;
       i++; column++; // skip over the pound sign
-              
       // Check specially for vector literals, matching #n[...]
-      var vectorMatch = new RegExp("([0-9]*)[\[\(\{]*", "g"),
+      var vectorMatch = new RegExp("([0-9]*)[\[\(\{]", "g"),
           vectorTest = vectorMatch.exec(str.slice(i));
-      if(vectorTest[1].length > 0){
+      if(vectorTest && vectorTest[1].length > 0){
         var size = vectorTest[1],
             sexp = readList(str, i+(size.length));
         datum = new vectorExpr(sexp, size);
@@ -419,9 +424,13 @@
                      i+= datum.location.span-1; break;
           case '|':  datum = readMultiLineComment(str, i-1);
                      i+= datum.location.span; break;
-          case ';':  console.log('reading #;');datum = readSExpComment(str, i+1);
+          case ';':  datum = readSExpComment(str, i+1);
                      i+= datum.location.span+1; break;
-          default: throwError(new types.Message(["Unknown pound-prefixed sexp: #", p]),
+          default: throwError(new types.Message(["<definitions>:"
+                                                 , line.toString()
+                                                 , ":"
+                                                 , (column-1).toString()
+                                                 , ": read: bad syntax `#", p,"'"]),
                               new Location(sCol, sLine, iStart, i-iStart));
          }
       } else {

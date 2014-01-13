@@ -545,7 +545,7 @@
                                       , ": expected at least one clause after cond, but nothing's there"]),
                     sexp.location);
     }
-    var condLocs = [sexp.location.start(), sexp[0].location, sexp.location.end()];
+    var condLocs = [sexp[0].location, sexp.location.start(), sexp.location.end()];
  
     function parseCondCouple(clause) {
       var clauseLocations = [clause.location.start(), clause.location.end()];
@@ -558,26 +558,27 @@
       }
       if(clause.length === 0){
         throwError(new types.Message([new types.MultiPart(sexp[0].val, condLocs, true)
-                                      , ": expected a clause with a question and an answer, but found "
-                                      , new types.ColoredPart("empty part", clause.location)]),
-                    sexp.location);
+                                      , ": expected a clause with a question and an answer, but found an "
+                                      , new types.MultiPart("empty part", clauseLocations, true)]),
+                    clause.location);
       }
       if(clause.length === 1){
         throwError(new types.Message([new types.MultiPart(sexp[0].val, condLocs, true)
                                       , ": expected a clause with a question and an answer, but found a "
                                       , new types.MultiPart("clause", clauseLocations, true)
                                       , " with only "
-                                      , new types.ColoredPart("one part", clause[0].location)]),
-                    sexp.location);
+                                      , new types.MultiPart("one part", [clause[0].location], false)]),
+                    clause.location);
       }
       if(clause.length > 2){
-        var extraLocs = sexp.slice(2).map(function(sexp){ return sexp.location; }),
-            wording = extraLocs.length+" extra "+((extraLocs.length === 1)? "part" : "parts");
+        var extraLocs = clause.map(function(sexp){ return sexp.location; }),
+            wording = extraLocs.length+" parts";
         throwError(new types.Message([new types.MultiPart(sexp[0].val, condLocs, true)
-                                      , ": expected a clause with a question and an answer, but found a "
-                                      , new types.MultiPart("clause", clauseLocations, true)
+                                      , ": expected a clause with a question and an answer, but found "
+                                      , new types.MultiPart("a clause", clauseLocations, true)
+                                      , " with "
                                       , new types.MultiPart(wording, extraLocs, false)]),
-                    sexp.location);
+                    clause.location);
       }
       if(sexpIsCouple(clause)){
         var cpl = new couple(parseExpr(clause[0]), parseExpr(clause[1]));
@@ -588,13 +589,14 @@
  
     return new condExpr(rest(sexp).reduceRight(function (rst, couple) {
        if((isSymbol(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (rst.length > 0)){
-         throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
-                                       , ": found an "
+         throwError(new types.Message([new types.MultiPart(sexp[0].val, condLocs, true)
+                                       , ": "
+                                       , "found an "
                                        , new types.ColoredPart("else clause", couple.location)
                                        , " that isn't the last clause in its cond expression; there is "
                                        , new types.ColoredPart("another clause", rst[0].location)
                                        , " after it"]),
-            sexp.location);
+            couple.location);
        } else {
          return [parseCondCouple(couple)].concat(rst);
        }
@@ -608,8 +610,9 @@
                                       , ": expected at least one clause after case, but nothing's there"]),
                     sexp.location);
     }
+    var caseLocs = [sexp[0].location, sexp.location.start(), sexp.location.end()];
     if(sexp.length === 2){
-        throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+        throwError(new types.Message([new types.MultiPart(sexp[0].val, caseLocs, true)
                                       , ": expected a clause with at least one choice (in parentheses)"
                                       + " and an answer after the expression, but nothing's there"]),
                     sexp.location);
@@ -618,25 +621,25 @@
     function parseCaseCouple(clause) {
       var clauseLocations = [clause.location.start(), clause.location.end()];
       if(!(clause instanceof Array)){
-        throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+        throwError(new types.Message([new types.MultiPart(sexp[0].val, caseLocs, true)
                                       , ": expected a clause with at least one choice (in parentheses), but found "
                                       , new types.ColoredPart("something else", clause.location)]),
                     sexp.location);
       }
       if(clause.length === 0){
-        throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+        throwError(new types.Message([new types.MultiPart(sexp[0].val, caseLocs, true)
                                       , ": expected at least one choice (in parentheses) and an answer, but found an "
                                       , new types.ColoredPart("empty part", clause.location)]),
                     sexp.location);
       }
       if(!(clause[0] instanceof Array)){
-        throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+        throwError(new types.Message([new types.MultiPart(sexp[0].val, caseLocs, true)
                                       , ": expected at least one choice (in parentheses), but found "
                                       , new types.ColoredPart("something else", clause.location)]),
                     sexp.location);
       }
       if(clause.length === 1){
-        throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+        throwError(new types.Message([new types.MultiPart(sexp[0].val, caseLocs, true)
                                       , ": expected a clause with a question and an answer, but found a "
                                       , new types.MultiPart("clause", clauseLocations, true)
                                       , " with only "
@@ -644,7 +647,7 @@
                     sexp.location);
       }
       if(clause.length > 2){
-        throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+        throwError(new types.Message([new types.MultiPart(sexp[0].val, caseLocs, true)
                                       , ": expected only one expression for the answer in the case clause, but found "
                                       , new types.MultiPart("clause", clauseLocations, true)
                                       , collectExtraParts(clause.slice(2))]),
@@ -659,7 +662,7 @@
  
     return new caseExpr(sexp[1], sexp.slice(2).reduceRight(function (rst, couple) {
                if((isSymbol(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (rst.length > 0)){
-                  throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+                  throwError(new types.Message([new types.MultiPart(sexp[0].val, caseLocs, true)
                                                 , "found an "
                                                 , new types.ColoredPart("else clause", couple.location)
                                                 , "that isn't the last clause in its case expression; there is "
