@@ -131,7 +131,7 @@ goog.provide("plt.wescheme.RoundRobin");
           console.log("PARSER OUTPUT (raw and prettyprinted):");
           console.log(AST);
           console.log(AST.join("\n"));
-          try { ////////////////// DESUGAR /////////////////////
+/*          try { ////////////////// DESUGAR /////////////////////
             var ASTandPinfo = desugar(AST),
                 program = ASTandPinfo[0],
                 pinfo = ASTandPinfo[1];
@@ -151,9 +151,9 @@ goog.provide("plt.wescheme.RoundRobin");
             console.log("ANALYSIS ERROR");
             throw e;
           }
-        } catch (e) {
+*/      } catch (e) {
           local_error = e;
-          console.log(local_error);
+//          console.log(local_error);
           onDoneError(local_error);
         }
         // if all systems are go, hit the server
@@ -187,11 +187,11 @@ goog.provide("plt.wescheme.RoundRobin");
                                        onDoneError);
                         }
                     } else {
-                        console.log("SERVER ERROR:");
-                        console.log(errorStruct.message);
+//                        console.log("SERVER ERROR:");
+//                        console.log(errorStruct.message);
                         var local = JSON.parse(local_error)["structured-error"],
                             server= JSON.parse(errorStruct.message)["structured-error"];
-                                              console.log('comparing (local to server)');
+//                                              console.log('comparing (local to server)');
 
                         // remove extraneous spaces and force everything to lowercase
                         // if the results are different, we should log them to the server
