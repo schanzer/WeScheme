@@ -48,7 +48,7 @@ function throwError(msg, loc) {
     } else if(part.location !== undefined){
       return {text: part.text, type: 'ColoredPart', loc: part.location.toJSON()};
     } else if(part.locations !== undefined){
-      return {text: part.text, type: 'MultiPart'
+      return {text: part.text, type: 'MultiPart', solid: part.solid
             , locs: part.locations.map(function(l){return l.toJSON()})};
     }
   }
@@ -87,7 +87,7 @@ var heir = function(p) {
 };
 
 // all Programs, by default, print out their values and have no location
-// anything that behaves differently must override these functions
+// anything that behaves differently must provide their own toString() function
 var Program = function() {
   // -> String
   this.toString = function(){ return this.val.toString(); };
@@ -117,8 +117,7 @@ function defVar(name, expr) {
 };
 defVar.prototype = heir(Program.prototype);
 
-// Variable**S** definition
-// (not yet used)
+// Multi-Variable definition
 function defVars(names, expr) {
   Program.call(this);
   this.names = names;
@@ -356,7 +355,7 @@ function primop(val) {
 };
 primop.prototype = heir(Program.prototype);
 
-// require-url
+// require expression
 function requireExpr(spec) {
   Program.call(this);
   this.spec = spec;
@@ -364,7 +363,7 @@ function requireExpr(spec) {
 };
 requireExpr.prototype = heir(Program.prototype);
 
-// provide
+// provide expression
 function provideStatement(clauses) {
   Program.call(this);
   this.clauses = clauses;

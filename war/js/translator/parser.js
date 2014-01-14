@@ -7,12 +7,11 @@
  
  Parser for http://docs.racket-lang.org/htdp-langs/intermediate-lam.html
  
- * Given an Array of SExps, produce an array of Programs
- * see structures.js for Program types
+ * Given an Array of SExps, produce an array of Programs or a structured error
+ * see structures.js for Program Objects and Error throwing
  
  TODO
  - JSLint
- - multipart error anomalies
  - proper parsing/errors for
     - quoted
     - quasiquoted
@@ -64,17 +63,6 @@
   }
 
 
- //////////////////////////////////////// PARSING ERRORS ////////////////////////////////
- function errorInParsing(sexp, msg){
-    throwError(new types.Message([new types.ColoredPart(sexp[0].val,sexp[0].location)].concat(msg))
-               , sexp.location);
- }
- // convert an array of expressions to one of ColoredParts
- function collectExtraParts(parts){
-    var coloredParts = parts.map(function(sexp){ return new types.ColoredPart("_", sexp.location); }),
-        txt = (coloredParts.length === 1)? " extra part " : " extra parts ";
-    return [coloredParts.length.toString(), txt, "<<"].concat(coloredParts).concat(">>");
- }
   //////////////////////////////////////// DEFINITION PARSING ////////////////////////////////
   // (define-struct ...)
   function isStructDefinition(sexp) {
@@ -647,10 +635,13 @@
                     sexp.location);
       }
       if(clause.length > 2){
+        var extraLocs = clause.map(function(sexp){ return sexp.location; }),
+            wording = extraLocs.length+" parts";
         throwError(new types.Message([new types.MultiPart(sexp[0].val, caseLocs, true)
-                                      , ": expected only one expression for the answer in the case clause, but found "
+                                      , ": expected only one expression for the answer in the case clause, but found a "
                                       , new types.MultiPart("clause", clauseLocations, true)
-                                      , collectExtraParts(clause.slice(2))]),
+                                      , " with "
+                                      , new types.MultiPart(wording, extraLocs, false)]),
                    sexp.location);
       }
       if(sexpIsCouple(clause)){
@@ -785,7 +776,9 @@
          });
     // if it's (require (planet...))
     } else if((sexp[1] instanceof Array) && isSymbolEqualTo(sexp[1][0], "planet")){
-      errorInParsing(sexp, ["Importing PLaneT pacakges is not supported at this time"]);
+      throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+                                    , "Importing PLaneT pacakges is not supported at this time"]),
+                 sexp.location);
     // if it's (require <not-a-string-or-symbol>)
     } else if(!((sexp[1] instanceof symbolExpr) || (sexp[1] instanceof stringExpr))){
       throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
