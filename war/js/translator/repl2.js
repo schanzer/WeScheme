@@ -60,7 +60,9 @@ function readFromRepl(event) {
       console.log(sexp);
       console.log("pretty:\n"+sexpToString(sexp));
     } catch (e) {
-      throw Error("LEXING ERROR\n"+e);
+      console.log(e);
+      console.log(JSON.parse(JSON.parse(e)['structured-error']).message);
+      throw Error("LEXING ERROR\n"+e.toString());
     }
     try {
       console.log("// PARSING: //////////////////////////////////\nraw:");
@@ -69,6 +71,7 @@ function readFromRepl(event) {
       console.log("pretty:");
       console.log(AST.join("\n"));
     } catch (e) {
+      console.log(JSON.parse(JSON.parse(e)['structured-error']).message);
       throw Error("PARSING ERROR\n"+e);
     }
     try {
@@ -80,6 +83,7 @@ function readFromRepl(event) {
       console.log("pinfo:");
       console.log(pinfo);
     } catch (e) {
+      console.log(JSON.parse(JSON.parse(e)['structured-error']).message);
       throw Error("DESUGARING ERROR\n"+e);
     }
     try {
