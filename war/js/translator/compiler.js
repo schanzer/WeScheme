@@ -1,24 +1,38 @@
 /*
  TODO
- - desugar Symbols, callExpr
- - proper handling of 'else' in cond
- - native call to force-boolean-context in if, and, or and cond
- - preserve location information during desugaring
+ - desugar Symbols, callExpr, caseExpr
  - test cases get desugared into native calls (and thunks?)
- - vars defined by 'local' should be temporarily added to the pinfo
- - require
  - implement bytecode structs
+ - how to add struct binding when define-struct is desugared away?
  - compilation
 */
 (function () {
  'use strict';
+ 
+ // tag-application-operator/module: Stx module-name -> Stx
+ // Adjust the lexical context of the func so it refers to the environment of a particular module.
+ function tagApplicationOperator_Module(call_exp, moduleName){
+    var func = call_exp.func,
+        operands = call_exp.args,
+        module = defaultModuleResolver(moduleName),
+        env = compilerStructs.emptyEnv().extendEnv_moduleBinding(module);
+    call_exp.context = env;
+    return call_exp;
+ }
 
- // BINDING STRUCTS ///////////////////////////////////////////////////////
- function provideBindingId(stx){ this.stx = stx;}
- function provideBindingStructId(stx){ this.stx = stx;}
+// forceBooleanContext: symbol-stx stx -> stx
+// Force a boolean runtime test on the given expression.
+ function forceBooleanContext(stx, boolExpr){
+    var runtimeCall = new callExpr(new symbolExpr("verify-boolean-branch-value")
+                                   , [stx, stx.location
+                                    , booleanExpr, booleanExpr.location]);
+    runtimeCall.location = booleanExpr.location;
+    tagApplicationOperator_Module(runtimeCall, 'moby/runtime/kernel/misc');
+ }
  
+ //////////////////////////////////////////////////////////////////////////////
  // DESUGARING ////////////////////////////////////////////////////////////////
- 
+
  // desugarProgram : Listof Programs null/pinfo -> [Listof Programs, pinfo]
  // desugar each program, appending those that desugar to multiple programs
  function desugarProgram(programs, pinfo){
@@ -106,7 +120,7 @@
                                         this.consequence,
                                         this.alternative],
                                        pinfo);
-    this.predicate = exprsAndPinfo[0][0];
+    this.predicate = forceBooleanContext(this, exprsAndPinfo[0][0]);
     this.consequence = exprsAndPinfo[0][1];
     this.alternative = exprsAndPinfo[0][2];
     return [this, exprsAndPinfo[1]];
@@ -138,19 +152,74 @@
  };
  // conds become nested ifs
  condExpr.prototype.desugar = function(pinfo){
-    var expr = this.clauses[this.clauses.length-1].second;
-    for(var i=this.clauses.length-2; i>-1; i--){
-      expr = new ifExpr(this.clauses[i].first,
+    // base case is all-false
+    var expr = new callExpr(new symbolExpr('make-cond-exhausted-expression')
+                            , this.location);
+    for(var i=this.clauses.length-1; i>-1; i--){
+      expr = new ifExpr(forceBooleanContext(this, this.clauses[i].first),
                         this.clauses[i].second,
                         expr);
     }
     return expr.desugar(pinfo);
  };
+ // case become nested ifs
+ caseExpr.prototype.desugar = function(pinfo){
+    var pinfoAndValSym = pinfo.gensym('val'),      // create a symbol 'val'
+        updatedPinfo1 = pinfoAndValSym[0],        // generate pinfo containing 'val'
+        valStx = pinfoAndValSym[1];               // remember the symbolExpr for 'val'
+    valStx.location = this.location;              // give it the same loc as the original expr
+        pinfoAndXSym = updatedPinfo1.gensym('x'), // create another symbol 'x' using pinfo1
+        updatedPinfo2 = pinfoAndXSym[0],          // generate pinfo containing 'x'
+        xStx = pinfoAndXSym[1];                   // remember the symbolExpr for 'x'
+    xStx.location = this.location;                // give it the same loc as the original expr
+ 
+    // predicate: stx
+    var predicateStx = new lambdaExpr([xStx], new callExpr(new symbolExpr('equal?'),
+                                                            xStx, valStx));
+    predicateStx.location = this.expr.location;
+ 
+     // loop: (listof stx) (listof stx) stx stx -> stx
+     function loop(rest, answers, datumLast, answerLast){
+        if(rest.length===0){
+           if(and (datumLast instanceof symbolExpr) (datumLast.val === 'else')){
+              return answerLast
+           } else {
+              var ormapStx = new primop('ormap'),
+                  quoteStx = new quotedExpr(datumLast),
+                  callStx = new callExpr(ormapStx, predicateStx, quoteStx),
+                  voidStx = new symbolExpr('void'),
+                  ifStx = new ifExpr(callStx, answerLast, voidStx);
+               ifStx.location = voidStx.location = callStx.location = this.location;
+               quoteStx.location = ormapStx.location = this.location;
+           }
+        } else {
+              var ormapStx = new primop('ormap'),
+                  quoteStx = new quotedExpr(rest[0]),
+                  callStx = new callExpr(ormapStx, predicateStx, quoteStx),
+                  voidStx = new symbolExpr('void'),
+                  ifStx = new ifExpr(callStx,
+                                     answers[0],
+                                     loop(rest.slice(1),
+                                          answers.slice(1),
+                                          datumLast,
+                                          answerLast));
+               ifStx.location = voidStx.location = callStx.location = this.location;
+               quoteStx.location = ormapStx.location = this.location;
+        }
+    }
+    
+    var translated = new letExpr([new couple(valStx, this.expr)]
+                                 , loop(questions, answers, questionLast, answerLast));
+    translated.location = this.location;
+    translated.desugar(updatedPinfo2);
+ };
  // ands become nested ifs
  andExpr.prototype.desugar = function(pinfo){
     var expr = this.exprs[this.exprs.length-1]; // ASSUME length >=2!!!
     for(var i=this.exprs.length-2; i>-1; i--){
-      expr = new ifExpr(this.exprs[i], expr, new booleanExpr(new symbolExpr("false")));
+      expr = new ifExpr(forceBooleanContext(this, this.exprs[i])
+                        , forceBooleanContext(this, expr)
+                        , new booleanExpr(new symbolExpr("false")));
     }
     return expr.desugar(pinfo);
  };
@@ -164,9 +233,13 @@
     function convertToNestedIf(restAndPinfo, expr){
       var pinfoAndTempSym = pinfo.gensym('tmp'),
           tmpSym = pinfoAndTempSym[1],
+          expr = forceBooleanContext(this, expr), // force a boolean context on the value
           tmpBinding = new couple(tmpSym, expr); // (let (tmpBinding) (if tmpSym tmpSym (...))
       tmpBinding.location = expr.location;
-      var let_exp = new letExpr([tmpBinding], new ifExpr(tmpSym, tmpSym, restAndPinfo[0]));
+      var let_exp = new letExpr([tmpBinding]
+                                , new ifExpr(tmpSym
+                                             , tmpSym
+                                             , forceBooleanContext(this, restAndPinfo[0])));
       let_exp.location = expr.location;
       var let_expAndPinfo = let_exp.desugar(pinfoAndTempSym[0])
       return [let_expAndPinfo[0], restAndPinfo[1]];
@@ -174,10 +247,10 @@
     var exprsAndPinfo = this.exprs.reduceRight(convertToNestedIf, [expr, pinfo]);
     return [exprsAndPinfo[0], exprsAndPinfo[1]];
  };
- symbolExpr.prototype.desugar = function(pinfo){
-    return this;
- };
  
+ //////////////////////////////////////////////////////////////////////////////
+ // COLLECT DEFINITIONS ///////////////////////////////////////////////////////
+
  // extend the Program class to collect definitions
  // Program.collectDefnitions: pinfo -> pinfo
  Program.prototype.collectDefinitions = function(pinfo){ return pinfo; };
@@ -216,50 +289,100 @@
         predicate = bf(predicateId, false, 1, false, loc),
         selectors = selectorIds.map(function(id){return bf(id, false, 1, false, loc);}),
         mutators  = mutatorIds.map(function(id){return bf(id, false, 2, false, loc);}),
-        structure = new bindingStructure(id, false, fields, constructorId,
-                                                predicateId, selectorIds, mutatorIds, loc),
+        structure = new bindingStructure(id, false, fields, constructorId, predicateId
+                                        , selectorIds, mutatorIds, loc),
         bindings = [structure, constructor, predicate].concat(selectors, mutators);
     return pinfo.accumulateDefinedBindings(bindings, pinfo, this.location);
  };
+ // When we hit a require, we have to extend our environment to include the list of module
+ // bindings provided by that module.
  requireExpr.prototype.collectDefinitions = function(pinfo){
- }
+    throw "collecting definitions from require is not yet implemented (see compiler.js)";
+    var errorMessage =  ["require", ": ", "moby-error-type:unknown-module: ", this.spec],
+        moduleName = pinfo.modulePathResolver(this.spec, this.currentModulePath);
+    // if it's an invalid moduleName, throw an error
+    if(!moduleName){
+      throwError(errorMessage, this.location);
+    }
+    var moduleBinding = pinfo.moduleResolver(moduleName);
+    // if it's an invalid moduleBinding, throw an error
+    if(!moduleBinding){
+      throwError(errorMessage, this.location);
+    }
  
+    // if everything is okay, add the module bindings to this pinfo and return
+    pinfo.accumulateModule(pinfo.accumulateModuleBindings(moduleBinding.bindings));
+    return pinfo;
+ };
+ localExpr.prototype.collectDefinitions = function(pinfo){
+    // remember previously defined names, so we can revert to them later
+    // in the meantime, scan the body
+    var prevKeys = pinfo.definedNames.keys(),
+        localPinfo= this.defs.reduce(function(pinfo, p){
+                                        return p.collectDefinitions(pinfo);
+                                        }
+                                        , pinfo),
+        newPinfo  = this.body.collectDefinitions(localPinfo),
+        newKeys = newPinfo.definedNames.keys();
+    // now that the body is scanned, forget all the new definitions
+    prev.forEach(function(k){
+                  if(prevKeys.indexOf(k) === -1) newPinfo.definedNames.remove(k);
+                });
+    return newPinfo;
+ };
+ 
+ // BINDING STRUCTS ///////////////////////////////////////////////////////
+ function provideBindingId(symbl){ this.symbl = symbl;}
+ function provideBindingStructId(symbl){ this.symbl = symbl;}
+
+ //////////////////////////////////////////////////////////////////////////////
+ // COLLECT PROVIDES //////////////////////////////////////////////////////////
+
  // extend the Program class to collect provides
  // Program.collectProvides: pinfo -> pinfo
  Program.prototype.collectProvides = function(pinfo){
     return pinfo;
  };
  provideStatement.prototype.collectProvides = function(pinfo){
-    // collectProvidesFromClause : clause pinfo -> pinfo
-    function collectProvidesFromClause(clause, pinfo){
+    var that = this;
+    // collectProvidesFromClause : pinfo clause -> pinfo
+    function collectProvidesFromClause(pinfo, clause){
       // if it's a symbol, make sure it's defined (otherwise error)
       if (clause instanceof symbolExpr){
         if(pinfo.definedNames.containsKey(clause.val)){
-          pinfo.updateProvidedNames(pinfo.providedNames.put(clause.val, makeProvideBindingId(clause)));
+          pinfo.providedNames.put(clause.val, new provideBindingId(clause));
+          return pinfo;
         } else {
-          throwError(types.Message([new ColoredPart(clause.val, clause.location),
-                                    ": provided name not defined"]));
+          throwError(new types.Message(["The name '"
+                                        , new types.ColoredPart(clause.toString(), clause.location)
+                                        , "', is not defined in the program, and cannot be provided."])
+                     , clause.location);
         }
-      // if it's a struct provide and the format is valid, make sure it's defined (otherwise error)
-      } else if(clause[0] === "struct-out" && clause.length === 2 && clause[1] instanceof symbolExpr){
+      // if it's an array, make sure the struct is defined (otherwise error)
+      // NOTE: ONLY (struct-out id) IS SUPPORTED AT THIS TIME
+      } else if(clause instanceof Array){
           if(pinfo.definedNames.containsKey(clause[1].val) &&
-             isBindingStructure(pinfo.definedNames.containsKey(clause[1].val))){
-              var b = makeProvideBindingStructId(clause[1]);
-              pinfo.updateProvidedNames(pinfo.providedNames.put(clause.val, b));
+             (pinfo.definedNames.get(clause[1].val) instanceof bindingStructure)){
+              var b = new provideBindingStructId(clause[1]);
+              pinfo.providedNames.put(clause.val, b);
+              return pinfo;
           } else {
-              throwError(types.Message([new ColoredPart(clause.val, clause[1].location),
-                                        ": provided struct not defined"]));
+            throwError(new types.Message(["The name '"
+                                          , new types.ColoredPart(clause[1].toString(), clause[1].location)
+                                          , "', is not defined in the program, and cannot be provided"])
+                       , clause.location);
           }
       // anything with a different format throws an error
       } else {
-        throwError(types.Message(["provide doesn't recognize the syntax of the clause: ",
-                                  new ColoredPart(clause.val, clause.location)]));
+        throw "Impossible: all invalid provide clauses should have been filtered out!";
       }
     }
     return this.clauses.reduce(collectProvidesFromClause, pinfo);
   };
  
- 
+ //////////////////////////////////////////////////////////////////////////////
+ // ANALYZE USES //////////////////////////////////////////////////////////////
+
  // extend the Program class to analyzing uses
  // Program.analyzeUses: pinfo -> pinfo
  Program.prototype.analyzeUses = function(pinfo, env){
@@ -288,10 +411,20 @@
     return this.body.analyzeUses(pinfo, env2);
  };
  localExpr.prototype.analyzeUses = function(pinfo, env){
-    var nestedPinfo = this.defs.reduce(function(p, d){return d.analyzeUses(p);}, pinfo),
-        body_pinfo = this.body.analyzeUses(nestedPinfo, nestedPinfo.env);
-    body_pinfo.env = pinfo.env;
-    return body_pinfo;
+    // remember previously used bindings, so we can revert to them later
+    // in the meantime, scan the body
+    var prevKeys = pinfo.usedBindingsHash.keys(),
+        localPinfo= this.defs.reduce(function(pinfo, p){
+                                        return p.analyzeUses(pinfo);
+                                        }
+                                        , pinfo),
+        newPinfo  = this.body.analyzeUses(localPinfo),
+        newKeys = newPinfo.usedBindingsHash.keys();
+    // now that the body is scanned, forget all the new definitions
+    prev.forEach(function(k){
+                  if(prevKeys.indexOf(k) === -1) newPinfo.usedBindingsHash.remove(k);
+                });
+    return newPinfo;
  };
  callExpr.prototype.analyzeUses = function(pinfo, env){
     return [this.func].concat(this.args).reduce(function(p, arg){
@@ -312,6 +445,8 @@
     }
  };
 
+ //////////////////////////////////////////////////////////////////////////////
+ // COMPILATION ///////////////////////////////////////////////////////////////
  
  // extend the Program class to include compilation
  // compile: pinfo -> [bytecode, pinfo]
@@ -503,8 +638,8 @@
     // The toplevel is going to include all of the defined identifiers in the pinfo
     // The environment will refer to elements in the toplevel.
     var toplevelPrefixAndEnv = makeModulePrefixAndEnv(pinfo),
-      toplevelPrefix = toplevelPrefixAndEnv[0],
-      env = toplevelPrefixAndEnv[1];
+        toplevelPrefix = toplevelPrefixAndEnv[0],
+        env = toplevelPrefixAndEnv[1];
    
     // pull out separate program components for ordered compilation
     var defns    = program.filter(isDefinition),
@@ -512,7 +647,7 @@
         provides = program.filter((function(p){return (p instanceof provideStatement);})),
         exprs    = program.filter(isExpression);
  
-    // Program [bytecodes, pinfo, env?] -> [bytecodes, pinfo]
+    // [bytecodes, pinfo, env?] Program -> [bytecodes, pinfo]
     // compile the program, then add the bytecodes and pinfo information to the acc
     function compileAndCollect(acc, p){
       var compiledProgramAndPinfo = p.compile(acc[1]),
@@ -532,7 +667,7 @@
         pinfo = compiledExpressionsAndPinfo[1];
  
     // generate the bytecode for the program and return it, along with the program info
-    var bytecode = bcode-make-seq(compiled-requires.concat(compiledDefinitions, compiledExpressions));
+    var bytecode = bcode-make-seq(compiledRequires.concat(compiledDefinitions, compiledExpressions));
     return [bcode-make-compilation-top(0, toplevel-prefix, bytecode), pinfo];
  }
  /////////////////////
