@@ -55,42 +55,6 @@
         quotes          = /[\'`,]/,
         oct3            = new RegExp("([0-7]{1,3})", "i");
 
-/*        // number lexing from http://docs.racket-lang.org/reference/reader.html#(part._parse-number)
-        exactness       = new RegExp("[#e|#i]{0,1}", "i"),
-        sign            = new RegExp("[-|+]"),
-        expMark_16      = new RegExp("[s|1]"),
-        expMark_10      = new RegExp("[s|1]"),
-        digit_2         = new RegExp("[0-1]"),
-        digit_8         = new RegExp("[0-7]"),
-        digit_10        = new RegExp("[0-9]"),
-        digit_16        = new RegExp("[0-9a-f]","i"),
-        digits_hash     = new RegExp("["+digit_16.source+"]+"+"#*"+"]"),
-        unsignedInteger = new RegExp("("+digit_16.source+")+"),
-        unsignedRational= new RegExp("["+unsignedInteger.source+"(\/"+unsignedInteger.source+"){0,1}]"),
-        exactInteger    = new RegExp("["+sign.source+"{0,1}"+unsignedInteger.source+"]"),
-        exactRational   = new RegExp("["+sign.source+"{0,1}"+unsignedRational.source+"]"),
-        exactComplex    = new RegExp("["+exactRational.source+sign.source+unsignedRational.source+"i]"),
-        inexactSimple   = new RegExp("["+digits_hash.source+"[.]{0,1}"+"#*"+
-                                     "|"+unsignedInteger.source+"{0,1}"+"."+digits_hash.source+
-                                     "|"+digits_hash.source+"/"+digits_hash.source+"]"),
-        inexactNormal   = new RegExp("["+inexactSimple.source +
-                                        "["+expMark_16.source + exactInteger.source+"]{0,1}"+"]"),
-        inexactReal     = new RegExp("["+sign.source+"{0,1}"+inexactNormal.source +
-                                     "|"+sign.source+inexactSpecial+"]"),
-        inexactSpecial  = new RegExp("["+"inf.0|nan.0|inf.f|nan.f"+"]"),
-        inexactUnsigned = new RegExp("["+inexactNormal.source+"|"+inexactSpecial.source+"]"),
-        digits_hash     = new RegExp("["+digit_16.source+"+"+"#*"+"]"),
-        inexactComplex  = new RegExp("["+inexactReal.source+"{0,1}"+sign.source+inexactUnsigned.source+"i"+
-                                     "|"+inexactReal.source+"@"+inexactReal.source+"]"),
-        inexact         = new RegExp("["+inexactReal.source+"|"+inexactComplex.source+"]"),
-        exact           = new RegExp("["+exactRational+"|"+exactComplex+"]", "i"),
-        number          = new RegExp("["+exact +"|"+ inexact+"]", "i"),
-        general         = new RegExp(exactness.source+number.source, "i"),
-        hex2            = new RegExp("("+digit_16.source+"{1,2})", "i"),
-        hex4            = new RegExp("("+digit_16.source+"{1,4})", "i"),
-        hex8            = new RegExp("("+digit_16.source+"{1,8})", "i"),
-*/
-
 (function () {
     'use strict';
 
@@ -419,13 +383,23 @@
           case 'T':  datum = new booleanExpr("true"); i++; break;
           case 'f':  // test for both forms of false
           case 'F':  datum = new booleanExpr("false"); i++; break;
+          // for comments, start reading after the semicolon
+          case ';':  datum = readSExpComment(str, i+1);
+                     i+= datum.location.span+1; break;
           // for all others, back up a character and keep reading
           case '\\': datum = readChar(str, i-1);
                      i+= datum.location.span-1; break;
           case '|':  datum = readMultiLineComment(str, i-1);
                      i+= datum.location.span; break;
-          case ';':  datum = readSExpComment(str, i+1);
-                     i+= datum.location.span+1; break;
+          // if it's a number
+          case 'e':
+          case 'i':
+          case 'b':
+          case 'o':
+          case 'd':
+          case 'x':  datum = readSymbolOrNumber(str, i-1);
+                    console.log(datum);
+                    if(datum){ i+= datum.location.span; break;}
           default: throwError(new types.Message(["<definitions>:"
                                                  , line.toString()
                                                  , ":"
@@ -559,32 +533,36 @@
       var sCol = column, sLine = line, iStart = i;
       var p = str.charAt(i), datum = "";
 
-      // if it *could* be the first char in a number, chew until we hit whitespace
-      if(/[+-]/.test(p) || p==="." || /[0-9]/.test(p)){
-        while(i < str.length &&
-              !isWhiteSpace(str.charAt(i)) &&
-              !isDelim(str.charAt(i))) {
+      // snip off the next token, and let's analyze it...
+      while(i < str.length && !isWhiteSpace(str.charAt(i)) && !isDelim(str.charAt(i))) {
            // check for newlines
            if(str.charAt(i) === "\n"){ line++; column = 0;}
            datum += str.charAt(i++);
-          column++;
-        }
-        var num = jsnums.fromString(datum);
-        // if the string we've seen IS a Number, return it as a numberExpr. Otherwise bail
-         if(num){
-           var sexp = new numberExpr(datum);
-           sexp.location = new Location(sCol, sLine, iStart, i-iStart);
-           return sexp;
-         }
+           column++;
       }
-                   
-      // if it was never a number (or turned out not to be), return the Symbol
-      var symbl = readSymbol(str,i,datum);
-      return symbl;
-    }
+
+      // attempt to parse using jsnums.fromString(), assign to sexp and add location
+      // if it's a bad number, throw an error
+      try{
+        var numValue = jsnums.fromString(datum);
+        if(numValue){
+          var sexp = new numberExpr(numValue);
+          sexp.location = new Location(sCol, sLine, iStart, i-iStart);
+          return sexp;
+        } else {
+          // if it was never a number (or turned out not to be), return the Symbol
+          var symbl = readSymbol(str,i,datum);
+          return symbl;
+        }
+      // if it's not a number
+      } catch(e) {
+        throwError(new types.Message(["read: bad number (datum)"])
+                  ,new Location(sCol, sLine, iStart, i-iStart));
+      }
+     }
 
     // readSymbol : String Number String -> symbolExpr
-    // reads in a symbol which can be any charcter except for certain delimiters
+    // reads in a symbol which can be any character except for certain delimiters
     // as described in isValidSymbolCharP
     function readSymbol(str, i, datum) {
       var sCol = column-datum.length, sLine = line, iStart = i-datum.length, symbl;
