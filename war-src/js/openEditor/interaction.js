@@ -674,7 +674,6 @@ WeSchemeInteractions = (function () {
     };
 
     WeSchemeInteractions.prototype.handleError = function(err) {
-                        console.log(err);
         this.addToInteractions(renderErrorAsDomNode(this, err));
         this.addToInteractions("\n");
     };
@@ -833,7 +832,6 @@ WeSchemeInteractions = (function () {
             var baseColor = currColor;
             var box;
             if(part.locations.length > 0){
-                        console.log(part.location);
                 if (part.solid || part.locations.length === 1) {
                     for (i = 0; i < part.locations.length; i++) {
                         locTints.push(baseColor);
@@ -1035,7 +1033,6 @@ WeSchemeInteractions = (function () {
             }
         } 
         dom.appendChild(msgDom);
-                        console.log(dom);
         if(err.structuredError && err.structuredError.message) {
             var link = that.createLocationHyperlink(err.structuredError.location);
             dom.appendChild(link);
