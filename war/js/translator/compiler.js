@@ -1,6 +1,6 @@
 /*
  TODO
- - desugar Symbols, callExpr, caseExpr
+ - desugar Symbols, callExpr
  - test cases get desugared into native calls (and thunks?)
  - implement bytecode structs
  - how to add struct binding when define-struct is desugared away?
@@ -20,14 +20,15 @@
     return call_exp;
  }
 
-// forceBooleanContext: symbol-stx stx -> stx
+// forceBooleanContext: symbol-stx, loc, bool -> stx
 // Force a boolean runtime test on the given expression.
- function forceBooleanContext(stx, boolExpr){
+ function forceBooleanContext(symbl, loc, boolExpr){
     var runtimeCall = new callExpr(new symbolExpr("verify-boolean-branch-value")
-                                   , [stx, stx.location
-                                    , booleanExpr, booleanExpr.location]);
+                                   , [symbl, loc.toVector()
+                                      ,boolExpr, boolExpr.location.toVector()]);
     runtimeCall.location = booleanExpr.location;
-    tagApplicationOperator_Module(runtimeCall, 'moby/runtime/kernel/misc');
+//    tagApplicationOperator_Module(runtimeCall, 'moby/runtime/kernel/misc');
+    return runtimeCall;
  }
  
  //////////////////////////////////////////////////////////////////////////////
@@ -120,7 +121,7 @@
                                         this.consequence,
                                         this.alternative],
                                        pinfo);
-    this.predicate = forceBooleanContext(this, exprsAndPinfo[0][0]);
+    this.predicate = forceBooleanContext("if", this.location, exprsAndPinfo[0][0]);
     this.consequence = exprsAndPinfo[0][1];
     this.alternative = exprsAndPinfo[0][2];
     return [this, exprsAndPinfo[1]];
@@ -156,7 +157,7 @@
     var expr = new callExpr(new symbolExpr('make-cond-exhausted-expression')
                             , this.location);
     for(var i=this.clauses.length-1; i>-1; i--){
-      expr = new ifExpr(forceBooleanContext(this, this.clauses[i].first),
+      expr = new ifExpr(forceBooleanContext("cond", this.location, this.clauses[i].first),
                         this.clauses[i].second,
                         expr);
     }
@@ -164,53 +165,55 @@
  };
  // case become nested ifs, with ormap as the predicate
  caseExpr.prototype.desugar = function(pinfo){
-    var that = this;
     var pinfoAndValSym = pinfo.gensym('val'),      // create a symbol 'val'
         updatedPinfo1 = pinfoAndValSym[0],        // generate pinfo containing 'val'
         valStx = pinfoAndValSym[1];               // remember the symbolExpr for 'val'
-    valStx.location = this.location;              // give it the same loc as the original expr
     var pinfoAndXSym = updatedPinfo1.gensym('x'), // create another symbol 'x' using pinfo1
         updatedPinfo2 = pinfoAndXSym[0],          // generate pinfo containing 'x'
         xStx = pinfoAndXSym[1];                   // remember the symbolExpr for 'x'
-    xStx.location = this.location;                // give it the same loc as the original expr
  
-    // This is predicate we'll be applying using ormap
-    var predicateStx = new lambdaExpr([xStx], new callExpr(new symbolExpr('equal?'),
-                                                            xStx, valStx));
-    predicateStx.location = this.expr.location;
-
-    // as a base expression, return either the else clause or void
+    // as a base expression, use either the else's second part or void
     var expr, clauses = this.clauses, lastClause = clauses[this.clauses.length-1];
     if((lastClause.first instanceof symbolExpr) && (lastClause.val === 'else')){
-      baseExpr = lastClause.second;
+      expr = lastClause.second;
       clauses = this.clauses.slice(this.clauses.length-2);
     } else {
       expr = new symbolExpr('void');
     }
 
+    // This is predicate we'll be applying using ormap: (lambda (x) (equal? x val))
+    var predicateStx = new lambdaExpr([xStx], new callExpr(new symbolExpr('equal?'),
+                                                          [xStx, valStx]));
+
+    var stxs = [valStx, xStx, predicateStx]; // track all the syntax we've created
+ 
     // generate (if (ormap <predicate> (quote clause.first)) clause.second base)
     function processClause(base, clause){
       var ormapStx = new primop('ormap'),
           quoteStx = new quotedExpr(clause.first),
-          callStx = new callExpr(ormapStx, predicateStx, quoteStx),
+          callStx = new callExpr(ormapStx, [predicateStx, quoteStx]),
           ifStx = new ifExpr(callStx, clause.second, base);
-      ifStx.location = that.location;
-      callStx.location = that.location;
-      quoteStx.location = that.location;
-      ormapStx.location = that.location;
+      stxs = stxs.concat([ormapStx, callStx, quoteStx, ifStx]);
       return ifStx;
     }
 
-    expr = clauses.reduceRight(processClause, expr);
-    expr.location = this.location;
-    return expr.desugar(updatedPinfo2);
+    // build the body of the let by decomposing cases into nested ifs
+    var binding = new couple(valStx, this.expr),
+        body = clauses.reduceRight(processClause, expr),
+        letExp = new letExpr([binding], body);
+    stxs = stxs.concat([binding, body,letExp]);
+
+    // assign location to every stx element
+    var loc = this.location;
+    stxs.forEach(function(stx){stx.location = loc;});
+    return letExp.desugar(updatedPinfo2);
  };
  // ands become nested ifs
  andExpr.prototype.desugar = function(pinfo){
     var expr = this.exprs[this.exprs.length-1];
     for(var i=this.exprs.length-2; i>-1; i--){ // ASSUME length >=2!!!
-      expr = new ifExpr(forceBooleanContext(this, this.exprs[i])
-                        , forceBooleanContext(this, expr)
+      expr = new ifExpr(forceBooleanContext("and", this.location, this.exprs[i])
+                        , forceBooleanContext("and", this.location, this, expr)
                         , new booleanExpr(new symbolExpr("false")));
     }
     return expr.desugar(pinfo);
@@ -225,13 +228,13 @@
     function convertToNestedIf(restAndPinfo, expr){
       var pinfoAndTempSym = pinfo.gensym('tmp'),
           tmpSym = pinfoAndTempSym[1],
-          expr = forceBooleanContext(this, expr), // force a boolean context on the value
+          expr = forceBooleanContext("or", this.location, expr), // force a boolean context on the value
           tmpBinding = new couple(tmpSym, expr); // (let (tmpBinding) (if tmpSym tmpSym (...))
       tmpBinding.location = expr.location;
       var let_exp = new letExpr([tmpBinding]
                                 , new ifExpr(tmpSym
                                              , tmpSym
-                                             , forceBooleanContext(this, restAndPinfo[0])));
+                                             , forceBooleanContext("or", this.location, restAndPinfo[0])));
       let_exp.location = expr.location;
       var let_expAndPinfo = let_exp.desugar(pinfoAndTempSym[0])
       return [let_expAndPinfo[0], restAndPinfo[1]];

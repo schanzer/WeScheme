@@ -208,7 +208,6 @@ function condExpr(clauses) {
 
 // Case expression
 function caseExpr(expr, clauses) {
-  console.log(clauses);
   Program.call(this);
   this.expr = expr;
   this.clauses = clauses;
@@ -282,7 +281,7 @@ function vectorExpr(vals, size) {
   this.size = size;
   this.toString = function(){
     var strVals = this.vals.map(function(v){return v.toString();});
-    return "#"+this.size+"("+strVals.join(" ")+")" ;
+    return "#"+this.size.toString()+"("+strVals.join(" ")+")" ;
   };
 };
 vectorExpr.prototype = heir(Program.prototype);

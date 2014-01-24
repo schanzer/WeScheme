@@ -70,6 +70,12 @@
       this.toString = function(){
         return "Loc("+this.sCol+", "+this.sLine+", "+this.offset+","+this.span+")";
       };
+      this.toVector = function(){
+        return new vectorExpr([new numberExpr(this.sCol), new numberExpr(this.sLine)
+                              ,new numberExpr(this.offset), new numberExpr(this.span)
+                              ,(this.source || "<definitions>")]
+                             ,new numberExpr(5));
+      };
       this.toJSON = function(){
         return {line: this.sLine.toString(), id: this.source || "<definitions>", span: this.span.toString(),
                offset: (this.offset+1).toString(), column: this.sCol.toString()};
