@@ -132,9 +132,9 @@
       var def = new defVar(b.first, b.second);
       def.location = b.location;
       return def};
-    var local_exp = new localExpr(this.bindings.map(bindingToDefn), this.body).desugar(pinfo);
-    local_exp.location = this.location;
-    return local_exp;
+    var localAndPinfo = new localExpr(this.bindings.map(bindingToDefn), this.body).desugar(pinfo);
+    localAndPinfo[0].location = this.location;
+    return localAndPinfo;
  };
  // lets become calls
  letExpr.prototype.desugar = function(pinfo){
@@ -162,61 +162,53 @@
     }
     return expr.desugar(pinfo);
  };
- // case become nested ifs
+ // case become nested ifs, with ormap as the predicate
  caseExpr.prototype.desugar = function(pinfo){
+    var that = this;
     var pinfoAndValSym = pinfo.gensym('val'),      // create a symbol 'val'
         updatedPinfo1 = pinfoAndValSym[0],        // generate pinfo containing 'val'
         valStx = pinfoAndValSym[1];               // remember the symbolExpr for 'val'
     valStx.location = this.location;              // give it the same loc as the original expr
-        pinfoAndXSym = updatedPinfo1.gensym('x'), // create another symbol 'x' using pinfo1
+    var pinfoAndXSym = updatedPinfo1.gensym('x'), // create another symbol 'x' using pinfo1
         updatedPinfo2 = pinfoAndXSym[0],          // generate pinfo containing 'x'
         xStx = pinfoAndXSym[1];                   // remember the symbolExpr for 'x'
     xStx.location = this.location;                // give it the same loc as the original expr
  
-    // predicate: stx
+    // This is predicate we'll be applying using ormap
     var predicateStx = new lambdaExpr([xStx], new callExpr(new symbolExpr('equal?'),
                                                             xStx, valStx));
     predicateStx.location = this.expr.location;
- 
-     // loop: (listof stx) (listof stx) stx stx -> stx
-     function loop(rest, answers, datumLast, answerLast){
-        if(rest.length===0){
-           if(and (datumLast instanceof symbolExpr) (datumLast.val === 'else')){
-              return answerLast
-           } else {
-              var ormapStx = new primop('ormap'),
-                  quoteStx = new quotedExpr(datumLast),
-                  callStx = new callExpr(ormapStx, predicateStx, quoteStx),
-                  voidStx = new symbolExpr('void'),
-                  ifStx = new ifExpr(callStx, answerLast, voidStx);
-               ifStx.location = voidStx.location = callStx.location = this.location;
-               quoteStx.location = ormapStx.location = this.location;
-           }
-        } else {
-              var ormapStx = new primop('ormap'),
-                  quoteStx = new quotedExpr(rest[0]),
-                  callStx = new callExpr(ormapStx, predicateStx, quoteStx),
-                  voidStx = new symbolExpr('void'),
-                  ifStx = new ifExpr(callStx,
-                                     answers[0],
-                                     loop(rest.slice(1),
-                                          answers.slice(1),
-                                          datumLast,
-                                          answerLast));
-               ifStx.location = voidStx.location = callStx.location = this.location;
-               quoteStx.location = ormapStx.location = this.location;
-        }
+
+    // as a base expression, return either the else clause or void
+    var expr, clauses = this.clauses, lastClause = clauses[this.clauses.length-1];
+    if((lastClause.first instanceof symbolExpr) && (lastClause.val === 'else')){
+      baseExpr = lastClause.second;
+      clauses = this.clauses.slice(this.clauses.length-2);
+    } else {
+      expr = new symbolExpr('void');
     }
-    
-    var translated = new letExpr([new couple(valStx, this.expr)]
-                                 , loop(questions, answers, questionLast, answerLast));
-    translated.location = this.location;
-    translated.desugar(updatedPinfo2);
+
+    // generate (if (ormap <predicate> (quote clause.first)) clause.second base)
+    function processClause(base, clause){
+      var ormapStx = new primop('ormap'),
+          quoteStx = new quotedExpr(clause.first),
+          callStx = new callExpr(ormapStx, predicateStx, quoteStx),
+          ifStx = new ifExpr(callStx, clause.second, base);
+      ifStx.location = that.location;
+      callStx.location = that.location;
+      quoteStx.location = that.location;
+      ormapStx.location = that.location;
+      return ifStx;
+    }
+
+    expr = clauses.reduceRight(processClause, expr);
+    expr.location = this.location;
+    return expr.desugar(updatedPinfo2);
  };
  // ands become nested ifs
  andExpr.prototype.desugar = function(pinfo){
-    var expr = this.exprs[this.exprs.length-1]; // ASSUME length >=2!!!
-    for(var i=this.exprs.length-2; i>-1; i--){
+    var expr = this.exprs[this.exprs.length-1];
+    for(var i=this.exprs.length-2; i>-1; i--){ // ASSUME length >=2!!!
       expr = new ifExpr(forceBooleanContext(this, this.exprs[i])
                         , forceBooleanContext(this, expr)
                         , new booleanExpr(new symbolExpr("false")));
