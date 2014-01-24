@@ -22,9 +22,6 @@
  
  TODO
  - JSLint
- - better lexing of numbers: http://docs.racket-lang.org/reference/reader.html#(part._parse-number)
- - quote and quasiquote
- - unclosed string and #q don't throw the right error struct
  */
 
 //////////////////////////////////////////////////////////////////////////////
@@ -71,7 +68,7 @@
       this.start  = function(){ return new Location("", "", this.offset, 1); };
       this.end    = function(){ return new Location("", "", this.offset+this.span-1, 1); };
       this.toString = function(){
-        return "start ("+this.sCol+", "+this.sLine+"), end ("+this.eCol+","+this.eLine+") index "+this.i;
+        return "Loc("+this.sCol+", "+this.sLine+", "+this.offset+","+this.span+")";
       };
       this.toJSON = function(){
         return {line: this.sLine.toString(), id: this.source || "<definitions>", span: this.span.toString(),
