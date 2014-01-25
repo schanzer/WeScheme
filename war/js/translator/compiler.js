@@ -1,6 +1,8 @@
 /*
  TODO
  - desugar Symbols, callExpr
+ - check for else base case for cond
+ - tagApplicationOperator_Module
  - test cases get desugared into native calls (and thunks?)
  - implement bytecode structs
  - how to add struct binding when define-struct is desugared away?
@@ -20,12 +22,14 @@
     return call_exp;
  }
 
-// forceBooleanContext: symbol-stx, loc, bool -> stx
+// forceBooleanContext: str, loc, bool -> stx
 // Force a boolean runtime test on the given expression.
- function forceBooleanContext(symbl, loc, boolExpr){
+ function forceBooleanContext(str, loc, boolExpr){
     var runtimeCall = new callExpr(new symbolExpr("verify-boolean-branch-value")
-                                   , [symbl, loc.toVector()
-                                      ,boolExpr, boolExpr.location.toVector()]);
+                                   , [new quotedExpr(new symbolExpr(str))
+                                      , new quotedExpr(loc.toVector())
+                                      , boolExpr
+                                      , new quotedExpr(boolExpr.location.toVector())]);
     runtimeCall.location = booleanExpr.location;
 //    tagApplicationOperator_Module(runtimeCall, 'moby/runtime/kernel/misc');
     return runtimeCall;
@@ -155,11 +159,10 @@
  condExpr.prototype.desugar = function(pinfo){
     // base case is all-false
     var expr = new callExpr(new symbolExpr('make-cond-exhausted-expression')
-                            , this.location);
+                            , new quotedExpr(this.location.toVector()));
     for(var i=this.clauses.length-1; i>-1; i--){
-      expr = new ifExpr(forceBooleanContext("cond", this.location, this.clauses[i].first),
-                        this.clauses[i].second,
-                        expr);
+      expr = new ifExpr(this.clauses[i].first, this.clauses[i].second, expr);
+      expr.location = this.location;
     }
     return expr.desugar(pinfo);
  };
@@ -211,36 +214,36 @@
  // ands become nested ifs
  andExpr.prototype.desugar = function(pinfo){
     var expr = this.exprs[this.exprs.length-1];
-    for(var i=this.exprs.length-2; i>-1; i--){ // ASSUME length >=2!!!
-      expr = new ifExpr(forceBooleanContext("and", this.location, this.exprs[i])
-                        , forceBooleanContext("and", this.location, this, expr)
-                        , new booleanExpr(new symbolExpr("false")));
+    for(var i= this.exprs.length-2; i>-1; i--){ // ASSUME length >=2!!!
+      expr = new ifExpr(this.exprs[i], expr, new booleanExpr(new symbolExpr("false")));
+      expr.location = this.location;
     }
     return expr.desugar(pinfo);
  };
  // ors become nested lets-with-if-bodies
  orExpr.prototype.desugar = function(pinfo){
     // grab the last expr, and remove it from the list and desugar
-    var expr = this.exprs.pop();
+    var expr = this.exprs.pop(),
+        that = this;
  
     // given a desugared chain, add this expr to the chain
     // we optimize the predicate/consequence by binding the expression to a temp symbol
     function convertToNestedIf(restAndPinfo, expr){
       var pinfoAndTempSym = pinfo.gensym('tmp'),
+          exprLoc = expr.location,
           tmpSym = pinfoAndTempSym[1],
-          expr = forceBooleanContext("or", this.location, expr), // force a boolean context on the value
+          expr = forceBooleanContext("or", exprLoc, expr), // force a boolean context on the value
           tmpBinding = new couple(tmpSym, expr); // (let (tmpBinding) (if tmpSym tmpSym (...))
-      tmpBinding.location = expr.location;
-      var let_exp = new letExpr([tmpBinding]
-                                , new ifExpr(tmpSym
-                                             , tmpSym
-                                             , forceBooleanContext("or", this.location, restAndPinfo[0])));
-      let_exp.location = expr.location;
-      var let_expAndPinfo = let_exp.desugar(pinfoAndTempSym[0])
-      return [let_expAndPinfo[0], restAndPinfo[1]];
+      tmpSym.location = exprLoc;
+      tmpBinding.location = exprLoc;
+      var if_exp = new ifExpr(tmpSym, tmpSym, restAndPinfo[0]),
+          let_exp = new letExpr([tmpBinding], if_exp);
+      if_exp.location = exprLoc;
+      let_exp.location = exprLoc;
+      return [let_exp, restAndPinfo[1]];
     }
     var exprsAndPinfo = this.exprs.reduceRight(convertToNestedIf, [expr, pinfo]);
-    return [exprsAndPinfo[0], exprsAndPinfo[1]];
+    return [exprsAndPinfo[0].desugar(exprsAndPinfo[1]), exprsAndPinfo[1]];
  };
  
  //////////////////////////////////////////////////////////////////////////////
@@ -320,7 +323,7 @@
         newPinfo  = this.body.collectDefinitions(localPinfo),
         newKeys = newPinfo.definedNames.keys();
     // now that the body is scanned, forget all the new definitions
-    prev.forEach(function(k){
+    newKeys.forEach(function(k){
                   if(prevKeys.indexOf(k) === -1) newPinfo.definedNames.remove(k);
                 });
     return newPinfo;
@@ -410,13 +413,13 @@
     // in the meantime, scan the body
     var prevKeys = pinfo.usedBindingsHash.keys(),
         localPinfo= this.defs.reduce(function(pinfo, p){
-                                        return p.analyzeUses(pinfo);
+                                        return p.analyzeUses(pinfo, env);
                                         }
                                         , pinfo),
-        newPinfo  = this.body.analyzeUses(localPinfo),
+        newPinfo  = this.body.analyzeUses(localPinfo, env),
         newKeys = newPinfo.usedBindingsHash.keys();
     // now that the body is scanned, forget all the new definitions
-    prev.forEach(function(k){
+    newKeys.forEach(function(k){
                   if(prevKeys.indexOf(k) === -1) newPinfo.usedBindingsHash.remove(k);
                 });
     return newPinfo;
