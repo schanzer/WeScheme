@@ -402,7 +402,6 @@
           case 'o':
           case 'd':
           case 'x':  datum = readSymbolOrNumber(str, i-1);
-                    console.log(datum);
                     if(datum){ i+= datum.location.span; break;}
           default: throwError(new types.Message(["<definitions>:"
                                                  , line.toString()
@@ -571,7 +570,6 @@
     // as described in isValidSymbolCharP
     function readSymbol(str, i, datum) {
       var sCol = column-datum.length, sLine = line, iStart = i-datum.length, symbl;
- console.log('before even starting, datum is '+datum);
       while(i < str.length && isValidSymbolCharP(str.charAt(i))) {
         // check for newlines
         if(str.charAt(i) === "\n"){ line++; column = 0;}
@@ -584,7 +582,6 @@
           column++;
         }
       }
- console.log(datum);
 
       if((i >= str.length) && (datum === "")) {
         throwError(new types.Message(["read: Unexpected EOF while reading a symbol"])
