@@ -388,7 +388,7 @@
           case 'f':  // test for both forms of false
           case 'F':  datum = new booleanExpr("false"); i++; break;
           // for comments, start reading after the semicolon
-          case ';':  datum = readSExpComment(str, i+1);
+          case ';':  datum = readLineComment(str, i+1);
                      i+= datum.location.span+1; break;
           // for all others, back up a character and keep reading
           case '\\': datum = readChar(str, i-1);
@@ -539,7 +539,7 @@
       var p = str.charAt(i), datum = "";
 
       // snip off the next token, and let's analyze it...
-      while(i < str.length && !isWhiteSpace(str.charAt(i)) && !isDelim(str.charAt(i))) {
+      while(i < str.length && isValidSymbolCharP(str.charAt(i))) {
            // check for newlines
            if(str.charAt(i) === "\n"){ line++; column = 0;}
            datum += str.charAt(i++);
@@ -571,6 +571,7 @@
     // as described in isValidSymbolCharP
     function readSymbol(str, i, datum) {
       var sCol = column-datum.length, sLine = line, iStart = i-datum.length, symbl;
+ console.log('before even starting, datum is '+datum);
       while(i < str.length && isValidSymbolCharP(str.charAt(i))) {
         // check for newlines
         if(str.charAt(i) === "\n"){ line++; column = 0;}
@@ -579,10 +580,11 @@
           datum = sym.val;
           i = sym.location.i;
         } else {
-          datum += str.charAt(i++);
+          datum += str.charAt(++i);
           column++;
         }
       }
+ console.log(datum);
 
       if((i >= str.length) && (datum === "")) {
         throwError(new types.Message(["read: Unexpected EOF while reading a symbol"])
