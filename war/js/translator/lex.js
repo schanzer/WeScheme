@@ -46,25 +46,28 @@
     /*      Data       */
     /////////////////////
 
+(function () {
+    'use strict';
+
     // a collection of common RegExps
     var leftListDelims  = /[(\u005B\u007B]/,
         rightListDelims = /[)\u005D\u007D]/,
         quotes          = /[\'`,]/,
+        hex2            = new RegExp("([0-9a-f]{1,2})", "i"),
+        hex4            = new RegExp("([0-9a-f]{1,4})", "i"),
+        hex8            = new RegExp("([0-9a-f]{1,8})", "i"),
         oct3            = new RegExp("([0-7]{1,3})", "i");
 
-(function () {
-    'use strict';
-
     // the delimiters encountered so far, and line and column
-    var delims, line, column, sCol, sLine;
+    var delims, line, column, sCol, sLine, source;
 
     // the location struct
-    var Location = function(sCol, sLine, offset, span, source){
+    var Location = function(sCol, sLine, offset, span, theSource){
       this.sCol   = sCol;   // starting index into the line
       this.sLine  = sLine;  // starting line # (1-index)
       this.offset = offset; // ch index of lexeme start, from beginning
       this.span   = span;   // num chrs between lexeme start and end
-      this.source = source; // [OPTIONAL] id of the containing DOM element
+      this.source = theSource || source; // [OPTIONAL] id of the containing DOM element
       this.start  = function(){ return new Location("", "", this.offset, 1); };
       this.end    = function(){ return new Location("", "", this.offset+this.span-1, 1); };
       this.toString = function(){
@@ -73,11 +76,11 @@
       this.toVector = function(){
         return new vectorExpr([new numberExpr(this.sCol), new numberExpr(this.sLine)
                               ,new numberExpr(this.offset+1), new numberExpr(this.span)
-                              ,(this.source || "<definitions>")]
+                              ,(this.source || source)]
                              ,new numberExpr(5));
       };
       this.toJSON = function(){
-        return {line: this.sLine.toString(), id: this.source || "<definitions>", span: this.span.toString(),
+        return {line: this.sLine.toString(), id: this.source || source, span: this.span.toString(),
                offset: (this.offset+1).toString(), column: this.sCol.toString()};
       };
     };
@@ -160,11 +163,12 @@
     /* Primary Methods */
     /////////////////////
 
-    // readProg : String -> SExp
+    // readProg : String String -> SExp
     // reads multiple sexps encoded into this string and converts them to a SExp
     // datum
-    function readProg(str) {
+    function readProg(str, strSource) {
       var i = 0; sCol = column = 0; sLine = line = 1; // initialize all position indices
+      source = strSource;
       var sexp,
           sexps = [];
       delims = [];
@@ -180,10 +184,11 @@
       return sexps;
     }
 
-    // readSSFile : String -> SExp
+    // readSSFile : String String -> SExp
     // removes the first three lines of the string that contain DrScheme meta data
-    function readSSFile(str) {
+    function readSSFile(str, strSource) {
       var i = 0; sCol = column = 0; sline = line = 1; // initialize all position indices
+      source = strSource;
       var crs = 0;
 
       while(i < str.length && crs < 3) {
@@ -202,9 +207,9 @@
       return sexps;
     }
 
-    // readSExp : String -> SExp
+    // readSExp : String String -> SExp
     // reads the first sexp encoded in this string and converts it to a SExp datum
-    function readSExp(str) {
+    function readSExp(str, source) {
       delims = [];
       var sexp = readSExpByIndex(str, 0);
       return sexp instanceof Comment ? null : sexp;
@@ -339,7 +344,8 @@
                 i += match.length-1; column += match.length-1;
                 break;
              default   :
-        throwError(new types.Message(["<definitions>:"
+        throwError(new types.Message([source
+                                      , ":"
                                       , sLine.toString()
                                       , ":"
                                       , sCol.toString()
@@ -351,12 +357,13 @@
       }
 
       if(i >= str.length) {
-        throwError(new types.Message(["<definitions>:"
+        throwError(new types.Message([source
+                                      , ":"
                                       , sLine.toString()
                                       , ":"
-                                      , (sCol+1).toString() // move forward to grab the starting quote
+                                      , sCol.toString() // move forward to grab the starting quote
                                       , ": read: expected a closing \'\"\'"])
-                   , new Location(sCol, sLine, iStart+1, 1, "<definitions>")
+                   , new Location(sCol, sLine, iStart+1, 1)
                    , "Error-GenericReadError");
       }
       var strng = new stringExpr(datum);
@@ -403,7 +410,8 @@
           case 'd':
           case 'x':  datum = readSymbolOrNumber(str, i-1);
                     if(datum){ i+= datum.location.span; break;}
-          default: throwError(new types.Message(["<definitions>:"
+          default: throwError(new types.Message([source
+                                                 , ":"
                                                  , line.toString()
                                                  , ":"
                                                  , (column-1).toString()
@@ -560,7 +568,8 @@
         }
       // if it's not a number
       } catch(e) {
-          throwError(new types.Message(["<definitions>:"
+          throwError(new types.Message([source
+                                        , ":"
                                         , sLine.toString()
                                         , ":"
                                         , (sCol-1).toString() // move forward to grab the starting quote
