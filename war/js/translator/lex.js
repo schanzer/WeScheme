@@ -340,7 +340,7 @@
                 break;
              default   :
         throwError(new types.Message(["<definitions>:"
-                                      , line.toString()
+                                      , sLine.toString()
                                       , ":"
                                       , sCol.toString()
                                       , ": read: unknown escape sequence \\" +chr+" in string"])
@@ -352,11 +352,11 @@
 
       if(i >= str.length) {
         throwError(new types.Message(["<definitions>:"
-                                      , line.toString()
+                                      , sLine.toString()
                                       , ":"
-                                      , sCol.toString()
+                                      , (sCol+1).toString() // move forward to grab the starting quote
                                       , ": read: expected a closing \'\"\'"])
-                   , new Location(sCol, sLine, iStart+1, iStart+1)
+                   , new Location(sCol, sLine, iStart+1, 1, "<definitions>")
                    , "Error-GenericReadError");
       }
       var strng = new stringExpr(datum);
@@ -560,8 +560,13 @@
         }
       // if it's not a number
       } catch(e) {
-        throwError(new types.Message(["read: "+e.message])
-                  ,new Location(sCol-1, sLine, iStart, i-iStart));
+          throwError(new types.Message(["<definitions>:"
+                                        , sLine.toString()
+                                        , ":"
+                                        , (sCol-1).toString() // move forward to grab the starting quote
+                                        , ": read: "+e.message])
+                     , new Location(sCol-1, sLine, iStart, i-iStart)
+                     , "Error-GenericReadError");
       }
      }
 
