@@ -72,7 +72,7 @@
       };
       this.toVector = function(){
         return new vectorExpr([new numberExpr(this.sCol), new numberExpr(this.sLine)
-                              ,new numberExpr(this.offset), new numberExpr(this.span)
+                              ,new numberExpr(this.offset+1), new numberExpr(this.span)
                               ,(this.source || "<definitions>")]
                              ,new numberExpr(5));
       };
@@ -355,8 +355,9 @@
                                       , line.toString()
                                       , ":"
                                       , sCol.toString()
-                                      , ": read: expected a closing \'\"\' "])
-                   , new Location(sCol, sLine, iStart, i-iStart));
+                                      , ": read: expected a closing \'\"\'"])
+                   , new Location(sCol, sLine, iStart+1, iStart+1)
+                   , "Error-GenericReadError");
       }
       var strng = new stringExpr(datum);
       strng.location = new Location(sCol, sLine, iStart, i+1-iStart);
@@ -407,8 +408,9 @@
                                                  , line.toString()
                                                  , ":"
                                                  , (column-1).toString()
-                                                 , ": read: bad syntax `#", p,"'"]),
-                              new Location(sCol, sLine, iStart, i-iStart));
+                                                 , ": read: bad syntax `#", p,"'"])
+                              , new Location(sCol, sLine, iStart, i-iStart)
+                              , "Error-GenericReadError");
          }
       } else {
         throwError(new types.Message(["read: Unexpected EOF when reading a pound-prefixed sexp: #", datum]),
@@ -559,8 +561,8 @@
         }
       // if it's not a number
       } catch(e) {
-        throwError(new types.Message(["read: bad number (datum)"])
-                  ,new Location(sCol, sLine, iStart, i-iStart));
+        throwError(new types.Message(["read: "+e.message])
+                  ,new Location(sCol-1, sLine, iStart, i-iStart));
       }
      }
 

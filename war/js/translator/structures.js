@@ -39,41 +39,49 @@ function coupleFirst(x) { return x.first; };
 function coupleSecond(x) { return x.second; };
 
 // encode the msg and location as a JSON error
-function throwError(msg, loc) {
+function throwError(msg, loc, errorClass) {
   loc.source = loc.source || "<definitions>"; // FIXME -- we should have the source populated
   // rewrite a ColoredPart to match the format expected by the runtime
   function rewritePart(part){
     if(typeof(part) === 'string'){
       return part;
     } else if(part.location !== undefined){
-      return {text: part.text, type: 'ColoredPart', loc: part.location.toJSON()};
+      return {text: part.text, type: 'ColoredPart', loc: part.location.toJSON()
+            , toString: function(){return part.text;}};
     } else if(part.locations !== undefined){
       return {text: part.text, type: 'MultiPart', solid: part.solid
-            , locs: part.locations.map(function(l){return l.toJSON()})};
+            , locs: part.locations.map(function(l){return l.toJSON()})
+            , toString: function(){return part.text;}};
     }
   }
+  
   msg.args = msg.args.map(rewritePart);
+  
   var json = {type: "moby-failure"
     , "dom-message": ["span"
                       ,[["class", "Error"]]
                       ,["span"
-                        , [["class", "Message"]],
-                        msg.toString()]
+                        , [["class", (errorClass || "Message")]]].concat(
+                         (errorClass? [["span"
+                                        , [["class", "Error.reason"]]
+                                        , msg.toString()]
+                                      , ["span", [["class", ((errorClass || "message")+".locations")]]]]
+                                      : msg.args.map(function(x){return x.toString();})))
                       ,["br", [], ""]
                       ,["span"
                         , [["class", "Error.location"]]
                         , ["span"
                            , [["class", "location-reference"]
                               , ["style", "display:none"]]
-                           , ["span", [["class", "location-offset"]], loc.offset]
-                           , ["span", [["class", "location-line"]]  , loc.sLine]
-                           , ["span", [["class", "location-column"]], loc.sCol]
-                           , ["span", [["class", "location-span"]]  , loc.span]
-                           , ["span", [["class", "location-id"]]    , loc.source]
+                           , ["span", [["class", "location-offset"]], loc.offset.toString()]
+                           , ["span", [["class", "location-line"]]  , loc.sLine.toString()]
+                           , ["span", [["class", "location-column"]], loc.sCol.toString()]
+                           , ["span", [["class", "location-span"]]  , loc.span.toString()]
+                           , ["span", [["class", "location-id"]]    , loc.source.toString()]
                            ]
                         ]
                       ]
-    , "structured-error": JSON.stringify({message: msg.args, location: loc.toJSON() })
+    , "structured-error": JSON.stringify({message: (errorClass? false : msg.args), location: loc.toJSON() })
   };
   throw JSON.stringify(json);
 }
