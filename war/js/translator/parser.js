@@ -620,9 +620,10 @@
                                       , new types.ColoredPart("empty part", clause.location)]),
                     sexp.location);
       }
-      if(!(clause[0] instanceof Array)){
+      if(!( (clause[0] instanceof Array) ||
+            ((clause[0] instanceof symbolExpr) && isSymbolEqualTo(clause[0], "else")))){
         throwError(new types.Message([new types.MultiPart(sexp[0].val, caseLocs, true)
-                                      , ": expected at least one choice (in parentheses), but found "
+                                      , ": expected 'else', or at least one choice in parentheses, but found "
                                       , new types.ColoredPart("something else", clause.location)]),
                     sexp.location);
       }
@@ -760,9 +761,13 @@
     if((sexp[1] instanceof Array) && isSymbolEqualTo(sexp[1][0], "lib")){
         // is it (require (lib)) or (require (lib <string>))
         if(sexp[1].length < 3){
+          var partsNum = sexp[1].slice(1).length,
+              partsStr = partsNum + ((partsNum===1)? " part" : " parts");
           throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
                                         , ": expected at least two strings after "
-                                        , new types.ColoredPart("lib", sexp[1][0].location)]),
+                                        , new types.ColoredPart("lib", sexp[1][0].location)
+                                        , " but found only "
+                                        , partsStr]),
                      sexp.location);
         }
         // is it (require (lib not-strings))?
@@ -777,7 +782,7 @@
     // if it's (require (planet...))
     } else if((sexp[1] instanceof Array) && isSymbolEqualTo(sexp[1][0], "planet")){
       throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
-                                    , "Importing PLaneT pacakges is not supported at this time"]),
+                                    , ": Importing PLaneT pacakges is not supported at this time"]),
                  sexp.location);
     // if it's (require <not-a-string-or-symbol>)
     } else if(!((sexp[1] instanceof symbolExpr) || (sexp[1] instanceof stringExpr))){
@@ -807,7 +812,7 @@
         }
         // everything else is NOT okay
         throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
-                                    , "I don't recognize the syntax of this "
+                                    , ": I don't recognize the syntax of this "
                                     , new types.ColoredPart("clause", p.location)]),
                  sexp.location);
     });
