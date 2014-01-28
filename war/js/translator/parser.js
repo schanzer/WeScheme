@@ -652,7 +652,7 @@
       }
     }
  
-    return new caseExpr(sexp[1], sexp.slice(2).reduceRight(function (rst, couple) {
+    return new caseExpr(parseExpr(sexp[1]), sexp.slice(2).reduceRight(function (rst, couple) {
                if((isSymbol(couple[0])) && (isSymbolEqualTo(couple[0], "else")) && (rst.length > 0)){
                   throwError(new types.Message([new types.MultiPart(sexp[0].val, caseLocs, true)
                                                 , "found an "

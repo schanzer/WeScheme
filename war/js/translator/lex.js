@@ -168,7 +168,7 @@
     // datum
     function readProg(str, strSource) {
       var i = 0; sCol = column = 0; sLine = line = 1; // initialize all position indices
-      source = strSource;
+      source = strSource || "<unknown>";
       var sexp,
           sexps = [];
       delims = [];
@@ -188,7 +188,7 @@
     // removes the first three lines of the string that contain DrScheme meta data
     function readSSFile(str, strSource) {
       var i = 0; sCol = column = 0; sline = line = 1; // initialize all position indices
-      source = strSource;
+      source = strSource || "unknown";
       var crs = 0;
 
       while(i < str.length && crs < 3) {
@@ -395,7 +395,7 @@
           case 'f':  // test for both forms of false
           case 'F':  datum = new booleanExpr("false"); i++; break;
           // for comments, start reading after the semicolon
-          case ';':  datum = readLineComment(str, i+1);
+          case ';':  datum = readSExpComment(str, i+1);
                      i+= datum.location.span+1; break;
           // for all others, back up a character and keep reading
           case '\\': datum = readChar(str, i-1);

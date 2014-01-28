@@ -1,5 +1,6 @@
 /*
  TODO
+ - fix desugaring bugs
  - desugar Symbols, callExpr
  - check for else base case for cond
  - tagApplicationOperator_Module
@@ -175,11 +176,11 @@
         updatedPinfo2 = pinfoAndXSym[0],          // generate pinfo containing 'x'
         xStx = pinfoAndXSym[1];                   // remember the symbolExpr for 'x'
  
-    // as a base expression, use either the else's second part or void
+    // if there's an 'else', pop off the clause and use the result as the base
     var expr, clauses = this.clauses, lastClause = clauses[this.clauses.length-1];
-    if((lastClause.first instanceof symbolExpr) && (lastClause.val === 'else')){
+    if((lastClause.first instanceof symbolExpr) && (lastClause.first.val === 'else')){
       expr = lastClause.second;
-      clauses = this.clauses.slice(this.clauses.length-2);
+      clauses.pop();
     } else {
       expr = new symbolExpr('void');
     }
@@ -223,7 +224,7 @@
  // ors become nested lets-with-if-bodies
  orExpr.prototype.desugar = function(pinfo){
     // grab the last expr, and remove it from the list and desugar
-    var expr = this.exprs.pop(),
+    var expr = forceBooleanContext("or", this.location, this.exprs.pop()),
         that = this;
  
     // given a desugared chain, add this expr to the chain
