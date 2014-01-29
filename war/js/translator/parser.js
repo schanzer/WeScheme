@@ -706,7 +706,7 @@
   }
 
  
-    return isCons(sexp[1])? parseQqList(sexp[1]) : new quasiquotedExpr(parseExpr(sexp[1]));
+    return new quasiquotedExpr(isCons(sexp[1])? parseQqList(sexp[1]) : parseExpr(sexp[1]));
   }
  
   function parseVector(sexp){
