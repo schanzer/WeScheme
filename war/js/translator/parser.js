@@ -696,17 +696,17 @@
                   sexp.location);
     }
     // when parsing a stx-list inside of a quasiquoted expr, check for use of unquote and unquote-splicing
-    function parseQqList(sexp, inlist) {
+    function parseQqList(sexp) {
       if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote")) return parseExpr(sexp[1]);
       if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote-splicing")){
         if(inlist) return new unquoteSplice(parseExpr(sexp[1]))
         else throwError(new types.Message(["misuse of ,@ or `unquote-splicing' within a quasiquoting backquote"]), sexp.location)
       }
-      return new qqList(sexp.map(function (x) {return parseQqList(x, true);}));
+      return parseExpr(sexp)
   }
 
  
-    return isCons(sexp[1])? parseQqList(sexp[1], inlist) : new quasiquotedExpr(parseExpr(sexp[1]));
+    return isCons(sexp[1])? parseQqList(sexp[1]) : new quasiquotedExpr(parseExpr(sexp[1]));
   }
  
   function parseVector(sexp){
