@@ -310,12 +310,6 @@ function listExpr(val) {
 };
 listExpr.prototype = heir(Program.prototype);
 
-// mtList expression TODO
-function mtListExpr() {
-  Program.call(this);
-};
-mtListExpr.prototype = heir(Program.prototype);
-
 // boolean expression
 function booleanExpr(sym) {
   Program.call(this);
@@ -325,7 +319,7 @@ function booleanExpr(sym) {
 };
 booleanExpr.prototype = heir(Program.prototype);
 
-// quoted expression TODO
+// quoted expression
 function quotedExpr(val) {
   Program.call(this);
   this.val = val;
@@ -333,7 +327,7 @@ function quotedExpr(val) {
 };
 quotedExpr.prototype = heir(Program.prototype);
 
-// quasiquoted expression TODO
+// quasiquoted expression
 function quasiquotedExpr(val) {
   Program.call(this);
   this.val = val;
@@ -341,7 +335,7 @@ function quasiquotedExpr(val) {
 };
 quasiquotedExpr.prototype = heir(Program.prototype);
 
-// quasiquoted list expression TODO
+// quasiquoted list expression
 function qqList(val) {
   Program.call(this);
   this.val = val;
@@ -349,11 +343,13 @@ function qqList(val) {
 };
 qqList.prototype = heir(Program.prototype);
 
-function qqSplice(val) {
+// unquote-splicing
+function unquoteSplice(val) {
   Program.call(this);
   this.val = val;
+  this.toString = function(){ return "@"+this.val.toString();};
 };
-qqSplice.prototype = heir(Program.prototype);
+unquoteSplice.prototype = heir(Program.prototype);
 
 // primop expression
 function primop(val) {
@@ -901,9 +897,47 @@ function getTopLevelEnv(lang){
   }
  
   // PINFO STRUCTS ////////////////////////////////////////////////////////////////
+ 
+  // These modules are hardcoded.
+  var knownModules = ["world-module"
+                                  ,"world-stub-module"
+                                  ,"location-module"
+                                  ,"tilt-module"
+                                  ,"net-module"
+                                  ,"parser-module"
+                                  ,"bootstrap-teachpack"
+                                  ,"function-teachpack"
+                                  ,"cage-teachpack"
+                                  ,"telephony-module"
+                                  ,"moby-module-binding"
+                                    
+                                  ,"foreign-module"
+                                  ,"kernel-misc-module"];
+ 
   var defaultCurrentModulePath = "";
-  function defaultModuleResolver(){}
-  function defaultModulePathResolver(){return false;}
+ 
+  // default-module-resolver: symbol -> (module-binding | false)
+  // loop through known modules and see if we know this name
+  compilerStructs.defaultModuleResolver = function(name){
+    for(var i=0; i< knownModules.length; i++){
+      if(moduleBindingName(knownModules[i]) === name.val) return knownModules[i];
+    }
+    return false;
+  }
+ 
+  // default-module-path-resolver: module-path module-path -> module-name
+  // Provides a default module resolver.
+  compilerStructs.defaultModulePathResolver = function(path, parentPath){
+    for(var i=0; i< knownModules.length; i++){
+      if(modulePathEqual(modulePathJoin(parentPath, path)
+                         , moduleBindingSource(knownModules[i]))){
+      return moduleBindingName(knownModules[i]);
+      }
+    }
+    if(path instanceof symbolExpr) return path;
+    else if(path instanceof stringExpr) return modulePathJoin(parentPath, path);
+  }
+ 
 
   // pinfo (program-info) is the "world" structure for the compilers;
   // it captures the information we get from analyzing and compiling
