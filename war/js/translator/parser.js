@@ -471,7 +471,7 @@
       return new beginExpr(rest(sexp).map(parseExpr));
     }
     function parseAndExpr(sexp) {
-      // is it just (and)?
+      // and must have 2+ arguments
       if(sexp.length < 3){
         throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
                                       , ": expected at least 2 arguments, but given "
@@ -482,7 +482,7 @@
       return new andExpr(rest(sexp).map(parseExpr));
     }
     function parseOrExpr(sexp) {
-      // is it just (or)?
+      // or must have 2+ arguments
       if(sexp.length < 3){
         throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
                                       , ": expected at least 2 arguments, but given "
@@ -493,14 +493,20 @@
       return new orExpr(rest(sexp.map(parseExpr)));
     }
     function parseQuotedExpr(sexp) {
-      return new quotedExpr((sexp.length === 0) ?   new callExpr(new primop("list"), []) :
-                            isCons(sexp)    ?  new callExpr(new primop("list"), sexp.map(parseQuotedExpr)) :
-                            isString(sexp)  ?  sexp :
-                            isNumber(sexp)  ?  sexp :
-                            isBoolean(sexp) ?  sexp :
-                            isChar(sexp)    ?  sexp :
-                            isSymbol(sexp)  ?  sexp :
-                            throwError(new types.Message(["quoted sexp"]), sexp.location));
+      // quote must have exactly one argument
+      if(sexp.length < 2){
+        throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+                                      , ": expected a single argument, but did not find one "]),
+                    sexp.location);
+      }
+      if(sexp.length > 2){
+        var extraLocs = sexp.slice(1).map(function(sexp){ return sexp.location; });
+        throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+                                      , ": expected a single argument, but found "
+                                      , new types.MultiPart("more than one.", extraLocs, false)]),
+                    sexp.location);
+      }
+      return new quotedExpr(parseExpr(sexp.slice(1)));
     }
 
     return (function () {
@@ -518,8 +524,8 @@
                     isSymbolEqualTo("begin", peek)   ? parseBeginExpr(sexp) :
                     isSymbolEqualTo("and", peek)     ? parseAndExpr(sexp) :
                     isSymbolEqualTo("or", peek)      ? parseOrExpr(sexp) :
-                    isSymbolEqualTo("quote", peek)   ? parseQuotedExpr(sexp[1]) :
-                    isSymbolEqualTo("quasiquote", peek) ? parseQuasiQuotedExpr(sexp[1], false) :
+                    isSymbolEqualTo("quote", peek)   ? parseQuotedExpr(sexp) :
+                    isSymbolEqualTo("quasiquote", peek) ? parseQuasiQuotedExpr(sexp, false) :
                     parseFuncCall(sexp);
           expr.location = sexp.location;
           return expr;
@@ -676,26 +682,31 @@
   }
 
   function parseQuasiQuotedExpr(sexp, inlist) {
-    return (sexp.length === 0) ? new qqList([]) :
-    isCons(sexp)   ? parseQqList(sexp, inlist) :
-    isString(sexp) ? sexp :
-    isNumber(sexp) ? sexp :
-    isBoolean(sexp)? sexp :
-    isChar(sexp)   ? sexp :
-    isSymbol(sexp) ? sexp :
-    throwError(new types.Message(["quoted sexp"]), sexp.location);
+     // quasiquote must have exactly one argument
+    if(sexp.length < 2){
+      throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+                                    , ": expected a single argument, but did not find one "]),
+                  sexp.location);
+    }
+    if(sexp.length > 2){
+      var extraLocs = sexp.slice(1).map(function(sexp){ return sexp.location; });
+      throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
+                                    , ": expected a single argument, but found "
+                                    , new types.MultiPart("more than one.", extraLocs, false)]),
+                  sexp.location);
+    }
+    // when parsing a stx-list inside of a quasiquoted expr, check for use of unquote and unquote-splicing
+    function parseQqList(sexp, inlist) {
+      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote")) return parseExpr(sexp[1]);
+      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote-splicing")){
+        if(inlist) return new unquoteSplice(parseExpr(sexp[1]))
+        else throwError(new types.Message(["misuse of ,@ or `unquote-splicing' within a quasiquoting backquote"]), sexp.location)
+      }
+      return new qqList(sexp.map(function (x) {return parseQqList(x, true);}));
   }
 
-  function parseQqList(sexp, inlist) {
-    return isSymbol(sexp[0]) ? isSymbolEqualTo(sexp[0], "unquote") ? parseExpr(sexp[1]) :
-    isSymbolEqualTo(sexp[0], "unquote-splicing") ? inlist ? new qqSplice(parseExpr(sexp[1])) :
-    throwError(new types.Message(["misuse of ,@ or `unquote-splicing' within a quasiquoting backquote"]), sexp.location) :
-    new qqList(sexp.map(function (x) {
-    return parseQuasiQuotedExpr(x, true);
-  })) :
-    new qqList(sexp.map(function (x) {
-                    return parseQuasiQuotedExpr(x, true);
-                    }));
+ 
+    return isCons(sexp[1])? parseQqList(sexp[1], inlist) : new quasiquotedExpr(parseExpr(sexp[1]));
   }
  
   function parseVector(sexp){
