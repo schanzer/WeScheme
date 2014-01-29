@@ -527,7 +527,7 @@
           throwError("read: Unexpected EOF when reading a quoted expression at "
                      + new Location(sCol, sLine, iStart, i-iStart));
         }
-        if(str.charAt(i+1) == '#') {
+        if(str.charAt(i+1) == '@') {
           symbol = new symbolExpr("unquote-splicing");
         } else {
           symbol = new symbolExpr("unquote");
@@ -557,7 +557,7 @@
       // if it's a bad number, throw an error
       try{
         var numValue = jsnums.fromString(datum);
-        if(numValue){
+        if(numValue || numValue === 0){ // don't interpret zero as 'false'
           var sexp = new numberExpr(numValue);
           sexp.location = new Location(sCol, sLine, iStart, i-iStart);
           return sexp;
