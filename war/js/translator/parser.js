@@ -701,11 +701,12 @@
     }
     // when parsing an element inside a quasiquoted list, check for use of quasiquote, unquote and unquote-splicing
     function parseQqListItem(acc, sexp) {
-      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote"))          return acc.concat([parseExpr(sexp[1])]);
-      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "quasiquote"))       return acc.concat([parseQuasiQuotedExpr(sexp)]);
-      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote-splicing"))  return acc.concat(parseExpr(sexp[1]));
-      if(isCons(sexp))                                                return acc.concat([sexp.map(parseQqListItem)]);
-      else                                                            return acc.concat([sexp]);
+      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote-splicing"))  acc.push(new unquoteSplice(parseExpr(sexp[1])));
+      else if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote"))      acc.push(parseExpr(sexp[1]));
+      else if(isCons(sexp) && isSymbolEqualTo(sexp[0], "quasiquote"))   acc.push(parseQuasiQuotedExpr(sexp));
+      else if(isCons(sexp))                                            acc.push(sexp.map(parseQqListItem));
+      else                                                             acc.push(sexp);
+      return acc;
     }
     return new quasiquotedExpr(isCons(sexp[1])? sexp[1].reduce(parseQqListItem, []) : sexp[1]);
   }
