@@ -506,7 +506,7 @@
                                       , new types.MultiPart("more than one.", extraLocs, false)]),
                     sexp.location);
       }
-      return new quotedExpr(parseExpr(sexp.slice(1)));
+      return new quotedExpr(sexp[1]);
     }
 
     return (function () {
@@ -702,7 +702,7 @@
     // when parsing an element inside a quasiquoted list, check for use of quasiquote, unquote and unquote-splicing
     function parseQqListItem(acc, sexp) {
       if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote-splicing"))  acc.push(new unquoteSplice(parseExpr(sexp[1])));
-      else if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote"))      acc.push(parseExpr(sexp[1]));
+      else if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote"))      acc.push(new unquotedExpr(parseExpr(sexp[1])));
       else if(isCons(sexp) && isSymbolEqualTo(sexp[0], "quasiquote"))   acc.push(parseQuasiQuotedExpr(sexp));
       else if(isCons(sexp))                                            acc.push(sexp.map(parseQqListItem));
       else                                                             acc.push(sexp);
