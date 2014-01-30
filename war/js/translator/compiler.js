@@ -1,7 +1,6 @@
 /*
  TODO
- - fix desugaring bugs
- - desugar Symbols, callExpr
+ - desugar Symbols
  - check for else base case for cond
  - tagApplicationOperator_Module
  - test cases get desugared into native calls (and thunks?)
@@ -243,8 +242,14 @@
       let_exp.location = exprLoc;
       return [let_exp, restAndPinfo[1]];
     }
-    var exprsAndPinfo = this.exprs.reduceRight(convertToNestedIf, [expr, pinfo]);
-    return [exprsAndPinfo[0].desugar(exprsAndPinfo[1]), exprsAndPinfo[1]];
+    var exprsAndPinfo = this.exprs.reduceRight(convertToNestedIf, [expr, pinfo]),
+        desugared = exprsAndPinfo[0].desugar(exprsAndPinfo[1]);
+    return [desugared[0], exprsAndPinfo[1]];
+ };
+ 
+ // go through each item in search of unquote or unquoteSplice
+ quasiquotedExpr.prototype.desugar = function(pinfo){
+ 
  };
  
  //////////////////////////////////////////////////////////////////////////////
@@ -570,7 +575,6 @@
  
  listExpr.prototype.compile = function(env, pinfo){}
  quotedExpr.prototype.compile = function(env, pinfo){}
- qqList.prototype.compile = function(env, pinfo){}
  primop.prototype.compile = function(env, pinfo){}
  quasiquotedExpr.prototype.compile = function(env, pinfo){}
  requireExpr.prototype.compile = function(pinfo){};
@@ -597,6 +601,7 @@
      // FIXME: this does not yet say anything if a definition is introduced twice
      // in the same lexical scope.  We must do this error check!
      return programs.reduce((function(pinfo, p){
+                             console.log('collecting definitions for '+p);
                              return p.collectDefinitions(pinfo);
                              })
                             , pinfo);

@@ -335,14 +335,6 @@ function quasiquotedExpr(val) {
 };
 quasiquotedExpr.prototype = heir(Program.prototype);
 
-// quasiquoted list expression
-function qqList(val) {
-  Program.call(this);
-  this.val = val;
-  this.toString = function(){ return "`"+this.val.toString();};
-};
-qqList.prototype = heir(Program.prototype);
-
 // unquote-splicing
 function unquoteSplice(val) {
   Program.call(this);

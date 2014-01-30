@@ -525,7 +525,7 @@
                     isSymbolEqualTo("and", peek)     ? parseAndExpr(sexp) :
                     isSymbolEqualTo("or", peek)      ? parseOrExpr(sexp) :
                     isSymbolEqualTo("quote", peek)   ? parseQuotedExpr(sexp) :
-                    isSymbolEqualTo("quasiquote", peek) ? parseQuasiQuotedExpr(sexp, false) :
+                    isSymbolEqualTo("quasiquote", peek) ? parseQuasiQuotedExpr(sexp) :
                     parseFuncCall(sexp);
           expr.location = sexp.location;
           return expr;
@@ -681,7 +681,7 @@
                    sexp.location);
   }
 
-  function parseQuasiQuotedExpr(sexp, inlist) {
+  function parseQuasiQuotedExpr(sexp) {
      // quasiquote must have exactly one argument
     if(sexp.length < 2){
       throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
@@ -695,18 +695,19 @@
                                     , new types.MultiPart("more than one.", extraLocs, false)]),
                   sexp.location);
     }
-    // when parsing a stx-list inside of a quasiquoted expr, check for use of unquote and unquote-splicing
-    function parseQqList(sexp) {
-      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote")) return parseExpr(sexp[1]);
-      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote-splicing")){
-        if(inlist) return new unquoteSplice(parseExpr(sexp[1]))
-        else throwError(new types.Message(["misuse of ,@ or `unquote-splicing' within a quasiquoting backquote"]), sexp.location)
-      }
-      return parseExpr(sexp)
-  }
-
- 
-    return new quasiquotedExpr(isCons(sexp[1])? parseQqList(sexp[1]) : parseExpr(sexp[1]));
+    // if the argument is (unquote-splicing....), throw an error
+    if(isCons(sexp[1]) && isSymbolEqualTo(sexp[1][0], "unquote-splicing")){
+      throwError(new types.Message(["misuse of ,@ or `unquote-splicing' within a quasiquoting backquote"]), sexp.location);
+    }
+    // when parsing an element inside a quasiquoted list, check for use of quasiquote, unquote and unquote-splicing
+    function parseQqListItem(acc, sexp) {
+      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote"))          return acc.concat([parseExpr(sexp[1])]);
+      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "quasiquote"))       return acc.concat([parseQuasiQuotedExpr(sexp)]);
+      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote-splicing"))  return acc.concat(parseExpr(sexp[1]));
+      if(isCons(sexp))                                                return acc.concat([sexp.map(parseQqListItem)]);
+      else                                                            return acc.concat([sexp]);
+    }
+    return new quasiquotedExpr(isCons(sexp[1])? sexp[1].reduce(parseQqListItem, []) : sexp[1]);
   }
  
   function parseVector(sexp){
