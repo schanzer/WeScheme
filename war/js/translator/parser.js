@@ -701,9 +701,17 @@
     }
     // when parsing an element inside a quasiquoted list, check for use of quasiquote, unquote and unquote-splicing
     function parseQqListItem(acc, sexp) {
-      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote-splicing"))  acc.push(new unquoteSplice(parseExpr(sexp[1])));
-      else if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote"))      acc.push(new unquotedExpr(parseExpr(sexp[1])));
-      else if(isCons(sexp) && isSymbolEqualTo(sexp[0], "quasiquote"))   acc.push(parseQuasiQuotedExpr(sexp));
+      if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote-splicing")){
+        if((sexp.length !== 2))
+          throwError(new types.Message(["Inside an unquote-splicing, expected to find a single argument, but found "+(sexp.length-1)])
+                     , sexp.location);
+        else acc.push(new unquoteSplice(parseExpr(sexp[1])));
+      } else if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote")){
+        if((sexp.length !== 2))
+          throwError(new types.Message(["Inside an unquote, expected to find a single argument, but found "+(sexp.length-1)])
+                     , sexp.location);
+        else acc.push(new unquotedExpr(parseExpr(sexp[1])));
+      }
       else if(isCons(sexp))                                            acc.push(sexp.map(parseQqListItem));
       else                                                             acc.push(sexp);
       return acc;

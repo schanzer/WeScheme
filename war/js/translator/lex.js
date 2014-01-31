@@ -528,6 +528,7 @@
                      + new Location(sCol, sLine, iStart, i-iStart));
         }
         if(str.charAt(i+1) == '@') {
+          i++;
           symbol = new symbolExpr("unquote-splicing");
         } else {
           symbol = new symbolExpr("unquote");
