@@ -247,9 +247,56 @@
     return [desugared[0], exprsAndPinfo[1]];
  };
  
+ quotedExpr.prototype.desugar = function(pinfo){
+    function desugarQuotedItem(sexp){
+      if(sexp instanceof Array) return sexp.map(desugarQuotedItem);
+      else return new callExpr(new primop('list'), [new quotedExpr(sexp.toString())]);
+    }
+    if(this.val instanceof Array){
+      var call_exp = new callExpr(new primop('append'), this.val.map(desugarQuotedItem));
+      call_exp.location = this.location;
+      return [call_exp, pinfo];
+    } else {
+      return [new symbolExpr(this.val), pinfo];
+    }
+ };
+
  // go through each item in search of unquote or unquoteSplice
  quasiquotedExpr.prototype.desugar = function(pinfo){
- 
+    var depth = 1;
+    function desugarQqListItem(item){
+ console.log(item);
+      // if it's unquotesplice, desugar the expr and include as-is
+      if(item instanceof unquoteSplice){
+ console.log('saw unquote-splice. Val is '+item.val.toString());
+        depth--;
+        return item.val.desugar(pinfo)[0];
+      // if it's unquote, desugar the expr and wrap in a (list..)
+      } else if(item instanceof unquotedExpr){
+ console.log('saw unquote');
+        depth--;
+        return new callExpr(new primop(new symbolExpr('list')), [item.val.desugar(pinfo)[0]]);
+      } else if(item instanceof quasiquotedExpr){
+ console.log('saw quasiquote');
+        depth++;
+        //return item.desugar(pinfo)[0];
+        return new callExpr(new primop(new symbolExpr('list')), [desugarQqListItem(item.val)]);
+      // if it's an array, desugar it as a QQlist
+      }
+      if(item instanceof Array){
+ console.log('saw sexp');
+        return new callExpr(new primop(new symbolExpr('list')), [item.map(desugarQqListItem)]);
+      // if it's just a val, return wrap it as a (list (quote ...))
+      } else {
+        return new callExpr(new primop(new symbolExpr('list')), [new quotedExpr(item.toString())]);
+      }
+    }
+    if(this.val instanceof Array){
+      var call_exp = new callExpr(new primop(new symbolExpr('append')), this.val.map(desugarQqListItem));
+      return [call_exp, pinfo];
+    } else {
+      return [new quotedExpr(this.val.toString()), pinfo];
+    }
  };
  
  //////////////////////////////////////////////////////////////////////////////
