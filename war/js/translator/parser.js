@@ -525,7 +525,7 @@
                     isSymbolEqualTo("and", peek)     ? parseAndExpr(sexp) :
                     isSymbolEqualTo("or", peek)      ? parseOrExpr(sexp) :
                     isSymbolEqualTo("quote", peek)   ? parseQuotedExpr(sexp) :
-                    isSymbolEqualTo("quasiquote", peek) ? parseQuasiQuotedExpr(sexp) :
+                    isSymbolEqualTo("quasiquote", peek) ? parseQuasiQuotedExpr(sexp, 1) :
                     parseFuncCall(sexp);
           expr.location = sexp.location;
           return expr;
@@ -681,7 +681,7 @@
                    sexp.location);
   }
 
-  function parseQuasiQuotedExpr(sexp) {
+  function parseQuasiQuotedExpr(sexp, depth) {
      // quasiquote must have exactly one argument
     if(sexp.length < 2){
       throwError(new types.Message([new types.ColoredPart(sexp[0].val, sexp[0].location)
@@ -700,7 +700,6 @@
       throwError(new types.Message(["misuse of ,@ or `unquote-splicing' within a quasiquoting backquote"]), sexp.location);
     }
  
-    var depth = 1;
     // when parsing an element inside a quasiquoted list, check for use of quasiquote, unquote and unquote-splicing
     // Track depth so we can throw parse errors
     function parseQqListItem(sexp) {
@@ -711,8 +710,10 @@
         } else if(depth === 0){
           throwError(new types.Message(["misuse of a , or 'unquote, not under a quasiquoting backquote"])
                      , sexp.location);
-        } else {
-          depth--;
+        }
+        // decrement depth no matter what. If, AFTER decrementing, we are at depth==0, return a real quasiquote
+        depth--;
+        if(depth === 0){
           return new unquoteSplice(parseExpr(sexp[1]));
         }
       } else if(isCons(sexp) && isSymbolEqualTo(sexp[0], "unquote")){
@@ -722,18 +723,24 @@
         } else if(depth === 0){
           throwError(new types.Message(["misuse of a ,@ or 'unquote, not under a quasiquoting backquote"])
                      , sexp.location);
-        } else {
-          depth--;
+        }
+        // decrement depth no matter what. If, AFTER decrementing, we are at depth==0, return a real unquote-splicing
+        depth--;
+        if(depth === 0){
           return new unquotedExpr(parseExpr(sexp[1]));
         }
       } else if(isCons(sexp) && isSymbolEqualTo(sexp[0], "quasiquote")){
         if((sexp.length !== 2))
           throwError(new types.Message(["Inside an quasiquote, expected to find a single argument, but found "+(sexp.length-1)])
                      , sexp.location);
+        // increment depth no matter what. If, AFTER incrementing, we are at depth==0, return a real quasiquote
         depth++;
-        return new quasiquotedExpr(isCons(sexp[1])? sexp[1].map(parseQqListItem) : sexp[1]);
+        if(depth === 0){
+          return new quasiquotedExpr(isCons(sexp[1])? sexp[1].map(parseQqListItem) : sexp[1]);
+        }
       }
-      else if(isCons(sexp)) return sexp.map(parseQqListItem);
+      // otherwise, parse using standard behavior
+      if(isCons(sexp)) return sexp.map(parseQqListItem);
       else return sexp;
     }
     return new quasiquotedExpr(isCons(sexp[1])? sexp[1].map(parseQqListItem) : sexp[1]);
