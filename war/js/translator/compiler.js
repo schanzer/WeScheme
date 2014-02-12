@@ -262,38 +262,32 @@
  };
 
  // go through each item in search of unquote or unquoteSplice
- quasiquotedExpr.prototype.desugar = function(pinfo){
-    var depth = 1;
-    function desugarQqListItem(item){
- console.log(item);
-      // if it's unquotesplice, desugar the expr and include as-is
-      if(item instanceof unquoteSplice){
- console.log('saw unquote-splice. Val is '+item.val.toString());
-        depth--;
-        return item.val.desugar(pinfo)[0];
-      // if it's unquote, desugar the expr and wrap in a (list..)
-      } else if(item instanceof unquotedExpr){
- console.log('saw unquote');
-        depth--;
-        return new callExpr(new primop(new symbolExpr('list')), [item.val.desugar(pinfo)[0]]);
-      } else if(item instanceof quasiquotedExpr){
- console.log('saw quasiquote');
-        depth++;
-        //return item.desugar(pinfo)[0];
-        return new callExpr(new primop(new symbolExpr('list')), [desugarQqListItem(item.val)]);
-      // if it's an array, desugar it as a QQlist
-      }
-      if(item instanceof Array){
- console.log('saw sexp');
-        return new callExpr(new primop(new symbolExpr('list')), [item.map(desugarQqListItem)]);
-      // if it's just a val, return wrap it as a (list (quote ...))
+  quasiquotedExpr.prototype.desugar = function(pinfo){
+    function desugarQuasiQuotedElements(element) {
+      // console.log("a call");
+      // console.log(element);
+      if(element instanceof unquoteSplice){
+        return element.val.desugar(pinfo)[0];
+      } else if(element instanceof unquotedExpr){
+        return new callExpr(new primop(new symbolExpr('list')), [element.val.desugar(pinfo)[0]]);
+      } else if(element instanceof quasiquotedExpr){
+        /* we first must exit the regime of quasiquote by calling desugar on the
+         * list a la unquote or unquoteSplice */
+        throwError("ASSERT: we should never parse a quasiQuotedExpr within an existing quasiQuotedExpr")
+      } else if(element instanceof Array){
+        return new callExpr(new primop(new symbolExpr('list')),
+                            [new callExpr(new primop(new symbolExpr('append')),
+                                          element.map(desugarQuasiQuotedElements))]);
       } else {
-        return new callExpr(new primop(new symbolExpr('list')), [new quotedExpr(item.toString())]);
+        return new callExpr(new primop(new symbolExpr('list')),
+                            [new quotedExpr(element.toString())]);
       }
     }
+
     if(this.val instanceof Array){
-      var call_exp = new callExpr(new primop(new symbolExpr('append')), this.val.map(desugarQqListItem));
-      return [call_exp, pinfo];
+      var result = new callExpr(new primop(new symbolExpr('append')),
+                                this.val.map(desugarQuasiQuotedElements));
+      return [result, pinfo];
     } else {
       return [new quotedExpr(this.val.toString()), pinfo];
     }
