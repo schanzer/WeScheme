@@ -286,7 +286,7 @@
 
     if(this.val instanceof Array){
       var result = new callExpr(new primop(new symbolExpr('append')),
-                                this.val.map(desugarQuasiQuotedElements, []));
+                                this.val.map(desugarQuasiQuotedElements));
       return [result, pinfo];
     } else {
       return [new quotedExpr(this.val.toString()), pinfo];
