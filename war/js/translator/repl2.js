@@ -80,6 +80,8 @@ function readFromRepl(event) {
           program = ASTandPinfo[0],
           pinfo = ASTandPinfo[1];
       console.log(program);
+      console.log("pretty:");
+      console.log(program.join("\n"));
       console.log("pinfo:");
       console.log(pinfo);
     } catch (e) {

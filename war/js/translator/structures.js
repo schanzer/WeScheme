@@ -323,15 +323,29 @@ booleanExpr.prototype = heir(Program.prototype);
 function quotedExpr(val) {
   Program.call(this);
   this.val = val;
-  this.toString = function(){ return "'"+this.val.toString(); };
+  this.toString = function(){
+    if(this.val instanceof Array) return "'("+this.val.toString()+")";
+    else return "'"+this.val.toString();
+  };
 };
 quotedExpr.prototype = heir(Program.prototype);
+
+// unquoted expression
+function unquotedExpr(val) {
+  Program.call(this);
+  this.val = val;
+  this.toString = function(){ return ","+this.val.toString(); };
+};
+unquotedExpr.prototype = heir(Program.prototype);
 
 // quasiquoted expression
 function quasiquotedExpr(val) {
   Program.call(this);
   this.val = val;
-  this.toString = function(){ return "`"+this.val.toString(); };
+  this.toString = function(){
+    if(this.val instanceof Array) return "`("+this.val.toString()+")";
+    else return "`"+this.val.toString();
+  };
 };
 quasiquotedExpr.prototype = heir(Program.prototype);
 
@@ -339,7 +353,7 @@ quasiquotedExpr.prototype = heir(Program.prototype);
 function unquoteSplice(val) {
   Program.call(this);
   this.val = val;
-  this.toString = function(){ return "@"+this.val.toString();};
+  this.toString = function(){ return ",@"+this.val.toString();};
 };
 unquoteSplice.prototype = heir(Program.prototype);
 
@@ -912,7 +926,7 @@ function getTopLevelEnv(lang){
   // loop through known modules and see if we know this name
   compilerStructs.defaultModuleResolver = function(name){
     for(var i=0; i< knownModules.length; i++){
-      if(moduleBindingName(knownModules[i]) === name.val) return knownModules[i];
+//      if(moduleBindingName(knownModules[i]) === name.val) return knownModules[i];
     }
     return false;
   }
@@ -923,7 +937,7 @@ function getTopLevelEnv(lang){
     for(var i=0; i< knownModules.length; i++){
       if(modulePathEqual(modulePathJoin(parentPath, path)
                          , moduleBindingSource(knownModules[i]))){
-      return moduleBindingName(knownModules[i]);
+//      return moduleBindingName(knownModules[i]);
       }
     }
     if(path instanceof symbolExpr) return path;
@@ -960,9 +974,9 @@ function getTopLevelEnv(lang){
  
     // For the module system.
     // (module-name -> (module-binding | false))
-    this.moduleResolver = moduleResolver || new defaultModuleResolver();
+    this.moduleResolver = moduleResolver || compilerStructs.defaultModuleResolver;
     // (string module-path -> module-name)
-    this.modulePathResolver = modulePathResolver || defaultModulePathResolver();
+    this.modulePathResolver = modulePathResolver || compilerStructs.defaultModulePathResolver;
     // module-path
     this.currentModulePath = currentModulePath || defaultCurrentModulePath;
  
