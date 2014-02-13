@@ -109,12 +109,14 @@ goog.provide("plt.wescheme.RoundRobin");
     var tryServerN = function(n, countFailures, 
                               programName, code, 
                               onDone, onDoneError) {
+       // we test until there's a discrepancy
+       var TEST_LOCAL = true;
  
-       // try client-side parsing first, to see if we can avoid hitting the server altogether
+       // try client-side parsing first
        try{
-          var sexp, AST, ASTandPinfo, local_error;
+          var sexp, AST, ASTandPinfo, local_error=false;
           try { //////////////////// LEX ///////////////////
-            var sexp = lex(code);
+            var sexp = lex(code, programName);
           } catch(e) {
             console.log("LEXING ERROR");
             throw e;
@@ -152,16 +154,23 @@ goog.provide("plt.wescheme.RoundRobin");
             throw e;
           }
 */      } catch (e) {
+ // for now we merely parse and log the local error -- don't do anything with it (YET)!
           local_error = e;
-//          console.log(local_error);
-          onDoneError(local_error);
+//          onDoneError(local_error);
         }
-        // if all systems are go, hit the server
+        // hit the server
         if (n < liveServers.length) {
             liveServers[n].xhr.compileProgram(
                 programName,
                 code,
-                onDone,
+//                onDone,
+                function(bytecode){
+                    if(TEST_LOCAL && local_error){
+                      TEST_LOCAL = false; // turn off local testing
+                      logResults(code, JSON.stringify(local_error), "NO SERVER ERROR");
+                    }
+                    onDone(bytecode);
+                },
                 function(errorStruct) {
                     // If we get a 503, just try again.
                     if (errorStruct.status == 503) {
@@ -186,17 +195,15 @@ goog.provide("plt.wescheme.RoundRobin");
                                        onDone,
                                        onDoneError);
                         }
-                    } else {
-//                        console.log("SERVER ERROR:");
-//                        console.log(errorStruct.message);
-                        var local = JSON.parse(local_error)["structured-error"],
-                            server= JSON.parse(errorStruct.message)["structured-error"];
-//                                              console.log('comparing (local to server)');
-
-                        // remove extraneous spaces and force everything to lowercase
+                    } else if(TEST_LOCAL){
+                        if(!local_error){
+                          TEST_LOCAL = false; // turn off local testing
+                          logResults(code, "NO LOCAL ERROR", JSON.stringify(errorStruct.message));
+                        }
                         // if the results are different, we should log them to the server
-                        if(!sameResults(JSON.parse(local), JSON.parse(server))){
-                            logResults(code, JSON.stringify(local), JSON.stringify(server));
+                        if(!sameResults(JSON.parse(local_error), JSON.parse(errorStruct.message))){
+                            TEST_LOCAL = false; // turn off local testing
+                            logResults(code, JSON.stringify(local_error), JSON.stringify(errorStruct.message));
                         }
                         onDoneError(errorStruct.message);
                     }
@@ -206,7 +213,7 @@ goog.provide("plt.wescheme.RoundRobin");
         }
     };
  
-    // differentResults : local server -> boolean
+    // sameResults : local server -> boolean
     // if there's a difference, log a diff to the form and return false
     // credit to: http://stackoverflow.com/questions/1068834/object-comparison-in-javascript
     function sameResults(x, y){
@@ -223,49 +230,54 @@ goog.provide("plt.wescheme.RoundRobin");
             server= (y instanceof Object)? alphabetizeObject(y) : y.toString();
         document.getElementById('diffString').value = "LOCAL: "+local+"\nSERVER: "+server;
         return false;
-       }
+      }
  
-       // if both x and y are null or undefined and exactly the same
-       if (x === y) return true;
+      // if both x and y are null or undefined and exactly the same
+      if (x === y) return true;
 
-       // if they are not strictly equal, they both need to be Objects
-       if ( !(x instanceof Object) || !(y instanceof Object) ) return saveDiffAndReturn(x,y);
+      // if they are not strictly equal, they both need to be Objects
+      if ( !(x instanceof Object) || !(y instanceof Object) ) return saveDiffAndReturn(x,y);
  
-       // if both are Locations, we only care about offset and span, so perform a weak comparison
-       if ( x.hasOwnProperty('offset') && y.hasOwnProperty('offset') ){
+      // if both are Locations, we only care about offset and span, so perform a weak comparison
+      if ( x.hasOwnProperty('offset') && y.hasOwnProperty('offset') ){
           return ( (x.span === y.span) && (x.offset === y.offset) )? true : saveDiffAndReturn(x,y);
-       }
+      }
  
-       // does every property in x also exist in y?
-       for (var p in x) {
+      // does every property in x also exist in y?
+      for (var p in x) {
+
           // empty fields can be safely removed
           if(x[p] === ""){ delete x[p]; continue; }
           // allows to compare x[ p ] and y[ p ] when set to undefined
           if ( ! x.hasOwnProperty(p) ) return saveDiffAndReturn(p+":undefined",y[p]);
           if ( ! y.hasOwnProperty(p) ) return saveDiffAndReturn(x[p],p+":undefined");
-          // if they have the same strict value or identity then they are equal
-          if ( x[p] === y[p] ) continue;
-          // Numbers, Strings, Functions, Booleans must be strictly equal
-          if ( typeof(x[p]) !== "object" ) return saveDiffAndReturn(x,y);
-
-          // Objects and Arrays must be tested recursively
-          if ( !sameResults(x[p],  y[p]) ) return false;
-       }
+          // Is this value actually an object? Objects and Arrays must be tested recursively
+          try{
+            var xObject = JSON.parse(x[p]), yObject = JSON.parse(y[p]);
+            if ( !sameResults(alphabetizeObject(xObject), alphabetizeObject(yObject)) ) return false;
+          } catch(e) {
+            // if they have the same strict value or identity then they are equal
+            if ( x[p] === y[p] ) continue;
+            // Numbers, Strings, Functions, Booleans must be strictly equal
+            if ( typeof(x[p]) !== "object" ) return saveDiffAndReturn(x,y);
+            if ( !sameResults(x[p],  y[p]) ) return false;
+          }
+      }
        
-       for (p in y) {
+      for (p in y) {
           // empty fields can be safely removed
           if(y[p] === ""){ delete y[p]; continue; }
  
           // allows x[ p ] to be set to undefined
           if ( y.hasOwnProperty(p) && !x.hasOwnProperty(p) ) return saveDiffAndReturn(p+":undefined",y[p]);
-       }
-       return true;
+      }
+      return true;
     }
  
     // logResults : code local server -> void
     // send code, local error and server error to a Google spreadsheet
     function logResults(code, local, server){
-      console.log('silently logging anonymized error message to GDocs');
+      console.log('Error messages differed. Logging anonymized error message to GDocs');
       document.getElementById('expr').value = code;
       document.getElementById('local').value = local.replace(/\s+/,"").toLowerCase();
       document.getElementById('server').value = server.replace(/\s+/,"").toLowerCase();
@@ -293,7 +305,7 @@ goog.provide("plt.wescheme.RoundRobin");
 
                 return onDone.apply(null, arguments);
             };
-            
+            // run the cached bytecode from previous compilation
             if ((programName === lastCompiledName) &&
                 (code === lastCompiledCode)) {
                 return onDone.apply(null, lastCompiledResult);

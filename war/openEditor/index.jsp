@@ -449,7 +449,7 @@
 <textarea name="entry.1936827156" id="expr"/>default_code</textarea>
 <textarea name="entry.1976503423" id="local">default_localError</textarea>
 <textarea name="entry.224419714" id="server">default_serverError</textarea>
-<textarea name="entry.234335861" id="diffString">no difference found</textarea>
+<textarea name="entry.234335861" id="diffString"></textarea>
 <input type="button" value="Submit" class="submit"/>
 </form>
 
