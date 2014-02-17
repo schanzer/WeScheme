@@ -56,45 +56,75 @@ function readFromRepl(event) {
     var progres;
     try {
       console.log("// LEXING: ///////////////////////////////////\nraw:");
-      sexp = lex(aSource);
+      var start = new Date().getTime(),
+          sexp = lex(aSource),
+          end = new Date().getTime(),
+          lexTime = Math.floor(end-start);
       console.log(sexp);
-      console.log("pretty:\n"+sexpToString(sexp));
+      console.log("Lexed in "+lexTime+"ms. Lexed as:\n"+sexpToString(sexp));
     } catch (e) {
+      if(e instanceof unimplementedException){throw e.str + " NOT IMPLEMENTED";}
       console.log(e);
       console.log(JSON.parse(JSON.parse(e)['structured-error']).message);
       throw Error("LEXING ERROR\n"+e.toString());
     }
     try {
       console.log("// PARSING: //////////////////////////////////\nraw:");
-      var AST = parse(sexp);
+      var start = new Date().getTime(),
+          AST = parse(sexp);
+          end = new Date().getTime(),
+          parseTime = Math.floor(end-start);
       console.log(AST);
-      console.log("pretty:");
-      console.log(AST.join("\n"));
+      console.log("Parsed in "+parseTime+"ms. Parsed as:\n"+AST.join("\n"));
     } catch (e) {
+      if(e instanceof unimplementedException){throw e.str + " NOT IMPLEMENTED";}
       console.log(JSON.parse(JSON.parse(e)['structured-error']).message);
       throw Error("PARSING ERROR\n"+e);
     }
     try {
       console.log("// DESUGARING: //////////////////////////////\nraw");
-      var ASTandPinfo = desugar(AST),
+      var start = new Date().getTime(),
+          ASTandPinfo = desugar(AST),
           program = ASTandPinfo[0],
-          pinfo = ASTandPinfo[1];
+          pinfo = ASTandPinfo[1],
+          end = new Date().getTime(),
+          desugarTime = Math.floor(end-start);
       console.log(program);
-      console.log("pretty:");
-      console.log(program.join("\n"));
+      console.log("Desugared in "+desugarTime+"ms. Desugared to:\n"+program.join("\n"));
       console.log("pinfo:");
       console.log(pinfo);
     } catch (e) {
+      if(e instanceof unimplementedException){ throw e.str + " NOT IMPLEMENTED";}
       console.log(JSON.parse(JSON.parse(e)['structured-error']).message);
       throw Error("DESUGARING ERROR\n"+e);
     }
     try {
       console.log("// ANALYSIS: //////////////////////////////\n");
+      var start = new Date().getTime();
       window.pinfo = analyze(program);
-      console.log("pinfo (bound to window.pinfo):");
+      var end = new Date().getTime(),
+      analysisTime = Math.floor(end-start);
+      console.log("Analyzed in "+analysisTime+"ms. pinfo bound to window.pinfo");
     } catch (e) {
+      if(e instanceof unimplementedException){throw e.str + " NOT IMPLEMENTED";}
       throw Error("ANALYSIS ERROR\n"+e);
     }
+    try {
+      console.log("// COMPILATION: //////////////////////////////\n");
+      var start = new Date().getTime();
+      window.pinfo = compile(program, pinfo);
+      var end = new Date().getTime(),
+      compileTime = Math.floor(end-start);
+      console.log("Compiled in "+compileTime+"ms");
+    } catch (e) {
+      if(e instanceof unimplementedException){throw e.str + " NOT IMPLEMENTED";}
+      throw Error("COMPILATION ERROR\n"+e);
+    }
+    console.log("// SUMMARY: /////////////////////////////////\n"
+                + "Lexing:     " + lexTime    + "ms\nParsing:    " + parseTime + "ms\n"
+                + "Desugaring: " + desugarTime + "ms\nAnalysis:   " + analysisTime + "ms\n"
+                + "TOTAL:      " + (lexTime+parseTime+desugarTime+analysisTime)+"ms");
+    
     
 /*    try {
       var program = compile(AST);

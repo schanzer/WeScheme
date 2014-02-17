@@ -2,6 +2,11 @@
 /////////////////// COMMON FUNCTIONS AND STRUCTURES //////////////////////////
 //////////////// used by multiple phases of the compiler/////////////////////
 
+
+var unimplementedException = function(str){
+  this.str = str;
+}
+
 // checkDuplicateIdentifiers : [listof SymbolExprs], Program -> Void
 // sort the array, and throw errors for non-symbols, keywords or duplicates
 function checkDuplicateIdentifiers(lst, caller){

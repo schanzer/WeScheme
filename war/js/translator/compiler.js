@@ -264,8 +264,6 @@
  // go through each item in search of unquote or unquoteSplice
   quasiquotedExpr.prototype.desugar = function(pinfo){
     function desugarQuasiQuotedElements(element) {
-      // console.log("a call");
-      // console.log(element);
       if(element instanceof unquoteSplice){
         return element.val.desugar(pinfo)[0];
       } else if(element instanceof unquotedExpr){
@@ -320,7 +318,9 @@
       return pinfo.accumulateDefinedBinding(binding, pinfo, that.location);
     }, pinfo);
  };
- defStruct.prototype.collectDefinitions = function(pinfo){
+/* THIS SHOULD BE DEAD CODE
+ ******************************************
+  defStruct.prototype.collectDefinitions = function(pinfo){
     var id = this.id.toString(),
         fields = this.fields.map(function(f){return f.toString();}),
         loc = id.location,
@@ -339,6 +339,7 @@
         bindings = [structure, constructor, predicate].concat(selectors, mutators);
     return pinfo.accumulateDefinedBindings(bindings, pinfo, this.location);
  };
+ */
  // When we hit a require, we have to extend our environment to include the list of module
  // bindings provided by that module.
  requireExpr.prototype.collectDefinitions = function(pinfo){
@@ -378,7 +379,7 @@
  
  // BINDING STRUCTS ///////////////////////////////////////////////////////
  function provideBindingId(symbl){ this.symbl = symbl;}
- function provideBindingStructId(symbl){ this.symbl = symbl;}
+ function provideBindingStructId(symbl){ this.symbl = symbl; }
 
  //////////////////////////////////////////////////////////////////////////////
  // COLLECT PROVIDES //////////////////////////////////////////////////////////
@@ -393,6 +394,7 @@
     // collectProvidesFromClause : pinfo clause -> pinfo
     function collectProvidesFromClause(pinfo, clause){
       // if it's a symbol, make sure it's defined (otherwise error)
+// console.log('collecting from '+clause.toString());
       if (clause instanceof symbolExpr){
         if(pinfo.definedNames.containsKey(clause.val)){
           pinfo.providedNames.put(clause.val, new provideBindingId(clause));
@@ -406,9 +408,12 @@
       // if it's an array, make sure the struct is defined (otherwise error)
       // NOTE: ONLY (struct-out id) IS SUPPORTED AT THIS TIME
       } else if(clause instanceof Array){
+// console.log(pinfo.definedNames.get(clause[1].val));
           if(pinfo.definedNames.containsKey(clause[1].val) &&
              (pinfo.definedNames.get(clause[1].val) instanceof bindingStructure)){
-              var b = new provideBindingStructId(clause[1]);
+              // add the entire bindingStructure to the provided binding, so we
+              // can access fieldnames, predicates, and permissions later
+              var b = new provideBindingStructId(clause[1], pinfo.definedNames.get(clause[1].val));
               pinfo.providedNames.put(clause.val, b);
               return pinfo;
           } else {
@@ -501,7 +506,7 @@
  
  // override these functions for Programs that require it
  defFunc.prototype.compile = function(env, pinfo){
-    throw "not implemented";
+  throw new unimplementedException("defFunc.compile");
   /*    var compiledNameAndPinfo = compileExpression(this.name, env, pinfo),
           compiledName = compiledNameAndPinfo[0],
           pinfo = compiledNameAndPinfo[1];
@@ -514,7 +519,7 @@
  };
  
  defVar.prototype.compile = function(env, pinfo){
-   throw "not implemented";
+  throw new unimplementedException("defVar.compile");
    /*    var compiledIdAndPinfo = compileExpression(this.name, env, pinfo),
     compiledId = compiledExpressionAndPinfo[0],
     pinfo = compiledExpressionAndPinfo[1];
@@ -527,7 +532,7 @@
  };
 
  defVars.prototype.compile = function(env, pinfo){
-    throw "not implemented";
+  throw new unimplementedException("defVars.compile");
   /*    var compiledIdsAndPinfo = compileExpression(this.names, env, pinfo),
           compiledIds = compiledIdsAndPinfo[0],
           pinfo = compiledIdsAndPinfo[1];
@@ -540,7 +545,7 @@
  };
  
  beginExpr.prototype.compile = function(env, pinfo){
-    throw "not implemented";
+  throw new unimplementedException("beginExpr.compile");
   /*    var compiledExpressionsAndPinfo = compileExpressions(this.exprs, env, pinfo),
           compiledExpressions = compiledExpressionsAndPinfo[0],
           pinfo1 = compiledExpressionsAndPinfo[1];
@@ -552,7 +557,7 @@
  // Compile a lambda expression.  The lambda must close its free variables over the
  // environment.
  lambdaExpr.prototype.compile = function(env, pinfo){
-    throw "not implemented";
+  throw new unimplementedException("lambdaExpr.compile");
   /*    var freeVars = freeVariables(this.body,
                                foldl( (function(variable env){return env.push(variable)})
                                      , emptyEnv
@@ -577,15 +582,15 @@
  };
  
  localExpr.prototype.compile = function(env, pinfo){
-    throw "compiling locals is not implemented";
+  throw new unimplementedException("localExpr.compile");
  };
  
  callExpr.prototype.compile = function(env, pinfo){
-    throw "compiling calls is not implemented";
+  throw new unimplementedException("callExpr.compile");
  };
  
  ifExpr.prototype.compile = function(env, pinfo){
-    throw "not implemented";
+  throw new unimplementedException("ifExpr.compile");
   /*    var compiledPredicateAndPinfo = this.predicate.compile(env, pinfo),
           compiledPredicate = compiledPredicateAndPinfo[0],
           pinfo = compiledPredicateAndPinfo[1];
@@ -601,7 +606,7 @@
  };
  
  symbolExpr.prototype.compile = function(env, pinfo){
-    throw "not implemented";
+  throw new unimplementedException("symbolExpr.compile");
   /*    var stackReference = envLookup(env, expr.val), bytecode;
       if(stackReference instanceof localStackRef){
         bytecode = bcode:make-localref(localStackRef.boxed, localStackRef.depth, false, false, false);
@@ -617,9 +622,9 @@
  listExpr.prototype.compile = function(env, pinfo){}
  quotedExpr.prototype.compile = function(env, pinfo){}
  primop.prototype.compile = function(env, pinfo){}
- quasiquotedExpr.prototype.compile = function(env, pinfo){}
  requireExpr.prototype.compile = function(pinfo){};
  provideStatement.prototype.compile = function(env, pinfo){};
+ quasiquotedExpr.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: quasiqoutedExpr should have been desugared"; }
  defStruct.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: define-struct should have been desugared"; };
  letStarExpr.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: letrec should have been desugared"; };
  letExpr.prototype.compile = function(env, pinfo){ throw "IMPOSSIBLE: let should have been desugared"; };
@@ -642,7 +647,7 @@
      // FIXME: this does not yet say anything if a definition is introduced twice
      // in the same lexical scope.  We must do this error check!
      return programs.reduce((function(pinfo, p){
-                             console.log('collecting definitions for '+p);
+//                             console.log('collecting definitions for '+p);
                              return p.collectDefinitions(pinfo);
                              })
                             , pinfo);
@@ -673,25 +678,20 @@
  
  // compile-compilation-top: program pinfo -> bytecode
  function compile(program, pinfo){
-    // desugaring pass
-    var programAndPinfo = desugar(program, pinfo),
-        program = programAndPinfo[0],
-        pinfo = programAndPinfo[1];
-    // analysis pass
-    var pinfo = programAnalyzeWithPinfo(program, pinfo);
-
+ 
+    throw new unimplementedException("top-level compile");
+ 
     // The toplevel is going to include all of the defined identifiers in the pinfo
     // The environment will refer to elements in the toplevel.
     var toplevelPrefixAndEnv = makeModulePrefixAndEnv(pinfo),
         toplevelPrefix = toplevelPrefixAndEnv[0],
         env = toplevelPrefixAndEnv[1];
-   
+ 
     // pull out separate program components for ordered compilation
     var defns    = program.filter(isDefinition),
         requires = program.filter((function(p){return (p instanceof requireExpr);})),
         provides = program.filter((function(p){return (p instanceof provideStatement);})),
         exprs    = program.filter(isExpression);
- 
     // [bytecodes, pinfo, env?] Program -> [bytecodes, pinfo]
     // compile the program, then add the bytecodes and pinfo information to the acc
     function compileAndCollect(acc, p){

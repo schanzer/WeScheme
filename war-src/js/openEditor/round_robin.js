@@ -114,31 +114,41 @@ goog.provide("plt.wescheme.RoundRobin");
  
        // try client-side parsing first
        try{
-          var sexp, AST, ASTandPinfo, local_error=false;
+          var sexp, AST, ASTandPinfo, local_error = false;
           try { //////////////////// LEX ///////////////////
-            var sexp = lex(code, programName);
+            console.log("// LEXING: ///////////////////////////////////\nraw:");
+            var start = new Date().getTime(),
+                sexp = lex(code, programName),
+                end = new Date().getTime(),
+                lexTime = Math.floor(end-start);
+            console.log(sexp);
+            console.log("Lexed in "+lexTime+"ms. Lexed as:\n"+sexp.map(sexpToString).join(" "));
           } catch(e) {
             console.log("LEXING ERROR");
             throw e;
           }
-          console.log("LEXER OUTPUT (raw and prettyprinted):");
-          console.log(sexp);
-          console.log(sexp.map(sexpToString).join(" "));
           try{ //////////////////// PARSE ///////////////////
-            var AST = parse(sexp);
+            console.log("// PARSING: //////////////////////////////////\nraw:");
+            var start = new Date().getTime(),
+                AST = parse(sexp);
+                end = new Date().getTime();
+            var parseTime = Math.floor(end - start);
+            console.log(AST);
+            console.log("Parsed in "+parseTime+"ms. Parsed as:\n"+(AST.join("\n")));
           } catch(e) {
             console.log("PARSING ERROR");
             throw e;
           }
-          console.log("PARSER OUTPUT (raw and prettyprinted):");
-          console.log(AST);
-          console.log(AST.join("\n"));
-/*          try { ////////////////// DESUGAR /////////////////////
-            var ASTandPinfo = desugar(AST),
-                program = ASTandPinfo[0],
-                pinfo = ASTandPinfo[1];
+          try { ////////////////// DESUGAR /////////////////////
             console.log("// DESUGARING: //////////////////////////////\nraw");
+            var start = new Date().getTime(),
+                ASTandPinfo = desugar(AST),
+                program = ASTandPinfo[0],
+                pinfo = ASTandPinfo[1],
+                end = new Date().getTime(),
+                desugarTime = Math.floor(end-start);
             console.log(program);
+            console.log("Desugared in "+desugarTime+"ms. Desugared to:\n"+program.join("\n"));
             console.log("pinfo:");
             console.log(pinfo);
           } catch (e) {
@@ -146,25 +156,36 @@ goog.provide("plt.wescheme.RoundRobin");
             throw e;
           }
           try {
+            console.log("// ANALYSIS: //////////////////////////////\n");
+            var start = new Date().getTime();
             window.pinfo = analyze(program);
-            console.log("// ANALYSIS: //////////////////////////////\nraw");
-            console.log("pinfo (bound to window.pinfo):");
+            var end = new Date().getTime(),
+            analysisTime = Math.floor(end-start);
+            console.log("Analyzed in "+analysisTime+"ms. pinfo bound to window.pinfo");
           } catch (e) {
             console.log("ANALYSIS ERROR");
             throw e;
           }
-*/      } catch (e) {
+          console.log("// SUMMARY: /////////////////////////////////\n"
+                      + "Lexing:     " + lexTime    + "ms\nParsing:    " + parseTime + "ms\n"
+                      + "Desugaring: " + desugarTime + "ms\nAnalysis:   " + analysisTime + "ms\n"
+                      + "TOTAL:      " + (lexTime+parseTime+desugarTime+analysisTime)+"ms");
+      } catch (e) {
  // for now we merely parse and log the local error -- don't do anything with it (YET)!
           local_error = e;
 //          onDoneError(local_error);
-        }
+      }
         // hit the server
+        var start = new Date().getTime();
         if (n < liveServers.length) {
             liveServers[n].xhr.compileProgram(
                 programName,
                 code,
 //                onDone,
                 function(bytecode){
+                    var end = new Date().getTime(),
+                        serverTime = Math.floor(end-start);
+                    console.log("Server round-trip in "+serverTime+"ms");
                     if(TEST_LOCAL && local_error){
                       TEST_LOCAL = false; // turn off local testing
                       logResults(code, JSON.stringify(local_error), "NO SERVER ERROR");
@@ -172,6 +193,9 @@ goog.provide("plt.wescheme.RoundRobin");
                     onDone(bytecode);
                 },
                 function(errorStruct) {
+                    var end = new Date().getTime(),
+                        serverTime = Math.floor(end-start);
+                    console.log("Server round-trip in "+serverTime+"ms");
                     // If we get a 503, just try again.
                     if (errorStruct.status == 503) {
                         tryServerN(n,
