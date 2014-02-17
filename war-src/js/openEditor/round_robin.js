@@ -114,16 +114,19 @@ goog.provide("plt.wescheme.RoundRobin");
  
        // try client-side parsing first
        try{
-          var sexp, AST, ASTandPinfo, local_error = false;
+          var sexp, AST, ASTandPinfo, local_error = false,
+              lexTime = 0, parseTime = 0, desugarTime = 0, analysisTime = 0;
           try { //////////////////// LEX ///////////////////
             console.log("// LEXING: ///////////////////////////////////\nraw:");
             var start = new Date().getTime(),
                 sexp = lex(code, programName),
-                end = new Date().getTime(),
-                lexTime = Math.floor(end-start);
+                end = new Date().getTime();
+            lexTime = Math.floor(end-start);
             console.log(sexp);
-            console.log("Lexed in "+lexTime+"ms. Lexed as:\n"+sexp.map(sexpToString).join(" "));
+            console.log("Lexed in "+lexTime+"ms");
           } catch(e) {
+            var end = new Date().getTime();
+                lexTime = Math.floor(end-start);
             console.log("LEXING ERROR");
             throw e;
           }
@@ -132,10 +135,12 @@ goog.provide("plt.wescheme.RoundRobin");
             var start = new Date().getTime(),
                 AST = parse(sexp);
                 end = new Date().getTime();
-            var parseTime = Math.floor(end - start);
+            parseTime = Math.floor(end - start);
             console.log(AST);
-            console.log("Parsed in "+parseTime+"ms. Parsed as:\n"+(AST.join("\n")));
+            console.log("Parsed in "+parseTime+"ms");
           } catch(e) {
+            var end = new Date().getTime();
+            parseTime = Math.floor(end - start);
             console.log("PARSING ERROR");
             throw e;
           }
@@ -145,13 +150,15 @@ goog.provide("plt.wescheme.RoundRobin");
                 ASTandPinfo = desugar(AST),
                 program = ASTandPinfo[0],
                 pinfo = ASTandPinfo[1],
-                end = new Date().getTime(),
-                desugarTime = Math.floor(end-start);
+                end = new Date().getTime();
+            desugarTime = Math.floor(end-start);
             console.log(program);
-            console.log("Desugared in "+desugarTime+"ms. Desugared to:\n"+program.join("\n"));
+            console.log("Desugared in "+desugarTime+"ms");
             console.log("pinfo:");
             console.log(pinfo);
           } catch (e) {
+            var end = new Date().getTime();
+            desugarTime = Math.floor(end-start);
             console.log("DESUGARING ERROR");
             throw e;
           }
@@ -163,18 +170,20 @@ goog.provide("plt.wescheme.RoundRobin");
             analysisTime = Math.floor(end-start);
             console.log("Analyzed in "+analysisTime+"ms. pinfo bound to window.pinfo");
           } catch (e) {
+            var end = new Date().getTime(),
+            analysisTime = Math.floor(end-start);
             console.log("ANALYSIS ERROR");
             throw e;
           }
-          console.log("// SUMMARY: /////////////////////////////////\n"
-                      + "Lexing:     " + lexTime    + "ms\nParsing:    " + parseTime + "ms\n"
-                      + "Desugaring: " + desugarTime + "ms\nAnalysis:   " + analysisTime + "ms\n"
-                      + "TOTAL:      " + (lexTime+parseTime+desugarTime+analysisTime)+"ms");
       } catch (e) {
  // for now we merely parse and log the local error -- don't do anything with it (YET)!
           local_error = e;
 //          onDoneError(local_error);
       }
+ console.log("// SUMMARY: /////////////////////////////////\n"
+             + "Lexing:     " + lexTime    + "ms\nParsing:    " + parseTime + "ms\n"
+             + "Desugaring: " + desugarTime + "ms\nAnalysis:   " + analysisTime + "ms\n"
+             + "TOTAL:      " + (lexTime+parseTime+desugarTime+analysisTime)+"ms");
         // hit the server
         var start = new Date().getTime();
         if (n < liveServers.length) {
