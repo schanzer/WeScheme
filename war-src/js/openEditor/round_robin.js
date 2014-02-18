@@ -180,10 +180,11 @@ goog.provide("plt.wescheme.RoundRobin");
           local_error = e;
 //          onDoneError(local_error);
       }
+ var localTime = lexTime+parseTime+desugarTime+analysisTime;
  console.log("// SUMMARY: /////////////////////////////////\n"
              + "Lexing:     " + lexTime    + "ms\nParsing:    " + parseTime + "ms\n"
              + "Desugaring: " + desugarTime + "ms\nAnalysis:   " + analysisTime + "ms\n"
-             + "TOTAL:      " + (lexTime+parseTime+desugarTime+analysisTime)+"ms");
+             + "TOTAL:      " + localTime +"ms");
         // hit the server
         var start = new Date().getTime();
         if (n < liveServers.length) {
@@ -193,8 +194,9 @@ goog.provide("plt.wescheme.RoundRobin");
 //                onDone,
                 function(bytecode){
                     var end = new Date().getTime(),
-                        serverTime = Math.floor(end-start);
-                    console.log("Server round-trip in "+serverTime+"ms");
+                        serverTime = Math.floor(end-start),
+                        factor =  Math.ceil(100*serverTime/localTime)/100;
+                    console.log("Server round-trip in "+serverTime+"ms. Local compilation was "+factor+"x faster");
                     if(TEST_LOCAL && local_error){
                       TEST_LOCAL = false; // turn off local testing
                       logResults(code, JSON.stringify(local_error), "NO SERVER ERROR");
@@ -203,8 +205,9 @@ goog.provide("plt.wescheme.RoundRobin");
                 },
                 function(errorStruct) {
                     var end = new Date().getTime(),
-                        serverTime = Math.floor(end-start);
-                    console.log("Server round-trip in "+serverTime+"ms");
+                        serverTime = Math.floor(end-start),
+                        factor =  Math.ceil(100*serverTime/localTime)/100;
+                    console.log("Server round-trip in "+serverTime+"ms. Local compilation was "+factor+"x faster");
                     // If we get a 503, just try again.
                     if (errorStruct.status == 503) {
                         tryServerN(n,
